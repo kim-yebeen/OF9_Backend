@@ -94,7 +94,7 @@ public class InitialScheduleCrawlRunner implements CommandLineRunner {
                     String dbDateStr = selectedYear + selectedMonth + dayPart;
                     LocalDate gameDate = LocalDate.parse(dbDateStr, dbFormatter);
 
-                    String gameId = dbDateStr + getTeamCode(homeTeam) + getTeamCode(awayTeam) + "0";
+                    String gameId = dbDateStr + getTeamCode(awayTeam) + getTeamCode(homeTeam) + "0";
 
                     Game game = new Game();
                     game.setGameId(gameId);
@@ -125,10 +125,10 @@ public class InitialScheduleCrawlRunner implements CommandLineRunner {
 
     private static String getTeamCode(String teamName) {
         switch (teamName) {
-            case "두산": return "DS";
+            case "두산": return "OB";
             case "NC": return "NC";
             case "KT": return "KT";
-            case "KIA": return "KIA";
+            case "KIA": return "HT";
             case "한화": return "HH";
             case "LG": return "LG";
             case "키움": return "WO";
