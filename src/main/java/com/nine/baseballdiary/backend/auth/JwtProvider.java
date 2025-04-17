@@ -9,17 +9,32 @@ import java.util.Date;
 
 @Component
 public class JwtProvider {
+
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpirationInMs;
+    @Value("${jwt.access-expiration}")
+    private long accessExpirationInMs;
 
-    public String createToken(String userId) {
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpirationInMs;
+
+    public String createAccessToken(String subject) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Date expiryDate = new Date(now.getTime() + accessExpirationInMs);
         return Jwts.builder()
-                .setSubject(userId)
+                .setSubject(subject)
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .compact();
+    }
+
+    public String createRefreshToken(String subject) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + refreshExpirationInMs);
+        return Jwts.builder()
+                .setSubject(subject)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)

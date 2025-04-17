@@ -1,17 +1,19 @@
+// src/main/java/com/nine/baseballdiary/backend/auth/AuthResponse.java
 package com.nine.baseballdiary.backend.auth;
 
 public class AuthResponse {
-    private Long userId;
-    private String nickname;
-    private String token;
+    private String accessToken;
+    private String refreshToken;
 
-    public AuthResponse(Long userId, String nickname, String token) {
-        this.userId = userId;
-        this.nickname = nickname;
-        this.token = token;
+    public AuthResponse(String accessToken, String refreshToken) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
     }
 
-    public Long getUserId() { return userId; }
-    public String getNickname() { return nickname; }
-    public String getToken() { return token; }
+    public String getAccessToken() {
+        return accessToken;
+    }
+    public String getRefreshToken() {
+        return refreshToken;
+    }
 }
