@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS record (
     record_id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     game_id VARCHAR REFERENCES game(game_id),
-    ticket_image_url TEXT,
     seat_info VARCHAR(100),
     comment TEXT,
     emotion_emoji VARCHAR(20),
