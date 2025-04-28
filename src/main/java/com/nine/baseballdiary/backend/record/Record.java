@@ -2,58 +2,55 @@ package com.nine.baseballdiary.backend.record;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Entity
 @Table(name = "record")
-@Getter @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Record {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer recordId;
 
+    // JWT에서 추출한 사용자 ID
     @Column(nullable = false)
     private Integer userId;
 
+    // KBO game 테이블의 PK (예: "20250401DSNC0")
     @Column(nullable = false)
-    private String gameId;       // FK to game.game_id
+    private String gameId;
 
-    //OCR 로 추출되거나 사용자가 수정할 수 있는 경기 일자/팀/시간 정보
-    private String gameDate;     // "2025-07-01" 형태
+    // OCR로 추출 또는 사용자가 보정하는 경기 정보
+    private LocalDate gameDate;
     private String homeTeam;
     private String awayTeam;
-    private String startTime;    // "14:00"
+    private LocalTime startTime;
 
-    // 업로드 된 티켓 이미지 URL
-    private String ticketImageUrl;
-    //좌석 정보
+    // 좌석 정보 (옵셔널)
     private String seatInfo;
 
-    private String comment;
+    // 세부 입력 (emotionEmoji는 필수)
+    @Column(nullable = false)
     private String emotionEmoji;
+    private String comment;
     private String bestPlayer;
 
-    //복수 먹거리 태그
     @ElementCollection
     @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "tag")
     private List<String> foodTags;
 
-    //복수 미디어 URL
     @ElementCollection
     @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "url")
     private List<String> mediaUrls;
 
-    // 경기 결과
-    private String result;   // WIN / LOSE / DRAW
+    private String result;      // WIN / LOSE / DRAW
 
-    // 초기 상태, 완료 상태
     @Column(nullable = false)
     private String status = "DRAFT";
 

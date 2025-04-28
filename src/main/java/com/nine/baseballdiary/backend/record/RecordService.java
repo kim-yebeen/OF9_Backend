@@ -1,109 +1,102 @@
 package com.nine.baseballdiary.backend.record;
 
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.transaction.Transactional;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Service
+@RequiredArgsConstructor
 public class RecordService {
 
     private final RecordRepository repo;
 
-    @Value("${app.upload.dir}") // application.properties에 설정 필요
-    private String uploadDir;
-
-    public RecordService(RecordRepository repo) {
-        this.repo = repo;
-    }
-
+    /**
+     * 1) Draft 생성 (OCR 결과를 클라이언트가 보내온 그대로 저장)
+     */
     @Transactional
-    public UploadRecordResponse uploadTicket(Integer userId, MultipartFile file) throws IOException {
-        // 1) 파일 저장
-        String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path target = Paths.get(uploadDir).resolve(filename);
-        Files.createDirectories(target.getParent());
-        file.transferTo(target.toFile());
-        String imageUrl = "/uploads/" + filename; // 실제 URL 매핑 필요
-
-        // 2) OCR 처리
-
-        // 3) DB 저장 OCR 추출값이 준비되면 값을 set,없으면 null
+    public RecordResponse createDraft(Integer userId, CreateDraftRequest req) {
         Record r = Record.builder()
                 .userId(userId)
-                .gameId(null)              // 게임아이디도 OCR 후 생성 or UpdateDraft 에서 생성
-                .ticketImageUrl(imageUrl)
-                .gameDate(null)
-                .homeTeam(null)
-                .awayTeam(null)
-                .startTime(null)
-                .seatInfo(null)
+                .gameId(req.getGameId())
+                .gameDate(LocalDate.parse(req.getGameDate()))
+                .homeTeam(req.getHomeTeam())
+                .awayTeam(req.getAwayTeam())
+                .startTime(LocalTime.parse(req.getStartTime()))
+                .seatInfo(req.getSeatInfo())
+                .status("DRAFT")
                 .build();
 
         r = repo.save(r);
-
-        return new UploadRecordResponse(
-                r.getRecordId(),
-                r.getTicketImageUrl(),
-                r.getGameDate(),
-                r.getHomeTeam(),
-                r.getAwayTeam(),
-                r.getStartTime(),
-                r.getSeatInfo()
-        );
+        return toResponse(r);
     }
 
+    /**
+     * 2) Draft 조회
+     */
     public RecordResponse getRecord(Integer id) {
-        Record r = repo.findById(id).orElseThrow();
-        return new RecordResponse(
-                r.getRecordId(),
-                r.getTicketImageUrl(),
-                r.getGameDate(), r.getHomeTeam(), r.getAwayTeam(),
-                r.getStartTime(), r.getSeatInfo(),
-                r.getEmotionEmoji(), r.getComment(), r.getBestPlayer(),
-                r.getFoodTags(), r.getMediaUrls(),
-                r.getResult(), r.getStatus(),
-                r.getCreatedAt(), r.getUpdatedAt()
-        );
+        return repo.findById(id)
+                .map(this::toResponse)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 recordId: " + id));
     }
 
+    /**
+     * 3) Draft 보정 (optional 필드만 업데이트)
+     */
     @Transactional
     public RecordResponse updateDraft(Integer id, UpdateDraftRequest req) {
         Record r = repo.findById(id).orElseThrow();
-        Optional.ofNullable(req.getGameDate()).ifPresent(r::setGameDate);
-        Optional.ofNullable(req.getStartTime()).ifPresent(r::setStartTime);
-        Optional.ofNullable(req.getSeatInfo()).ifPresent(r::setSeatInfo);
-        // status stays DRAFT
+        if (req.getGameDate()   != null) r.setGameDate(LocalDate.parse(req.getGameDate()));
+        if (req.getHomeTeam()   != null) r.setHomeTeam(req.getHomeTeam());
+        if (req.getAwayTeam()   != null) r.setAwayTeam(req.getAwayTeam());
+        if (req.getStartTime()  != null) r.setStartTime(LocalTime.parse(req.getStartTime()));
+        if (req.getSeatInfo()   != null) r.setSeatInfo(req.getSeatInfo());
+
         r = repo.save(r);
-        return getRecord(id);
+        return toResponse(r);
     }
 
+    /**
+     * 4) 세부 입력 저장 → emotionEmoji 없으면 예외, status=COMPLETED
+     */
     @Transactional
     public RecordResponse completeDetail(Integer id, CreateDetailRequest req) {
         if (req.getEmotionEmoji() == null) {
             throw new IllegalArgumentException("감정 이모지는 반드시 선택해야 합니다.");
         }
         Record r = repo.findById(id).orElseThrow();
-
         r.setEmotionEmoji(req.getEmotionEmoji());
-        Optional.ofNullable(req.getComment()).ifPresent(r::setComment);
-        Optional.ofNullable(req.getBestPlayer()).ifPresent(r::setBestPlayer);
-        Optional.ofNullable(req.getFoodTags()).ifPresent(r::setFoodTags);
-        Optional.ofNullable(req.getMediaUrls()).ifPresent(r::setMediaUrls);
-        Optional.ofNullable(req.getResult()).ifPresent(r::setResult);
-
+        r.setComment(req.getComment());
+        r.setBestPlayer(req.getBestPlayer());
+        r.setFoodTags(req.getFoodTags());
+        r.setMediaUrls(req.getMediaUrls());
+        r.setResult(req.getResult());
         r.setStatus("COMPLETED");
+
         r = repo.save(r);
-        return new RecordResponse(r.getRecordId(), null, null, null, null, null, null,
-                r.getEmotionEmoji(), r.getComment(), r.getBestPlayer(),
-                r.getFoodTags(), r.getMediaUrls(), r.getResult(),
-                r.getStatus(), r.getCreatedAt(), r.getUpdatedAt());
+        return toResponse(r);
+    }
+
+    private RecordResponse toResponse(Record r) {
+        return new RecordResponse(
+                r.getRecordId(),
+                r.getGameId(),
+                r.getGameDate().toString(),
+                r.getHomeTeam(),
+                r.getAwayTeam(),
+                r.getStartTime().toString(),
+                r.getSeatInfo() == null ? "" : r.getSeatInfo(),
+                r.getEmotionEmoji(),
+                r.getComment()    == null ? "" : r.getComment(),
+                r.getBestPlayer() == null ? "" : r.getBestPlayer(),
+                r.getFoodTags(),
+                r.getMediaUrls(),
+                r.getResult()     == null ? "" : r.getResult(),
+                r.getStatus(),
+                r.getCreatedAt().toString(),      // String
+                r.getUpdatedAt().toString()       // String
+        );
     }
 }
