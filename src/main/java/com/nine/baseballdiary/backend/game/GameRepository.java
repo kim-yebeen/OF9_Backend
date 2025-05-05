@@ -19,13 +19,4 @@ public interface GameRepository extends JpaRepository<Game, String> {
     // (1) 달력 API: from/to 기간 동안의 경기
     List<Game> findByDateBetween(LocalDate from, LocalDate to);
 
-    // (3) 홈팀 목록 (distinct)
-    @Query("select distinct g.homeTeam from Game g order by g.homeTeam")
-    List<String> findDistinctHomeTeam();
-
-    // (4) 특정 홈팀의 원정팀 목록
-    @Query("select distinct g.awayTeam from Game g where g.homeTeam = :homeTeam order by g.awayTeam")
-    List<String> findDistinctAwayTeamByHomeTeam(@Param("homeTeam") String homeTeam);
-
-
 }

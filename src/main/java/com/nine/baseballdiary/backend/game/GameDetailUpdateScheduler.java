@@ -19,7 +19,7 @@ public class GameDetailUpdateScheduler {
     private final GameDetailService detailSvc;
 
     /** 오늘(포함) 이전의 SCHEDULED·CANCELLED 경기만 재검증 (매일 16시) */
-    @Scheduled(cron = "0 25 16 * * ?")
+    @Scheduled(cron = "0 0 23 * * ?")
     public void dailyUpdate() {
         LocalDate today = LocalDate.now();
         List<Game> toUpdate = repo.findByStatusAndDateLessThanEqual("SCHEDULED", today);

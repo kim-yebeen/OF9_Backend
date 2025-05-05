@@ -28,7 +28,7 @@ public class InitialScheduleScheduler {
     }
 
     /** 매주 월요일 오전 3시 전체 스케줄(1차) 크롤링 */
-    @Scheduled(cron = "0 25 16 ? * MON")
+    @Scheduled(cron = "0 0 3 ? * MON")
     public void weeklyInitialCrawl() throws Exception {
         WebDriverManager.chromedriver().setup();
         WebDriver driver = new ChromeDriver();

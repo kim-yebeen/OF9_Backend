@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT now()
     );
 
-CREATE TABLE user_follow (
+CREATE TABLE IF NOT EXISTS user_follow (
     follower_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     followee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT now(),

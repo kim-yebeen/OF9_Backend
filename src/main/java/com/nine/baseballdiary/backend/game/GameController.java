@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/games")
+@RequestMapping("/games")
 @RequiredArgsConstructor
 public class GameController {
 
@@ -30,17 +30,6 @@ public class GameController {
                 .collect(Collectors.toList());
     }
 
-    /** 홈팀 드롭다운 */
-    @GetMapping("/home-teams")
-    public List<String> listHomeTeams() {
-        return gameRepo.findDistinctHomeTeam();
-    }
-
-    /** 원정팀 드롭다운 */
-    @GetMapping("/{homeTeam}/away-teams")
-    public List<String> listAwayTeams(@PathVariable String homeTeam) {
-        return gameRepo.findDistinctAwayTeamByHomeTeam(homeTeam);
-    }
 
     /** 단일 경기 기본 정보 */
     @GetMapping("/{gameId}")
