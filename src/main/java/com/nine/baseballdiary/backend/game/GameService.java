@@ -20,4 +20,6 @@ public class GameService {
     public void updateGame(Game game) {
         gameRepository.save(game);
     }
+
+
 }
