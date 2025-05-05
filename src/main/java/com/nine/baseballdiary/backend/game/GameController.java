@@ -1,18 +1,20 @@
 package com.nine.baseballdiary.backend.game;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequestMapping("/api/games")
+@RequiredArgsConstructor
 public class GameController {
 
-    @Autowired
-    private GameDetailService gameDetailService;
+    private final GameDetailService gameDetailService;
 
-    // 예시 URL: /api/game-detail/update?gameId=20250401DSNC0&gameDate=20250401
-    @GetMapping("/api/game-detail/update")
-    public String updateGameDetail(@RequestParam String gameId, @RequestParam String gameDate) {
-        gameDetailService.updateGameDetail(gameId, gameDate);
-        return "업데이트 요청 완료: " + gameId;
+    /** 개별 게임 상세 정보 즉시 업데이트 */
+    @GetMapping("/{gameId}/detail/update")
+    public ResponseEntity<String> updateGameDetail(@PathVariable String gameId) {
+        gameDetailService.updateGameDetail(gameId);
+        return ResponseEntity.ok("업데이트 요청 완료: " + gameId);
     }
 }
