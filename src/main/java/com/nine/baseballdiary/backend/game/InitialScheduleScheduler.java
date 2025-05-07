@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import jakarta.annotation.PostConstruct; // ✅ 추가
 
 @Component
 public class InitialScheduleScheduler {
@@ -26,6 +27,20 @@ public class InitialScheduleScheduler {
     public InitialScheduleScheduler(GameService gameService) {
         this.gameService = gameService;
     }
+
+
+    // ✅ 추가: 서버 부팅 시 바로 1번만 크롤링
+    @PostConstruct
+    public void initCrawl() {
+        try {
+            System.out.println("서버 부팅: 초기 스케줄 크롤링 시작");
+            weeklyInitialCrawl();
+            System.out.println("서버 부팅: 초기 스케줄 크롤링 완료");
+        } catch (Exception e) {
+            System.err.println("서버 부팅: 초기 스케줄 크롤링 실패");
+            e.printStackTrace();
+        }
+    } // 여기까지 임시로 추가, 아래 크론탭에서 현재 시간으로 변경하여 바로 크롤링 실행 가능:  혜령
 
     /** 매주 월요일 오전 3시 전체 스케줄(1차) 크롤링 */
     @Scheduled(cron = "0 0 3 ? * MON")

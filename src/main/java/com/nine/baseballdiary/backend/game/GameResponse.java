@@ -48,4 +48,21 @@ public class GameResponse {
     public Integer getHomeScore(){ return homeScore; }
     public Integer getAwayScore(){ return awayScore; }
     public String getStatus()   { return status; }
+
+    // ✅ 추가
+    // ─── Game -> GameResponse 변환 ───────────────────────────────────────────
+    public static GameResponse from(Game game) {
+        return new GameResponse(
+                game.getGameId(),
+                game.getDate(),
+                game.getTime(),
+                game.getPlaytime(),
+                game.getStadium(),
+                game.getHomeTeam(),
+                game.getAwayTeam(),
+                game.getHomeScore(),
+                game.getAwayScore(),
+                game.getStatus()
+        );
+    }
 }

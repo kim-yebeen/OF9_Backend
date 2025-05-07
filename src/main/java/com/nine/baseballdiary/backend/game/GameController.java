@@ -9,6 +9,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// ✅ 추가
+import java.time.LocalTime;
+
 @RestController
 @RequestMapping("/games")
 @RequiredArgsConstructor
@@ -17,6 +20,17 @@ public class GameController {
     private final GameService gameService;
     private final GameDetailService detailService;      // ← 직접 주입
     private final GameRepository gameRepo;
+
+    // ✅ 추가
+    @GetMapping("/search")
+    public ResponseEntity<GameResponse> searchGame(
+            @RequestParam String awayTeam,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime time
+    ) {
+        Game game = gameService.findGameByCondition(awayTeam, date, time);
+        return ResponseEntity.ok(GameResponse.from(game));
+    } // 여기까지
 
     /** 달력 조회 */
     @GetMapping
