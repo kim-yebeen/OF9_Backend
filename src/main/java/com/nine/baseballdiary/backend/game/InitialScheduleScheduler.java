@@ -2,6 +2,7 @@
 package com.nine.baseballdiary.backend.game;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
+import jakarta.annotation.PostConstruct;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
@@ -28,6 +29,18 @@ public class InitialScheduleScheduler {
         this.gameService = gameService;
     }
 
+    @PostConstruct
+    public void initCrawl() {
+        try {
+            System.out.println("서버 부팅: 초기 스케줄 크롤링 시작");
+            weeklyInitialCrawl();
+            System.out.println("서버 부팅: 초기 스케줄 크롤링 완료");
+        } catch (Exception e) {
+            System.err.println("서버 부팅: 초기 스케줄 크롤링 실패");
+            e.printStackTrace();
+        }
+    }
+    
     /** 매주 월요일 오전 3시 전체 스케줄(1차) 크롤링 */
     @Scheduled(cron = "0 30 17 * * ?")
     public void weeklyInitialCrawl() {

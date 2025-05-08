@@ -6,10 +6,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface GameRepository extends JpaRepository<Game, String> {
+    Optional<Game> findByAwayTeamAndDateAndTime(String awayTeam, LocalDate date, LocalTime time);
     // 기존
     List<Game> findByStatus(String status);
 
