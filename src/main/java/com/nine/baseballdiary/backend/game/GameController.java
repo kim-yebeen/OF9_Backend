@@ -24,10 +24,11 @@ public class GameController {
     // ✅ 추가
     @GetMapping("/search")
     public ResponseEntity<GameResponse> searchGame(
-            @RequestParam String awayTeam,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime time
+            @RequestParam("awayTeam") String awayTeam,
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam("time") String timeStr
     ) {
+        LocalTime time = LocalTime.parse(timeStr);
         Game game = gameService.findGameByCondition(awayTeam, date, time);
         return ResponseEntity.ok(GameResponse.from(game));
     } // 여기까지
@@ -35,8 +36,8 @@ public class GameController {
     /** 달력 조회 */
     @GetMapping
     public List<GameResponse> listByDateRange(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return gameRepo.findByDateBetween(from, to)
                 .stream()
@@ -47,7 +48,7 @@ public class GameController {
 
     /** 단일 경기 기본 정보 */
     @GetMapping("/{gameId}")
-    public ResponseEntity<GameResponse> getGame(@PathVariable String gameId) {
+    public ResponseEntity<GameResponse> getGame(@PathVariable("gameId") String gameId) {
         Game g = gameService.getGameById(gameId);
         if (g == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(toDto(g));
@@ -55,7 +56,7 @@ public class GameController {
 
     /** 단일 경기 상세 업데이트 (즉시) */
     @GetMapping("/{gameId}/detail/update")
-    public ResponseEntity<String> updateDetail(@PathVariable String gameId) {
+    public ResponseEntity<String> updateDetail(@PathVariable("gameId") String gameId) {
         detailService.updateGameDetail(gameId);        // ← GameDetailService 직접 호출
         return ResponseEntity.ok("업데이트 요청 완료: " + gameId);
     }
