@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import jakarta.annotation.PostConstruct; // ✅ 추가
 
 @Component
 public class InitialScheduleScheduler {
@@ -39,8 +40,11 @@ public class InitialScheduleScheduler {
             System.err.println("서버 부팅: 초기 스케줄 크롤링 실패");
             e.printStackTrace();
         }
+
     }
-    
+
+
+
     /** 매주 월요일 오전 3시 전체 스케줄(1차) 크롤링 */
     @Scheduled(cron = "0 30 17 * * ?")
     public void weeklyInitialCrawl() {

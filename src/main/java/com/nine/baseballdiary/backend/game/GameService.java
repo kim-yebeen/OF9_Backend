@@ -9,12 +9,24 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+
+// ✅ 추가
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import lombok.RequiredArgsConstructor;
+
+
 @Service
 @RequiredArgsConstructor
 public class GameService {
 
-    @Autowired
+    // ✅ 수정
+    //@Autowired
+    //private GameRepository gameRepository;
     private final GameRepository gameRepository;
+
 
     public Game findGameByCondition(String awayTeam, LocalDate date, LocalTime time) {
         return gameRepository.findByAwayTeamAndDateAndTime(awayTeam, date, time)

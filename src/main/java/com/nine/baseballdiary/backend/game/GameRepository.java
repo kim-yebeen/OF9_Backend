@@ -10,9 +10,17 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+// ✅ 추가
+import java.util.Optional;
+import java.time.LocalTime;
+
 @Repository
 public interface GameRepository extends JpaRepository<Game, String> {
+
+
+    // ✅ 추가
     Optional<Game> findByAwayTeamAndDateAndTime(String awayTeam, LocalDate date, LocalTime time);
+
     // 기존
     List<Game> findByStatus(String status);
 

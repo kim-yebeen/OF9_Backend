@@ -49,6 +49,7 @@ public class GameResponse {
     public Integer getAwayScore(){ return awayScore; }
     public String getStatus()   { return status; }
 
+
     public static GameResponse from(Game game) {
         return new GameResponse(
                 game.getGameId(),
