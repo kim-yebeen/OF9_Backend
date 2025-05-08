@@ -11,6 +11,7 @@ import org.openqa.selenium.support.ui.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -28,84 +29,84 @@ public class InitialScheduleScheduler {
     }
 
     /** 매주 월요일 오전 3시 전체 스케줄(1차) 크롤링 */
-    @Scheduled(cron = "0 0 3 ? * MON")
-    public void weeklyInitialCrawl() throws Exception {
+    @Scheduled(cron = "0 30 17 * * ?")
+    public void weeklyInitialCrawl() {
         WebDriverManager.chromedriver().setup();
         WebDriver driver = new ChromeDriver();
         try {
             driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
-            WebDriverWait wait = new WebDriverWait(driver, java.time.Duration.ofSeconds(20));
-            wait.until(ExpectedConditions.elementToBeClickable(By.id("ddlYear")));
-            wait.until(ExpectedConditions.elementToBeClickable(By.id("ddlMonth")));
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
 
-            String yearTxt = new Select(driver.findElement(By.id("ddlYear")))
-                    .getFirstSelectedOption()
-                    .getText().trim();
-            Select monthSel = new Select(driver.findElement(By.id("ddlMonth")));
+            String year = driver.findElement(By.id("ddlYear")).getAttribute("value");
 
+            // 1월부터 12월까지 순회
             for (int m = 1; m <= 12; m++) {
-                monthSel.selectByValue(String.format("%02d", m));
-                Thread.sleep(2000);
-                wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("#tblScheduleList")));
+                String monthVal = String.format("%02d", m);
+                // 반드시 loop 안에서 새로 찾기
+                Select monthSelect = new Select(driver.findElement(By.id("ddlMonth")));
+                monthSelect.selectByValue(monthVal);
 
-                List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
+                // AJAX로 테이블이 업데이트 될 때까지 대기
+                wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(
+                        By.cssSelector("#tblScheduleList tbody tr"), 0
+                ));
+
+                // 로드된 모든 행을 다시 읽어서 크롤링
+                List<WebElement> rows = driver.findElements(
+                        By.cssSelector("#tblScheduleList tbody tr")
+                );
+                String currentDayRaw = "";
                 for (WebElement row : rows) {
-                    List<WebElement> tds = row.findElements(By.tagName("td"));
-                    if (tds.size() < 3) continue;
-
-                    // 날짜 파싱
-                    String rawDay = row.findElements(By.cssSelector("td.day"))
-                            .stream().findFirst().map(WebElement::getText).orElse("");
-                    if (rawDay.isBlank()) continue;
-                    String dayNum = rawDay.replaceAll("\\(.*?\\)", "")
-                            .split("\\.")[1];
-                    String dbDate = yearTxt
-                            + String.format("%02d", m)
-                            + String.format("%02d", Integer.parseInt(dayNum));
-                    LocalDate gameDate = LocalDate.parse(dbDate, DB_DATE);
-
-                    // 시간 파싱
-                    String timeTxt = tds.get(1).getText().trim();
-                    LocalTime startTime = null;
-                    if (!timeTxt.isBlank()) {
-                        try { startTime = LocalTime.parse(timeTxt, TIME_FMT); }
-                        catch (Exception ignore) {}
+                    // (1) 날짜 셀 (rowspan 사용하는 월 첫 행만)
+                    List<WebElement> days = row.findElements(By.cssSelector("td.day"));
+                    if (!days.isEmpty()) {
+                        currentDayRaw = days.get(0).getText().split("\\(")[0].trim();
                     }
+                    if (currentDayRaw.isBlank()) continue;
 
-                    // 팀 + 취소 여부
-                    Document doc = Jsoup.parse(tds.get(2).getAttribute("innerHTML"));
+                    // (2) 경기 정보
+                    WebElement playCell = row.findElement(By.cssSelector("td.play"));
+                    Document doc = Jsoup.parse(playCell.getAttribute("innerHTML"));
                     Elements spans = doc.select("span");
-                    String awayTeam = spans.first().text().trim();
-                    String homeTeam = spans.last().text().trim();
-                    boolean isCancelled = doc.select("span.cancel").size() > 0
-                            || doc.body().text().contains("우천취소");
+                    if (spans.size() < 2) continue;
+                    String awayName = spans.first().text().trim();
+                    String homeName = spans.last().text().trim();
 
-                    // gameId 생성
-                    String gameId = dbDate
-                            + getTeamCode(awayTeam)
-                            + getTeamCode(homeTeam)
+                    // (3) gameDate
+                    String dayPart = currentDayRaw.split("\\.")[1];
+                    String dbDateStr = year + monthVal + String.format("%02d", Integer.parseInt(dayPart));
+                    LocalDate gameDate = LocalDate.parse(dbDateStr, DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+                    // (4) 시간
+                    String timeText = row.findElement(By.cssSelector("td.time")).getText().trim();
+                    if (timeText.isBlank()) continue;
+                    LocalTime startTime = LocalTime.parse(timeText, DateTimeFormatter.ofPattern("H:mm"));
+
+                    // (5) 구장
+                    List<WebElement> tds = row.findElements(By.tagName("td"));
+                    String stadium = tds.size() >= 8
+                            ? tds.get(tds.size() - 2).getText().trim()
+                            : "";
+
+                    // (6) gameId 조합
+                    String gameId = dbDateStr
+                            + getTeamCode(awayName)
+                            + getTeamCode(homeName)
                             + "0";
 
-                    // 저장
+                    // (7) 저장
                     Game g = new Game();
                     g.setGameId(gameId);
                     g.setDate(gameDate);
                     g.setTime(startTime);
                     g.setPlaytime(null);
-                    g.setStadium("");
-                    g.setAwayTeam(awayTeam);
-                    g.setHomeTeam(homeTeam);
+                    g.setStadium(stadium);
+                    g.setAwayTeam(awayName);
+                    g.setHomeTeam(homeName);
                     g.setAwayScore(0);
                     g.setHomeScore(0);
-                    g.setStatus(isCancelled ? "CANCELLED" : "SCHEDULED");
-                    g.setAwayImg("");
-                    g.setHomeImg("");
-
+                    g.setStatus("SCHEDULED");
                     gameService.saveGame(g);
-                    System.out.printf("[INITIAL] %s | %s %s vs %s | %s%n",
-                            gameId, dbDate, awayTeam, homeTeam,
-                            (isCancelled ? "CANCELLED" : startTime == null ? "TBD" : startTime)
-                    );
                 }
             }
         } finally {

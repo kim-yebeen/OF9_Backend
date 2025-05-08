@@ -114,14 +114,6 @@ public class GameDetailService {
                 game.setStatus("SCHEDULED");
             }
 
-            // 4) 구장명·시작시간 갱신 (취소경기도 갱신해주면 추후 변경 반영 용)
-            if (root.has("S_NM")) {
-                game.setStadium(root.get("S_NM").asText());
-            }
-            String startTm = root.path("START_TM").asText("");
-            if (isValid(startTm)) {
-                game.setTime(LocalTime.parse(startTm, TIME_FMT));
-            }
 
             // 저장
             gameRepository.save(game);
