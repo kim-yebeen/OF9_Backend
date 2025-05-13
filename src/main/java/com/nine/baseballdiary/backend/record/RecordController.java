@@ -17,5 +17,11 @@ public class RecordController {
         return ResponseEntity.status(201).body(res);
     }
 
-
+    //
+    @GetMapping("/{recordId}/details")
+    public ResponseEntity<RecordDetailResponse> getRecordDetail(@PathVariable Long recordId){
+        //Record 상세 정보 요청
+        RecordDetailResponse res = service.getRecordDetail(recordId);
+        return ResponseEntity.status(200).body(res);
+    }
 }

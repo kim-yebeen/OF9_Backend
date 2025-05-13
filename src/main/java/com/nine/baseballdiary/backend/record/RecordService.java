@@ -58,17 +58,28 @@ public class RecordService {
     // `fav_team`을 짧은 이름으로 변환하는 메서드
     private String convertFavTeam(String favTeam) {
         switch (favTeam) {
-            case "KIA 타이거즈": return "KIA";
-            case "두산 베어스": return "두산";
-            case "롯데 자이언츠": return "롯데";
-            case "삼성 라이온즈": return "삼성";
-            case "키움 히어로즈": return "키움";
-            case "한화 이글스": return "한화";
-            case "KT WIZ": return "KT";
-            case "LG 트윈스": return "LG";
-            case "NC 다이노스": return "NC";
-            case "SSG 랜더스": return "SSG";
-            default: return favTeam;  // 기본값은 그대로 반환
+            case "KIA 타이거즈":
+                return "KIA";
+            case "두산 베어스":
+                return "두산";
+            case "롯데 자이언츠":
+                return "롯데";
+            case "삼성 라이온즈":
+                return "삼성";
+            case "키움 히어로즈":
+                return "키움";
+            case "한화 이글스":
+                return "한화";
+            case "KT WIZ":
+                return "KT";
+            case "LG 트윈스":
+                return "LG";
+            case "NC 다이노스":
+                return "NC";
+            case "SSG 랜더스":
+                return "SSG";
+            default:
+                return favTeam;  // 기본값은 그대로 반환
         }
     }
 
@@ -121,5 +132,106 @@ public class RecordService {
                 record.getUpdatedAt()
         );
     }
-}
 
+
+    // 레코드 상세 정보 조회
+    public RecordDetailResponse getRecordDetail(Long recordId) {
+        // 1) 레코드 조회
+        Record record = recordRepo.findById(recordId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
+
+        // 2) 게임 정보 조회 (gameId를 Long 타입으로 조회)
+        Game game = gameRepo.findById(record.getGameId())  // gameId는 String으로 저장되므로 그대로 사용
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + record.getGameId()));
+
+        // 3) 게임 일자, 시간, 홈팀, 어웨이팀, 구장 정보 가져오기
+        String gameDate = game.getDate().toString();    // 날짜
+        String gameTime = game.getTime().toString();    // 시간
+        String homeTeam = convertHomeTeam(game.getHomeTeam());  // 홈팀 변환
+        String awayTeam = convertAwayTeam(game.getAwayTeam());  // 어웨이팀 변환
+        String stadium = convertStadium(game.getStadium());     // 구장 변환
+
+        // 4) 이모티콘 코드만 반환
+        Integer emotionCode = record.getEmotionCode();  // 이모티콘 코드만 반환
+        String emotionLabel = convertEmotionLabel(emotionCode);  // 이모티콘 라벨 변환
+
+        // 5) 응답 반환
+        return new RecordDetailResponse(
+                gameDate,
+                gameTime,
+                emotionCode,
+                emotionLabel,  // 라벨 값 추가
+                record.getTicketImageUrl(),
+                homeTeam,
+                awayTeam,
+                stadium,
+                record.getSeatInfo()
+        );
+    }
+
+    // 이모티콘 코드에 해당하는 라벨 반환
+    private String convertEmotionLabel(Integer emotionCode) {
+        switch (emotionCode) {
+            case 1: return "짜릿해요";
+            case 2: return "만족해요";
+            case 3: return "감동이에요";
+            case 4: return "놀랐어요";
+            case 5: return "행복해요";
+            case 6: return "답답해요";
+            case 7: return "아쉬워요";
+            case 8: return "화났어요";
+            case 9: return "지쳤어요";
+            default: return "알 수 없음";
+        }
+    }
+
+    // `fav_team`을 짧은 이름으로 변환하는 메서드
+    private String convertHomeTeam(String homeTeam) {
+        switch (homeTeam) {
+            case "KIA": return "KIA 타이거즈";
+            case "두산": return "두산 베어스";
+            case "롯데": return "롯데 자이언츠";
+            case "삼성": return "삼성 라이온즈";
+            case "키움": return "키움 히어로즈";
+            case "한화": return "한화 이글스";
+            case "KT": return "KT WIZ";
+            case "LG": return "LG 트윈스";
+            case "NC": return "NC 다이노스";
+            case "SSG": return "SSG 랜더스";
+            default: return homeTeam;  // 기본값은 그대로 반환
+        }
+    }
+
+    // 어웨이팀 값을 짧은 이름에서 긴 이름으로 변환하는 메서드
+    private String convertAwayTeam(String awayTeam) {
+        switch (awayTeam) {
+            case "KIA": return "KIA 타이거즈";
+            case "두산": return "두산 베어스";
+            case "롯데": return "롯데 자이언츠";
+            case "삼성": return "삼성 라이온즈";
+            case "키움": return "키움 히어로즈";
+            case "한화": return "한화 이글스";
+            case "KT": return "KT WIZ";
+            case "LG": return "LG 트윈스";
+            case "NC": return "NC 다이노스";
+            case "SSG": return "SSG 랜더스";
+            default: return awayTeam;  // 기본값은 그대로 반환
+        }
+    }
+
+    // stadium 값을 짧은 이름에서 긴 이름으로 변환하는 메서드
+    private String convertStadium(String stadium) {
+        switch (stadium) {
+            case "잠실": return "잠실야구장";
+            case "문학": return "문학야구장";
+            case "고척": return "고척 SKYDOME";
+            case "사직": return "사직야구장";
+            case "수원": return "KT 위즈 파크";
+            case "대전(신)": return "한화생명 이글스 파크";
+            case "대구": return "대구삼성라이온즈파크";
+            case "광주": return "기아 챔피언스 필드";
+            case "창원": return "NC 파크";
+            default: return stadium;  // 기본값은 그대로 반환
+        }
+    }
+}
