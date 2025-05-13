@@ -30,4 +30,5 @@ public interface GameRepository extends JpaRepository<Game, String> {
     // (1) 달력 API: from/to 기간 동안의 경기
     List<Game> findByDateBetween(LocalDate from, LocalDate to);
 
+    public Optional<Game> findById(String gameId);
 }

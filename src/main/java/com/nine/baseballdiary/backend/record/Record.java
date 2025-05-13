@@ -2,6 +2,10 @@ package com.nine.baseballdiary.backend.record;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -14,50 +18,50 @@ public class Record {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer recordId;
+    private Long recordId;           // 레코드 ID
 
-    // JWT에서 추출한 사용자 ID
     @Column(nullable = false)
-    private Integer userId;
+    private Long userId;             // 유저 ID
 
-    // KBO game 테이블의 PK (예: "20250401DSNC0")
     @Column(nullable = false)
-    private String gameId;
+    private String gameId;           // 경기 ID
 
-    // OCR로 추출 또는 사용자가 보정하는 경기 정보
-    private LocalDate gameDate;
-    private String homeTeam;
-    private String awayTeam;
-    private LocalTime startTime;
-
-    // 좌석 정보 (옵셔널)
-    private String seatInfo;
-
-    // 세부 입력 (emotionEmoji는 필수)
-    @Column(nullable = false)
-    private String emotionEmoji;
-    private String comment;
-    private String bestPlayer;
+    private String seatInfo;         // 좌석 정보
+    private String ticketImageUrl;   // 티켓 이미지 URL
+    private Integer emotionCode;     // 감정 코드
+    private String comment;          // 한줄평
+    private String bestPlayer;       // 베스트 플레이어
 
     @ElementCollection
     @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "tag")
-    private List<String> foodTags;
+    private List<String> foodTags;   // 음식 태그
 
     @ElementCollection
     @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "url")
-    private List<String> mediaUrls;
+    private List<String> mediaUrls;  // 미디어 URL 리스트
 
-    private String result;      // WIN / LOSE / DRAW
+    private String result;           // 경기 결과 (WIN/LOSE/DRAW)
 
-    @Column(nullable = false)
-    private String status = "DRAFT";
+    private LocalDateTime createdAt;  // 생성일 수동 설정
+    private LocalDateTime updatedAt;  // 수정일 수동 설정
 
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    // Getters, Setters
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    // 생성 시, createdAt 자동 설정
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = this.createdAt;  // 처음 생성 시, createdAt과 동일하게 설정
+    }
+
+    // 업데이트 시, updatedAt 자동 설정
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

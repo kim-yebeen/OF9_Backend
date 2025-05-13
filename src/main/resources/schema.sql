@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP DEFAULT now()
     );
 
+
+
 CREATE TABLE IF NOT EXISTS user_follow (
     follower_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     followee_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -38,14 +40,15 @@ CREATE TABLE IF NOT EXISTS record (
     game_id VARCHAR REFERENCES game(game_id),
     seat_info VARCHAR(100),
     comment TEXT,
-    emotion_emoji VARCHAR(20),
+    emotion_code SMALLINT NOT NULL REFERENCES emotion(code),
     best_player VARCHAR(50),
     food_tags TEXT[],
     media_urls TEXT[],
-    result VARCHAR(10), -- WIN / LOSE / DRAW
+    result VARCHAR(10),  -- WIN / LOSE / DRAW
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
     );
+
 
 CREATE TABLE IF NOT EXISTS stadium (
     id SERIAL PRIMARY KEY,
@@ -57,3 +60,23 @@ CREATE TABLE IF NOT EXISTS food (
     fnb_name VARCHAR(50) NOT NULL,
     stadium_id INT REFERENCES stadium(id)
     );
+
+
+-- 1. 감정_lookup 테이블 추가
+CREATE TABLE IF NOT EXISTS emotion (
+    code SMALLINT PRIMARY KEY,       -- 1~9 숫자 코드
+    label VARCHAR(20) NOT NULL       -- "짜릿해요" 등 한글 레이블
+);
+
+-- 초기 감정 데이터 삽입 (한 번만 실행)
+INSERT INTO emotion (code, label) VALUES
+    (1, '짜릿해요'),
+    (2, '만족해요'),
+    (3, '감동이에요'),
+    (4, '놀랐어요'),
+    (5, '행복해요'),
+    (6, '답답해요'),
+    (7, '아쉬워요'),
+    (8, '화났어요'),
+    (9, '지쳤어요')
+ON CONFLICT DO NOTHING;
