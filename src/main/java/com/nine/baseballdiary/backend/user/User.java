@@ -10,6 +10,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 기본 생성자
+    public User() {}
+
+    // Long 타입 ID를 받는 생성자 추가
+    public User(Long id) {
+        this.id = id;
+    }
     @Column(nullable = false, unique = true)
     private Long kakaoId;
 
@@ -37,4 +44,11 @@ public class User {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
 }

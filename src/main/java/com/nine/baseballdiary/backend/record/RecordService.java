@@ -8,6 +8,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Locale;
+
 @Service
 @RequiredArgsConstructor
 public class RecordService {
@@ -234,4 +239,73 @@ public class RecordService {
             default: return stadium;  // 기본값은 그대로 반환
         }
     }
+
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("yyyy/MM/dd EEE", Locale.ENGLISH);
+
+    // 1) 피드
+    public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
+        return recordRepo.findByUserId(userId).stream()
+                .filter(rec -> rec.getMediaUrls() != null && !rec.getMediaUrls().isEmpty())
+                .map(rec -> {
+                    Game g = gameRepo.findById(rec.getGameId()).orElseThrow();
+                    // 바뀐 포맷 사용
+                    String fmtDate = g.getDate().format(DATE_FMT);
+                    String img = rec.getMediaUrls().get(0);
+                    return new RecordFeedResponse(rec.getRecordId(), fmtDate, img);
+                })
+                .collect(Collectors.toList());
+    }
+
+
+    //2) 리스트: 업로드 상세 정보와 동일
+    public List<RecordListResponse> getUserRecordsList(Long userId) {
+        return recordRepo.findByUserId(userId).stream()
+                .map(rec -> {
+                    // 1) Game 조회
+                    Game game = gameRepo.findById(rec.getGameId())
+                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
+                    // 2) 날짜 포맷
+                    String gameDate = game.getDate().format(DATE_FMT);
+                    // 3) 시간
+                    String gameTime = game.getTime().toString();
+                    // 4) 감정 라벨
+                    Integer emoCode = rec.getEmotionCode();
+                    String emoLabel = convertEmotionLabel(emoCode);
+                    // 5) 팀/구장 변환
+                    String home = convertHomeTeam(game.getHomeTeam());
+                    String away = convertAwayTeam(game.getAwayTeam());
+                    String stdm = convertStadium(game.getStadium());
+                    // 6) 결과
+                    String result = rec.getResult();
+
+                    return new RecordListResponse(
+                            gameDate,
+                            gameTime,
+                            emoCode,
+                            emoLabel,
+                            rec.getTicketImageUrl(),
+                            home,
+                            away,
+                            stdm,
+                            rec.getSeatInfo(),
+                            result
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 3) 캘린더: 날짜 + 승패여부
+    public List<RecordCalendarResponse> getUserRecordsCalendar(Long userId) {
+        return recordRepo.findByUserId(userId).stream()
+                .map(rec -> {
+                    Game g = gameRepo.findById(rec.getGameId())
+                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
+                    // LocalDate → ISO 문자열 ("yyyy-MM-dd")
+                    String gameDateStr = g.getDate().toString();
+                    return new RecordCalendarResponse(gameDateStr, rec.getResult());
+                })
+                .collect(Collectors.toList());
+    }
+
 }

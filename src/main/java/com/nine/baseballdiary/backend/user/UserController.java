@@ -1,28 +1,36 @@
 package com.nine.baseballdiary.backend.user;
 
+import com.nine.baseballdiary.backend.record.RecordService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/users")
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
+    private final RecordService recordService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
-
-    // 📝 닉네임/소개/응원팀 수정 예정
-    @PutMapping("/me")
-    public String updateMyProfile(@RequestBody Object request) {
-        // TODO: 프로필 수정 로직 작성 예정
-        return "사용자 프로필 수정은 아직 구현되지 않았습니다.";
-    }
-
-    // 📝 마이페이지 조회 예정
+    // 내 정보 조회
     @GetMapping("/me")
-    public String getMyProfile() {
-        // TODO: 마이페이지 조회 로직 작성 예정
-        return "마이페이지 조회는 아직 구현되지 않았습니다.";
+    public ResponseEntity<UserResponse> getUserInfo(@RequestParam Long userId) {
+        UserResponse userInfo = userService.getUserInfo(userId);
+        return ResponseEntity.ok(userInfo);
+    }
+
+    // 내 직관 기록 조회
+    @GetMapping("/me/records")
+    public ResponseEntity<?> getUserRecords(@RequestParam Long userId, @RequestParam String format) {
+        switch (format.toLowerCase()) {
+            case "feed":
+                return ResponseEntity.ok(recordService.getUserRecordsFeed(userId));
+            case "list":
+                return ResponseEntity.ok(recordService.getUserRecordsList(userId));
+            case "calendar":
+                return ResponseEntity.ok(recordService.getUserRecordsCalendar(userId));
+            default:
+                return ResponseEntity.badRequest().body("Invalid format");
+        }
     }
 }
