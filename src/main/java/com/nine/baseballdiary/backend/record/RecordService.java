@@ -155,6 +155,8 @@ public class RecordService {
         String homeTeam = convertHomeTeam(game.getHomeTeam());  // 홈팀 변환
         String awayTeam = convertAwayTeam(game.getAwayTeam());  // 어웨이팀 변환
         String stadium = convertStadium(game.getStadium());     // 구장 변환
+        Integer homeScore   = game.getHomeScore();
+        Integer awayScore   = game.getAwayScore();
 
         // 4) 이모티콘 코드만 반환
         Integer emotionCode = record.getEmotionCode();  // 이모티콘 코드만 반환
@@ -170,7 +172,9 @@ public class RecordService {
                 homeTeam,
                 awayTeam,
                 stadium,
-                record.getSeatInfo()
+                record.getSeatInfo(),
+                homeScore,
+                awayScore
         );
     }
 
