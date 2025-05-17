@@ -8,8 +8,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,21 @@ public class GameService {
         return gameRepo.findByDateBetween(from, to);
     }
 
+    // 월 단위(YYYY-MM)로 경기 정보를 조회하여 DTO 리스트로 변환 반환
+    // @param yearMonth "2025-05" 형식의 문자열
+    //@return 해당 월의 GameResponse 리스트
+    public List<GameResponse> getGamesByMonth(String yearMonth) {
+        // YearMonth 파싱
+        YearMonth ym = YearMonth.parse(yearMonth);
+        LocalDate start = ym.atDay(1);             // 월의 첫째 날
+        LocalDate end = ym.atEndOfMonth();         // 월의 마지막 날
+        // DB 조회
+        List<Game> games = gameRepo.findByDateBetween(start, end);
+        // 엔티티 → DTO 변환
+        return games.stream()
+                .map(GameResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
     /**
      * 단일 경기 조회 (예외를 던짐)
      */

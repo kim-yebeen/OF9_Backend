@@ -1,8 +1,14 @@
 package com.nine.baseballdiary.backend.game;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+@Getter
+@NoArgsConstructor
 public class GameResponse {
     private String gameId;
     private LocalDate date;

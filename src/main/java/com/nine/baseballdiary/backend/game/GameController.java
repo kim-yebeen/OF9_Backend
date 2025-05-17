@@ -16,6 +16,13 @@ import java.util.stream.Collectors;
 public class GameController {
     private final GameService gameService;
 
+    @GetMapping("/month/{yearMonth}")
+    public ResponseEntity<List<GameResponse>> getGamesByMonth(
+            @PathVariable String yearMonth) {
+        List<GameResponse> result = gameService.getGamesByMonth(yearMonth);
+        return ResponseEntity.ok(result);
+    }
+
     /** 기간검색: /games?from=2025-05-01&to=2025-05-31 */
     @GetMapping
     public ResponseEntity<List<GameResponse>> getGames(
