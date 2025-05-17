@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS game (
     game_id VARCHAR PRIMARY KEY,
     date DATE NOT NULL,
     time TIME,
-    playtime TIME,
     stadium VARCHAR(50),
     home_team VARCHAR(50),
     away_team VARCHAR(50),
