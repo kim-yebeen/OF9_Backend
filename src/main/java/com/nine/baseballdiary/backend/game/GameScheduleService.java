@@ -2,6 +2,7 @@ package com.nine.baseballdiary.backend.game;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -19,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.logging.Logger;
@@ -38,7 +40,7 @@ public class GameScheduleService {
 
     //매주 월요일 새벽 1시 전체 크롤링
     //@Scheduled(cron = "0 0 3 * * 1")
-    @Scheduled(cron = "0 17 20 * * ?")
+    @Scheduled(cron = "0 35 20 * * ?")
     public void weeklyInitialCrawl() {
         crawlSchedule(true);
     }
@@ -79,16 +81,26 @@ public class GameScheduleService {
             int startMonth = fullCrawl ? 1 : Integer.parseInt(currentMonth);
             int endMonth   = fullCrawl ? 12 : Integer.parseInt(currentMonth);
 
+
             for (int m = startMonth; m <= endMonth; m++) {
                 String monthVal = String.format("%02d", m);
                 try {
+                    // 월 선택
                     new Select(driver.findElement(By.id("ddlMonth"))).selectByValue(monthVal);
-                    String expectedPrefix = monthVal + ".";
-                    wait.until(ExpectedConditions.textToBePresentInElementLocated(
-                            By.cssSelector("#tblScheduleList tbody tr:first-child td.day"), expectedPrefix
-                    ));
 
-                    List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
+                    // 해당 월의 첫 번째 날짜 셀이 나타날 때까지 대기
+                    try {
+                        wait.until(ExpectedConditions.textToBePresentInElementLocated(
+                                By.cssSelector("#tblScheduleList tbody tr:first-child td.day"),
+                                monthVal + "."
+                        ));
+                    } catch (TimeoutException | NoSuchElementException e) {
+                        // 데이터가 없는 월은 스킵
+                        logger.info(monthVal + "월에 스케줄 데이터가 없어 건너뜁니다.");
+                        continue;
+                    }
+
+                        List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
                     String currentDayRaw = "";
                     Map<String, Integer> doubleHeaderCounter = new HashMap<>();
 
