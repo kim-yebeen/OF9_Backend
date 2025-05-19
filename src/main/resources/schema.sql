@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS record (
     user_id INT REFERENCES users(id),
     game_id VARCHAR REFERENCES game(game_id),
     seat_info VARCHAR(100),
+    stadium VARCHAR(50) NOT NULL,
     comment TEXT,
+    long_content TEXT,
     emotion_code SMALLINT NOT NULL REFERENCES emotion(code),
     best_player VARCHAR(50),
     food_tags TEXT[],
@@ -48,6 +50,11 @@ CREATE TABLE IF NOT EXISTS record (
     updated_at TIMESTAMP DEFAULT now()
     );
 
+CREATE TABLE IF NOT EXISTS record_companions (
+                                                 record_id     INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
+    companion_id  INT NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
+    PRIMARY KEY(record_id, companion_id)
+    );
 
 CREATE TABLE IF NOT EXISTS stadium (
     id SERIAL PRIMARY KEY,

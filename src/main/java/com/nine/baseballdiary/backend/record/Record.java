@@ -27,10 +27,19 @@ public class Record {
     private String gameId;           // 경기 ID
 
     private String seatInfo;         // 좌석 정보
-    private String ticketImageUrl;   // 티켓 이미지 URL
+    private String stadium;   // 티켓 이미지 URL
     private Integer emotionCode;     // 감정 코드
     private String comment;          // 한줄평
+    @Column(columnDefinition = "TEXT")
+    private String longContent;      // 긴 본문 텍스트
+
     private String bestPlayer;       // 베스트 플레이어
+
+    // 함께 한 친구들
+    @ElementCollection
+    @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"))
+    @Column(name = "companion")
+    private List<String> companions; // 함께 한 친구들
 
     @ElementCollection
     @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))

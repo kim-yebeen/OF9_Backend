@@ -11,7 +11,6 @@ public class RecordListResponse {
     private String gameTime;
     private Integer emotionCode;
     private String emotionLabel;
-    private String ticketImageUrl;
     private String homeTeam;
     private String awayTeam;
     private String stadium;
@@ -22,7 +21,6 @@ public class RecordListResponse {
                               String gameTime,
                               Integer emotionCode,
                               String emotionLabel,
-                              String ticketImageUrl,
                               String homeTeam,
                               String awayTeam,
                               String stadium,
@@ -32,7 +30,6 @@ public class RecordListResponse {
         this.gameTime = gameTime;
         this.emotionCode = emotionCode;
         this.emotionLabel = emotionLabel;
-        this.ticketImageUrl = ticketImageUrl;
         this.homeTeam = homeTeam;
         this.awayTeam = awayTeam;
         this.stadium = stadium;

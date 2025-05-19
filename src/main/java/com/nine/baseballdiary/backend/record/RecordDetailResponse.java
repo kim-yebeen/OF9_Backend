@@ -1,9 +1,15 @@
 package com.nine.baseballdiary.backend.record;
 
 import lombok.Getter;
+import lombok.Builder;
+
+import java.util.List;
+//클릭 시 상세 보기 용
 
 @Getter
+@Builder
 public class RecordDetailResponse {
+    private Long recordId;
     private String gameDate;
     private String gameTime;
     private Integer emotionCode;
@@ -13,31 +19,13 @@ public class RecordDetailResponse {
     private String awayTeam;
     private String stadium;
     private String seatInfo;
-
     private Integer homeScore;
     private Integer awayScore;
-    // 생성자
-    public RecordDetailResponse(String gameDate,
-                                String gameTime,
-                                Integer emotionCode,
-                                String emotionLabel,
-                                String ticketImageUrl,
-                                String homeTeam,
-                                String awayTeam,
-                                String stadium,
-                                String seatInfo,
-                                Integer homeScore,      // 파라미터 추가
-                                Integer awayScore) {    // 파라미터 추가
-        this.gameDate       = gameDate;
-        this.gameTime       = gameTime;
-        this.emotionCode    = emotionCode;
-        this.emotionLabel   = emotionLabel;
-        this.ticketImageUrl = ticketImageUrl;
-        this.homeTeam       = homeTeam;
-        this.awayTeam       = awayTeam;
-        this.stadium        = stadium;
-        this.seatInfo       = seatInfo;
-        this.homeScore      = homeScore;
-        this.awayScore      = awayScore;
-    }
+    private String result;
+    private String comment;
+    private String longContent;
+    private String bestPlayer;
+    private List<String> companions;
+    private List<String> foodTags;
+    private List<String> mediaUrls;
 }

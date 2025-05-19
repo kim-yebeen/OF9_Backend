@@ -12,17 +12,27 @@ import java.util.List;
 public class RecordController {
     private final RecordService service;
 
+    // 2-1) 1단계 생성 (최소 필수정보)
     @PostMapping
-    public ResponseEntity<RecordResponse> create(@RequestBody CreateRecordRequest req) {
-        // Record 생성 요청
-        RecordResponse res = service.createRecord(req);
+    public ResponseEntity<RecordUploadResponse> uploadRecord(@RequestBody CreateRecordRequest req) {
+        RecordUploadResponse res = service.uploadRecord(req);
         return ResponseEntity.status(201).body(res);
     }
 
-    //
+    // 2-2) 2단계 수정 (상세 입력)
+    @PatchMapping("/{recordId}")
+    public ResponseEntity<RecordDetailResponse> updateRecord(
+            @PathVariable Long recordId,
+            @RequestBody UpdateRecordRequest req
+    ) {
+        RecordDetailResponse res = service.updateRecord(recordId, req);
+        return ResponseEntity.ok(res);
+    }
+
+    // 상세 정보 페이지에 표시될 모든 정보 (새로운 details 엔드포인트)
     @GetMapping("/{recordId}/details")
     public ResponseEntity<RecordDetailResponse> getRecordDetail(@PathVariable Long recordId){
-        //Record 상세 정보 요청
+        // Record 상세 정보 요청
         RecordDetailResponse res = service.getRecordDetail(recordId);
         return ResponseEntity.status(200).body(res);
     }
@@ -46,5 +56,12 @@ public class RecordController {
     public ResponseEntity<List<RecordCalendarResponse>> getUserRecordsCalendar(@PathVariable Long userId) {
         List<RecordCalendarResponse> response = service.getUserRecordsCalendar(userId);
         return ResponseEntity.ok(response);
+    }
+
+    //레코드 삭제
+    @DeleteMapping("/{recordId}")
+    public ResponseEntity<Void> deleteRecord(@PathVariable Long recordId) {
+        service.deleteRecord(recordId);
+        return ResponseEntity.noContent().build();
     }
 }

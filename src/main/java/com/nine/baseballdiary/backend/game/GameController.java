@@ -26,8 +26,8 @@ public class GameController {
     /** 기간검색: /games?from=2025-05-01&to=2025-05-31 */
     @GetMapping
     public ResponseEntity<List<GameResponse>> getGames(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(name="from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name="to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         List<Game> games = gameService.getGamesByDateRange(from, to);
         List<GameResponse> dto = games.stream()

@@ -14,7 +14,9 @@ public class RecordResponse {
     private String ticketImageUrl;
     private Integer emotionCode;  // emotion_code로 수정
     private String comment;
+    private String longContent;
     private String bestPlayer;
+    private List<String> companions; // 추가
     private List<String> foodTags;
     private List<String> mediaUrls;
     private String result;
@@ -23,16 +25,19 @@ public class RecordResponse {
 
     // 생성자 수정
     public RecordResponse(Long recordId, Long userId, String gameId, String seatInfo, String ticketImageUrl,
-                          Integer emotionCode, String comment, String bestPlayer, List<String> foodTags,
-                          List<String> mediaUrls, String result, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                          Integer emotionCode, String comment, String longContent, String bestPlayer,
+                          List<String> companions, List<String> foodTags, List<String> mediaUrls,
+                          String result, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.recordId = recordId;
-        this.userId = userId;  // Long으로 수정
+        this.userId = userId;
         this.gameId = gameId;
         this.seatInfo = seatInfo;
         this.ticketImageUrl = ticketImageUrl;
-        this.emotionCode = emotionCode;  // emotion_code로 수정
+        this.emotionCode = emotionCode;
         this.comment = comment;
+        this.longContent = longContent;
         this.bestPlayer = bestPlayer;
+        this.companions = companions;
         this.foodTags = foodTags;
         this.mediaUrls = mediaUrls;
         this.result = result;

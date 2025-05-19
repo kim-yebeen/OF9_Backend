@@ -10,306 +10,260 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class RecordService {
     private final RecordRepository recordRepo;
-    private final GameRepository gameRepo;
-    private final UserRepository userRepo;
+    private final GameRepository   gameRepo;
+    private final UserRepository   userRepo;
 
-    // 레코드 생성 메서드
+    // 피드, 리스트에서 짧게 보여줄 때  —  "25/04/29 Fri"
+    private static final DateTimeFormatter FEED_FMT =
+            DateTimeFormatter.ofPattern("yy/MM/dd EEE", Locale.ENGLISH);
+
+    // 업로드 후 상세에 “2025년 04월 29일 (금)요일” 처럼 보여줄 때
+    private static final DateTimeFormatter UPLOAD_FMT =
+            DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 (E)요일", Locale.KOREAN);
+
+    private static final DateTimeFormatter TIME_FMT =
+            DateTimeFormatter.ofPattern("H:mm");
+
+    // — 1단계: 최소 정보로 생성 →
     @Transactional
-    public RecordResponse createRecord(CreateRecordRequest req) {
-        // 1) 유저·게임 정보 조회
+    public RecordUploadResponse uploadRecord(CreateRecordRequest req) {
         User user = userRepo.findById(req.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저 ID: " + req.getUserId()));
-
-        // 사용자 favTeam이 없으면 예외 처리
-        if (user.getFavTeam() == null || user.getFavTeam().isEmpty()) {
-            throw new IllegalArgumentException("유저의 즐겨찾는 팀이 설정되지 않았습니다.");
-        }
-
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저"));
         Game game = gameRepo.findById(req.getGameId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + req.getGameId()));
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임"));
 
-        // 2) emotion_code 값을 그대로 할당 (변환 없이 그대로 사용)
-        Integer emotionCode = req.getEmotionCode();
-
-        // 3) 경기 결과 계산
         String result = calculateResult(user.getFavTeam(), game);
 
-        // 4) Record 엔티티 빌드 (game 필드들은 DB 조회값 사용)
-        Record record = Record.builder()
+        Record rec = Record.builder()
                 .userId(req.getUserId())
                 .gameId(req.getGameId())
+                .stadium(req.getStadium())
                 .seatInfo(req.getSeatInfo())
-                .ticketImageUrl(req.getTicketImageUrl())
-                .emotionCode(emotionCode)  // emotion_code에 값 할당
-                .comment(req.getComment())
-                .bestPlayer(req.getBestPlayer())
-                .foodTags(req.getFoodTags())
-                .mediaUrls(req.getMediaUrls())
-                .result(result)      // 서버에서 계산한 결과
+                .emotionCode(req.getEmotionCode())
+                .result(result)
                 .build();
+        rec = recordRepo.save(rec);
 
-        record = recordRepo.save(record);
-        return toResponse(record);  // Record를 RecordResponse로 변환하여 반환
+        return toUploadResponse(rec, game);
     }
 
-
-    // `fav_team`을 짧은 이름으로 변환하는 메서드
-    private String convertFavTeam(String favTeam) {
-        switch (favTeam) {
-            case "KIA 타이거즈":
-                return "KIA";
-            case "두산 베어스":
-                return "두산";
-            case "롯데 자이언츠":
-                return "롯데";
-            case "삼성 라이온즈":
-                return "삼성";
-            case "키움 히어로즈":
-                return "키움";
-            case "한화 이글스":
-                return "한화";
-            case "KT WIZ":
-                return "KT";
-            case "LG 트윈스":
-                return "LG";
-            case "NC 다이노스":
-                return "NC";
-            case "SSG 랜더스":
-                return "SSG";
-            default:
-                return favTeam;  // 기본값은 그대로 반환
-        }
-    }
-
-    // `fav_team`과 `home_team`, `away_team` 비교 후 경기 결과 계산
-    private String calculateResult(String favTeam, Game game) {
-        // `fav_team`을 짧은 이름으로 변환
-        String convertedFavTeam = convertFavTeam(favTeam);
-        String homeTeam = game.getHomeTeam();
-        String awayTeam = game.getAwayTeam();
-
-        // `home_team`과 `away_team`을 비교
-        boolean isHome = convertedFavTeam.equals(homeTeam);
-        boolean isAway = convertedFavTeam.equals(awayTeam);
-
-        if (!isHome && !isAway) {
-            // 즐겨찾는 팀이 경기 참가팀이 아닌 경우 예외 처리
-            throw new IllegalArgumentException("유저 즐겨찾는 팀이 해당 경기 정보에 없습니다.");
-        }
-
-        // 경기 스코어 비교 (홈팀과 원정팀 스코어)
-        int homeScore = game.getHomeScore() != null ? game.getHomeScore() : 0;
-        int awayScore = game.getAwayScore() != null ? game.getAwayScore() : 0;
-
-        // 동점일 경우 DRAW
-        if (homeScore == awayScore) {
-            return "DRAW";
-        }
-
-        // 홈팀/원정팀 승리 계산
-        boolean isWin = (isHome && homeScore > awayScore)
-                || (isAway && awayScore > homeScore);
-        return isWin ? "WIN" : "LOSE";  // WIN / LOSE / DRAW
-    }
-
-    // Record를 RecordResponse로 변환
-    private RecordResponse toResponse(Record record) {
-        return new RecordResponse(
-                record.getRecordId(),
-                record.getUserId(),
-                record.getGameId(),
-                record.getSeatInfo(),
-                record.getTicketImageUrl(),
-                record.getEmotionCode(),
-                record.getComment(),
-                record.getBestPlayer(),
-                record.getFoodTags(),
-                record.getMediaUrls(),
-                record.getResult(),
-                record.getCreatedAt(),
-                record.getUpdatedAt()
+    public RecordUploadResponse toUploadResponse(Record rec, Game g) {
+        String d1 = g.getDate().format(UPLOAD_FMT);
+        String t1 = g.getTime() != null
+                ? g.getTime().format(TIME_FMT)
+                : "";
+        String label = convertEmotionLabel(rec.getEmotionCode());
+        // companions 테이블에 저장한 친구 목록은 별도 조회해서 리턴해도 좋습니다.
+        return new RecordUploadResponse(
+                rec.getRecordId(),
+                d1,
+                t1,
+                rec.getEmotionCode(),
+                label,
+                convertHomeTeam(g.getHomeTeam()),
+                convertAwayTeam(g.getAwayTeam()),
+                rec.getStadium(),      // 사용자가 입력한 구장
+                rec.getSeatInfo(),
+                g.getHomeScore(),
+                g.getAwayScore(),
+                rec.getResult()
         );
     }
 
+    // — 2단계: 상세 정보로 업데이트 →
+    @Transactional
+    public RecordDetailResponse updateRecord(Long recordId, UpdateRecordRequest req) {
+        Record rec = recordRepo.findById(recordId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
+        // 선택입력값만 set
+        rec.setComment   (req.getComment());
+        rec.setLongContent(req.getLongContent());
+        rec.setBestPlayer(req.getBestPlayer());
+        rec.setCompanions(req.getCompanions());
+        rec.setFoodTags  (req.getFoodTags());
+        rec.setMediaUrls (req.getMediaUrls());
+        // 변경감지 → 자동 save
+        return getRecordDetail(recordId);
+    }
 
-    // 레코드 상세 정보 조회
+    // 2) 피드에서 클릭 시 상세 조회
+    @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long recordId) {
-        // 1) 레코드 조회
-        Record record = recordRepo.findById(recordId)
+        Record rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
+        Game game = gameRepo.findById(rec.getGameId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
 
-        // 2) 게임 정보 조회 (gameId를 Long 타입으로 조회)
-        Game game = gameRepo.findById(record.getGameId())  // gameId는 String으로 저장되므로 그대로 사용
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + record.getGameId()));
+        String fmtDate = game.getDate().format(UPLOAD_FMT);
+        String fmtTime = game.getTime().format(TIME_FMT);
+        String emoLabel = convertEmotionLabel(rec.getEmotionCode());
 
-        // 3) 게임 일자, 시간, 홈팀, 어웨이팀, 구장 정보 가져오기
-        String gameDate = game.getDate().toString();    // 날짜
-        String gameTime = game.getTime().toString();    // 시간
-        String homeTeam = convertHomeTeam(game.getHomeTeam());  // 홈팀 변환
-        String awayTeam = convertAwayTeam(game.getAwayTeam());  // 어웨이팀 변환
-        String stadium = convertStadium(game.getStadium());     // 구장 변환
-        Integer homeScore   = game.getHomeScore();
-        Integer awayScore   = game.getAwayScore();
-
-        // 4) 이모티콘 코드만 반환
-        Integer emotionCode = record.getEmotionCode();  // 이모티콘 코드만 반환
-        String emotionLabel = convertEmotionLabel(emotionCode);  // 이모티콘 라벨 변환
-
-        // 5) 응답 반환
-        return new RecordDetailResponse(
-                gameDate,
-                gameTime,
-                emotionCode,
-                emotionLabel,  // 라벨 값 추가
-                record.getTicketImageUrl(),
-                homeTeam,
-                awayTeam,
-                stadium,
-                record.getSeatInfo(),
-                homeScore,
-                awayScore
-        );
+        return RecordDetailResponse.builder()
+                .recordId(rec.getRecordId())                    // Long
+                .gameDate(fmtDate)                              // String
+                .gameTime(fmtTime)                              // String
+                .emotionCode(rec.getEmotionCode())              // Integer
+                .emotionLabel(emoLabel)                         // String
+                .homeTeam(convertHomeTeam(game.getHomeTeam()))  // String
+                .awayTeam(convertAwayTeam(game.getAwayTeam()))  // String
+                .stadium(convertStadium(game.getStadium()))     // String
+                .seatInfo(rec.getSeatInfo())                    // String
+                .homeScore(game.getHomeScore())                 // Integer
+                .awayScore(game.getAwayScore())                 // Integer
+                .result(rec.getResult())                        // String
+                .comment(rec.getComment())                      // String
+                .longContent(rec.getLongContent())              // String
+                .bestPlayer(rec.getBestPlayer())                // String
+                .companions(rec.getCompanions())                // List<String>
+                .foodTags(rec.getFoodTags())                    // List<String>
+                .mediaUrls(rec.getMediaUrls())                  // List<String>
+                .build();
     }
 
-    // 이모티콘 코드에 해당하는 라벨 반환
-    private String convertEmotionLabel(Integer emotionCode) {
-        switch (emotionCode) {
-            case 1: return "짜릿해요";
-            case 2: return "만족해요";
-            case 3: return "감동이에요";
-            case 4: return "놀랐어요";
-            case 5: return "행복해요";
-            case 6: return "답답해요";
-            case 7: return "아쉬워요";
-            case 8: return "화났어요";
-            case 9: return "지쳤어요";
-            default: return "알 수 없음";
-        }
-    }
-
-    // `fav_team`을 짧은 이름으로 변환하는 메서드
-    private String convertHomeTeam(String homeTeam) {
-        switch (homeTeam) {
-            case "KIA": return "KIA 타이거즈";
-            case "두산": return "두산 베어스";
-            case "롯데": return "롯데 자이언츠";
-            case "삼성": return "삼성 라이온즈";
-            case "키움": return "키움 히어로즈";
-            case "한화": return "한화 이글스";
-            case "KT": return "KT WIZ";
-            case "LG": return "LG 트윈스";
-            case "NC": return "NC 다이노스";
-            case "SSG": return "SSG 랜더스";
-            default: return homeTeam;  // 기본값은 그대로 반환
-        }
-    }
-
-    // 어웨이팀 값을 짧은 이름에서 긴 이름으로 변환하는 메서드
-    private String convertAwayTeam(String awayTeam) {
-        switch (awayTeam) {
-            case "KIA": return "KIA 타이거즈";
-            case "두산": return "두산 베어스";
-            case "롯데": return "롯데 자이언츠";
-            case "삼성": return "삼성 라이온즈";
-            case "키움": return "키움 히어로즈";
-            case "한화": return "한화 이글스";
-            case "KT": return "KT WIZ";
-            case "LG": return "LG 트윈스";
-            case "NC": return "NC 다이노스";
-            case "SSG": return "SSG 랜더스";
-            default: return awayTeam;  // 기본값은 그대로 반환
-        }
-    }
-
-    // stadium 값을 짧은 이름에서 긴 이름으로 변환하는 메서드
-    private String convertStadium(String stadium) {
-        switch (stadium) {
-            case "잠실": return "잠실야구장";
-            case "문학": return "문학야구장";
-            case "고척": return "고척 SKYDOME";
-            case "사직": return "사직야구장";
-            case "수원": return "KT 위즈 파크";
-            case "대전(신)": return "한화생명 이글스 파크";
-            case "대구": return "대구삼성라이온즈파크";
-            case "광주": return "기아 챔피언스 필드";
-            case "창원": return "NC 파크";
-            default: return stadium;  // 기본값은 그대로 반환
-        }
-    }
-
-    private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("yyyy/MM/dd EEE", Locale.ENGLISH);
-
-    // 1) 피드
+    // 3) 마이페이지 피드 조회
+    @Transactional(readOnly = true)
     public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
         return recordRepo.findByUserId(userId).stream()
-                .filter(rec -> rec.getMediaUrls() != null && !rec.getMediaUrls().isEmpty())
-                .map(rec -> {
-                    Game g = gameRepo.findById(rec.getGameId()).orElseThrow();
-                    // 바뀐 포맷 사용
-                    String fmtDate = g.getDate().format(DATE_FMT);
-                    String img = rec.getMediaUrls().get(0);
-                    return new RecordFeedResponse(rec.getRecordId(), fmtDate, img);
-                })
-                .collect(Collectors.toList());
+                .filter(r->r.getMediaUrls()!=null && !r.getMediaUrls().isEmpty())
+                .map(r->{
+                    Game g = gameRepo.getById(r.getGameId());
+                    return new RecordFeedResponse(
+                            r.getRecordId(),
+                            g.getDate().format(FEED_FMT),
+                            r.getMediaUrls().get(0)
+                    );
+                }).toList();
     }
 
 
-    //2) 리스트: 업로드 상세 정보와 동일
+    // 4) 마이페이지 리스트 조회
+    @Transactional(readOnly = true)
     public List<RecordListResponse> getUserRecordsList(Long userId) {
         return recordRepo.findByUserId(userId).stream()
-                .map(rec -> {
-                    // 1) Game 조회
-                    Game game = gameRepo.findById(rec.getGameId())
-                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
-                    // 2) 날짜 포맷
-                    String gameDate = game.getDate().format(DATE_FMT);
-                    // 3) 시간
-                    String gameTime = game.getTime().toString();
-                    // 4) 감정 라벨
-                    Integer emoCode = rec.getEmotionCode();
-                    String emoLabel = convertEmotionLabel(emoCode);
-                    // 5) 팀/구장 변환
-                    String home = convertHomeTeam(game.getHomeTeam());
-                    String away = convertAwayTeam(game.getAwayTeam());
-                    String stdm = convertStadium(game.getStadium());
-                    // 6) 결과
-                    String result = rec.getResult();
-
+                .map(r -> {
+                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
                     return new RecordListResponse(
-                            gameDate,
-                            gameTime,
-                            emoCode,
-                            emoLabel,
-                            rec.getTicketImageUrl(),
-                            home,
-                            away,
-                            stdm,
-                            rec.getSeatInfo(),
-                            result
+                            g.getDate().format(UPLOAD_FMT),
+                            g.getTime().format(TIME_FMT),
+                            r.getEmotionCode(),
+                            convertEmotionLabel(r.getEmotionCode()),
+                            convertHomeTeam(g.getHomeTeam()),
+                            convertAwayTeam(g.getAwayTeam()),
+                            r.getStadium(),
+                            r.getSeatInfo(),
+                            r.getResult()
                     );
                 })
                 .collect(Collectors.toList());
     }
 
-    // 3) 캘린더: 날짜 + 승패여부
+    // 5) 마이페이지 캘린더 조회
+    @Transactional(readOnly = true)
     public List<RecordCalendarResponse> getUserRecordsCalendar(Long userId) {
         return recordRepo.findByUserId(userId).stream()
-                .map(rec -> {
-                    Game g = gameRepo.findById(rec.getGameId())
-                            .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
-                    // LocalDate → ISO 문자열 ("yyyy-MM-dd")
-                    String gameDateStr = g.getDate().toString();
-                    return new RecordCalendarResponse(gameDateStr, rec.getResult());
+                .map(r -> {
+                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
+                    return new RecordCalendarResponse(
+                            g.getDate().toString(), // 프론트에서 ISO 포맷 처리
+                            r.getResult()
+                    );
                 })
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public void deleteRecord(Long recordId) {
+        if (!recordRepo.existsById(recordId)) {
+            throw new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId);
+        }
+        recordRepo.deleteById(recordId);
+    }
+
+    // ——— Helpers ———
+
+    private String calculateResult(String favTeam, Game game) {
+        String shortFav = convertFavTeam(favTeam);
+        boolean isHome = shortFav.equals(game.getHomeTeam());
+        boolean isAway = shortFav.equals(game.getAwayTeam());
+        if (!isHome && !isAway) throw new IllegalArgumentException("즐겨찾는 팀 불일치");
+
+        int home = game.getHomeScore()==null?0:game.getHomeScore();
+        int away = game.getAwayScore()==null?0:game.getAwayScore();
+        if (home == away) return "DRAW";
+        boolean win = (isHome && home>away) || (isAway && away>home);
+        return win ? "WIN" : "LOSE";
+    }
+
+    private String convertEmotionLabel(int code) {
+        return switch(code) {
+            case 1 -> "짜릿해요";
+            case 2 -> "만족해요";
+            case 3 -> "감동이에요";
+            case 4 -> "놀랐어요";
+            case 5 -> "행복해요";
+            case 6 -> "답답해요";
+            case 7 -> "아쉬워요";
+            case 8 -> "화났어요";
+            case 9 -> "지쳤어요";
+            default -> "알 수 없음";
+        };
+    }
+
+    private String convertFavTeam(String fav) {
+        return switch(fav) {
+            case "KIA 타이거즈" -> "KIA";
+            case "두산 베어스"   -> "두산";
+            case "롯데 자이언츠" -> "롯데";
+            case "삼성 라이온즈" -> "삼성";
+            case "키움 히어로즈" -> "키움";
+            case "한화 이글스"   -> "한화";
+            case "KT WIZ"      -> "KT";
+            case "LG 트윈스"    -> "LG";
+            case "NC 다이노스"   -> "NC";
+            case "SSG 랜더스"   -> "SSG";
+            default -> fav;
+        };
+    }
+
+    private String convertHomeTeam(String t) {
+        return switch(t) {
+            case "KIA" -> "KIA 타이거즈";
+            case "두산"-> "두산 베어스";
+            case "롯데"-> "롯데 자이언츠";
+            case "삼성"-> "삼성 라이온즈";
+            case "키움"-> "키움 히어로즈";
+            case "한화"-> "한화 이글스";
+            case "KT"  -> "KT WIZ";
+            case "LG"  -> "LG 트윈스";
+            case "NC"  -> "NC 다이노스";
+            case "SSG" -> "SSG 랜더스";
+            default -> t;
+        };
+    }
+
+    private String convertAwayTeam(String t) {
+        return convertHomeTeam(t);
+    }
+
+    private String convertStadium(String s) {
+        return switch(s) {
+            case "잠실"   -> "잠실야구장";
+            case "문학"   -> "문학야구장";
+            case "고척"   -> "고척 SKYDOME";
+            case "사직"   -> "사직야구장";
+            case "수원"   -> "KT 위즈 파크";
+            case "대전(신)"-> "한화생명 이글스 파크";
+            case "대구"   -> "대구삼성라이온즈파크";
+            case "광주"   -> "기아 챔피언스 필드";
+            case "창원"   -> "NC 파크";
+            default -> s;
+        };
+    }
 }
