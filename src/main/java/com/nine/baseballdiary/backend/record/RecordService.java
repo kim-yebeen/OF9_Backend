@@ -2,8 +2,8 @@ package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
-import com.nine.baseballdiary.backend.user.User;
-import com.nine.baseballdiary.backend.user.UserRepository;
+import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

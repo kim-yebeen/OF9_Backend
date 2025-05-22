@@ -1,14 +1,13 @@
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     kakao_id BIGINT UNIQUE NOT NULL,
-    nickname VARCHAR(50) NOT NULL,
+    nickname VARCHAR(50) NOT NULL UNIQUE,
     profile_image_url TEXT,
-    body VARCHAR(100),
     fav_team VARCHAR(50),
+    is_priavate BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
     );
-
 
 
 CREATE TABLE IF NOT EXISTS user_follow (
@@ -35,8 +34,8 @@ CREATE TABLE IF NOT EXISTS game (
 
 CREATE TABLE IF NOT EXISTS record (
     record_id SERIAL PRIMARY KEY,
-    user_id INT REFERENCES users(id),
-    game_id VARCHAR REFERENCES game(game_id),
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,
+    game_id VARCHAR REFERENCES game(game_id) ON DELETE NO ACTION,
     seat_info VARCHAR(100),
     stadium VARCHAR(50) NOT NULL,
     comment TEXT,
@@ -51,7 +50,7 @@ CREATE TABLE IF NOT EXISTS record (
     );
 
 CREATE TABLE IF NOT EXISTS record_companions (
-                                                 record_id     INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
+    record_id     INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
     companion_id  INT NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
     PRIMARY KEY(record_id, companion_id)
     );
@@ -86,3 +85,12 @@ INSERT INTO emotion (code, label) VALUES
     (8, '화났어요'),
     (9, '지쳤어요')
 ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS follow_request (
+    id SERIAL PRIMARY KEY,
+    requester_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
+);

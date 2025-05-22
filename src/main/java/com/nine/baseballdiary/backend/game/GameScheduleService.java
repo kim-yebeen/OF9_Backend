@@ -183,7 +183,7 @@ public class GameScheduleService {
                         }
 
                         String rowText = row.getText();
-                        if (rowText.contains("우천취소") || rowText.contains("경기취소")) {
+                        if (rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
                             status = "CANCELED";
                         }
 

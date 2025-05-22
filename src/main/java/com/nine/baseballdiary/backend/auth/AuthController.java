@@ -1,7 +1,7 @@
 // src/main/java/com/nine/baseballdiary/backend/auth/AuthController.java
 package com.nine.baseballdiary.backend.auth;
 
-import com.nine.baseballdiary.backend.user.User;
+import com.nine.baseballdiary.backend.user.entity.User;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

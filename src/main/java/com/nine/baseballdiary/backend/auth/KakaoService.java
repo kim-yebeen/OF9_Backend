@@ -1,7 +1,7 @@
 package com.nine.baseballdiary.backend.auth;
 
-import com.nine.baseballdiary.backend.user.User;
-import com.nine.baseballdiary.backend.user.UserRepository;
+import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
