@@ -1,11 +1,15 @@
 package com.nine.baseballdiary.backend.game;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Entity
 @Table(name = "game")
+@Getter @Setter
 public class Game {
 
     @Id
@@ -45,89 +49,4 @@ public class Game {
     @Column(name = "away_img", columnDefinition = "TEXT")
     private String awayImg;
 
-    // getters and setters
-
-    public String getGameId() {
-        return gameId;
     }
-    public void setGameId(String gameId) {
-        this.gameId = gameId;
-    }
-
-    public LocalDate getDate() {
-        return date;
-    }
-    public void setDate(LocalDate date) {
-        this.date = date;
-    }
-
-    public LocalTime getTime() {
-        return time;
-    }
-    public void setTime(LocalTime time) {
-        this.time = time;
-    }
-
-    public LocalTime getPlaytime() {
-        return playtime;
-    }
-    public void setPlaytime(LocalTime playtime) {
-        this.playtime = playtime;
-    }
-
-    public String getStadium() {
-        return stadium;
-    }
-    public void setStadium(String stadium) {
-        this.stadium = stadium;
-    }
-
-    public String getHomeTeam() {
-        return homeTeam;
-    }
-    public void setHomeTeam(String homeTeam) {
-        this.homeTeam = homeTeam;
-    }
-
-    public String getAwayTeam() {
-        return awayTeam;
-    }
-    public void setAwayTeam(String awayTeam) {
-        this.awayTeam = awayTeam;
-    }
-
-    public Integer getHomeScore() {
-        return homeScore;
-    }
-    public void setHomeScore(Integer homeScore) {
-        this.homeScore = homeScore;
-    }
-
-    public Integer getAwayScore() {
-        return awayScore;
-    }
-    public void setAwayScore(Integer awayScore) {
-        this.awayScore = awayScore;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getHomeImg() {
-        return homeImg;
-    }
-    public void setHomeImg(String homeImg) {
-        this.homeImg = homeImg;
-    }
-
-    public String getAwayImg() {
-        return awayImg;
-    }
-    public void setAwayImg(String awayImg) {
-        this.awayImg = awayImg;
-    }
-}

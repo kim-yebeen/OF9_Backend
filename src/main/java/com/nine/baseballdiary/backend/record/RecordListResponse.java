@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.reaction.ReactionResponse;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,6 +33,10 @@ public class RecordListResponse {
     private String longContent;
     private List<String> mediaUrls;
 
+    private List<ReactionResponse> reactions;
+    private Integer totalReactionCount;
+    private Long recordId;
+
     public RecordListResponse(Long userId,
                               String nickname,
                               String profileImageUrl,
@@ -47,7 +52,9 @@ public class RecordListResponse {
                               Integer emotionCode,
                               String emotionLabel,
                               String longContent,
-                              List<String> mediaUrls) {
+                              List<String> mediaUrls,
+                              List<ReactionResponse> reactions,
+                              Integer totalReactionCount) {
         this.userId = userId;
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
@@ -64,6 +71,8 @@ public class RecordListResponse {
         this.emotionLabel = emotionLabel;
         this.longContent = longContent;
         this.mediaUrls = mediaUrls;
+        this.reactions = reactions;
+        this.totalReactionCount = totalReactionCount;
     }
 
 }

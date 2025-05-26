@@ -2,11 +2,12 @@ package com.nine.baseballdiary.backend.record;
 
 import lombok.Getter;
 import lombok.Builder;
+import lombok.Setter;
 
 import java.util.List;
 //클릭 시 상세 보기 용
 
-@Getter
+@Getter @Setter
 @Builder
 public class RecordDetailResponse {
     private Long recordId;
@@ -28,4 +29,5 @@ public class RecordDetailResponse {
     private List<String> companions;
     private List<String> foodTags;
     private List<String> mediaUrls;
+    private String createdAt;
 }

@@ -13,14 +13,13 @@ import java.util.List;
 public class RecordController {
     private final RecordService service;
 
-    // 2-1) 1단계 생성 (최소 필수정보)
     @PostMapping
-    public ResponseEntity<RecordUploadResponse> uploadRecord(@RequestBody CreateRecordRequest req) {
+    public ResponseEntity<RecordUploadResponse> upload(@RequestBody CreateRecordRequest req) {
         RecordUploadResponse res = service.uploadRecord(req);
         return ResponseEntity.status(201).body(res);
     }
 
-    // 2-2) 2단계 수정 (상세 입력)
+    // 레코드 수정
     @PatchMapping("/{recordId}")
     public ResponseEntity<RecordDetailResponse> updateRecord(
             @PathVariable Long recordId,

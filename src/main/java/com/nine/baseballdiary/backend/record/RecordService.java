@@ -2,6 +2,9 @@ package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
+import com.nine.baseballdiary.backend.reaction.ReactionResponse;
+import com.nine.baseballdiary.backend.reaction.ReactionService;
+import com.nine.baseballdiary.backend.reaction.RecordReactionSummary;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
@@ -22,6 +25,7 @@ public class RecordService {
     private final GameRepository   gameRepo;
     private final UserRepository   userRepo;
     private final UserFollowRepository userflRepo;
+    private final ReactionService reactionService;
 
     // 피드, 리스트에서 짧게 보여줄 때  —  "25/04/29 Fri"
     private static final DateTimeFormatter FEED_FMT =
@@ -34,53 +38,46 @@ public class RecordService {
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("H:mm");
 
-    // — 1단계: 최소 정보로 생성 →
+
+    // 레코드 업로드 (모든 정보를 한번에 처리)
     @Transactional
     public RecordUploadResponse uploadRecord(CreateRecordRequest req) {
+        // 1) User 조회
         User user = userRepo.findById(req.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저"));
-        Game game = gameRepo.findById(req.getGameId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임"));
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + req.getUserId()));
 
+        // 2) Game 조회
+        Game game = gameRepo.findById(req.getGameId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
+
+        // 3) 결과 계산
         String result = calculateResult(user.getFavTeam(), game);
 
-        Record rec = Record.builder()
+        // 4) Record 엔티티 빌드 (모든 정보 포함)
+        Record record = Record.builder()
                 .userId(req.getUserId())
                 .gameId(req.getGameId())
                 .stadium(req.getStadium())
                 .seatInfo(req.getSeatInfo())
                 .emotionCode(req.getEmotionCode())
+                .comment(req.getComment())
+                .longContent(req.getLongContent())
+                .bestPlayer(req.getBestPlayer())
+                .companions(req.getCompanions())
+                .foodTags(req.getFoodTags())
+                .mediaUrls(req.getMediaUrls())
                 .result(result)
                 .build();
-        rec = recordRepo.save(rec);
 
-        return toUploadResponse(rec, game);
+        // 5) 저장
+        Record savedRecord = recordRepo.save(record);
+
+        // 6) 단순한 응답 반환 (recordId와 gameDate만)
+        String dateStr = game.getDate().format(UPLOAD_FMT);
+        return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);
     }
 
-    public RecordUploadResponse toUploadResponse(Record rec, Game g) {
-        String d1 = g.getDate().format(UPLOAD_FMT);
-        String t1 = g.getTime() != null
-                ? g.getTime().format(TIME_FMT)
-                : "";
-        String label = convertEmotionLabel(rec.getEmotionCode());
-        // companions 테이블에 저장한 친구 목록은 별도 조회해서 리턴해도 좋습니다.
-        return new RecordUploadResponse(
-                rec.getRecordId(),
-                d1,
-                t1,
-                rec.getEmotionCode(),
-                label,
-                convertHomeTeam(g.getHomeTeam()),
-                convertAwayTeam(g.getAwayTeam()),
-                rec.getStadium(),      // 사용자가 입력한 구장
-                rec.getSeatInfo(),
-                g.getHomeScore(),
-                g.getAwayScore(),
-                rec.getResult()
-        );
-    }
-
-    // — 2단계: 상세 정보로 업데이트 →
+    // 레코드 수정
     @Transactional
     public RecordDetailResponse updateRecord(Long recordId, UpdateRecordRequest req) {
         Record rec = recordRepo.findById(recordId)
@@ -108,6 +105,8 @@ public class RecordService {
         String fmtTime = game.getTime().format(TIME_FMT);
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
 
+        String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
         return RecordDetailResponse.builder()
                 .recordId(rec.getRecordId())                    // Long
                 .gameDate(fmtDate)                              // String
@@ -126,7 +125,8 @@ public class RecordService {
                 .bestPlayer(rec.getBestPlayer())                // String
                 .companions(rec.getCompanions())                // List<String>
                 .foodTags(rec.getFoodTags())                    // List<String>
-                .mediaUrls(rec.getMediaUrls())                  // List<String>
+                .mediaUrls(rec.getMediaUrls())
+                .createdAt(createdAtStr)
                 .build();
     }
 
@@ -153,6 +153,11 @@ public class RecordService {
                 .map(r -> {
                     Game g = gameRepo.findById(r.getGameId()).orElseThrow();
                     User user = userRepo.findById(r.getUserId()).orElseThrow();
+// 리액션 정보 조회
+                    RecordReactionSummary reactionSummary = reactionService.getRecordReactions(r.getRecordId(), userId);
+                    List<ReactionResponse> reactions = reactionSummary.getReactions();
+                    int totalReactionCount = reactionSummary.getTotalCount();
+
                     return new RecordListResponse(
                             user.getId(),
                             user.getNickname(),
@@ -169,7 +174,9 @@ public class RecordService {
                             r.getEmotionCode(),
                             convertEmotionLabel(r.getEmotionCode()),
                             r.getLongContent(),
-                            r.getMediaUrls()
+                            r.getMediaUrls(),
+                            reactions, // 추가
+                            totalReactionCount
                     );
                 })
                 .collect(Collectors.toList());

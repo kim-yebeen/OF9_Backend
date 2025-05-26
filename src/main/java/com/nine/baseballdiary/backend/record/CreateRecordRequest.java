@@ -9,14 +9,18 @@ import java.util.List;
 @Getter
 @Setter
 public class CreateRecordRequest {
-    @NotNull
-    private Long userId;
-    @NotBlank
+    private long userId;
+    // 필수 정보
     private String gameId;
-    @NotBlank
     private String stadium;
-    @NotBlank
     private String seatInfo;
-    @NotNull
     private Integer emotionCode;
+
+    // 선택 정보 (한번에 다 받을 수 있음)
+    private String comment;
+    private String longContent;
+    private String bestPlayer;
+    private List<String> companions;
+    private List<String> foodTags;
+    private List<String> mediaUrls;
 }
