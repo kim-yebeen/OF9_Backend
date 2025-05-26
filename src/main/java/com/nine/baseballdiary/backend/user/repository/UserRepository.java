@@ -12,5 +12,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByNickname(String nickname);
     Optional<User> findByNickname(String nickname);
     List<User> findByNicknameContainingIgnoreCase(String q);
+
+    // [추가] id 리스트로 조회
+    List<User> findByIdIn(List<Long> ids);
+
+    // [추가] id 리스트 + 닉네임 검색
+    List<User> findByIdInAndNicknameContainingIgnoreCase(List<Long> ids, String nickname);
 }
 

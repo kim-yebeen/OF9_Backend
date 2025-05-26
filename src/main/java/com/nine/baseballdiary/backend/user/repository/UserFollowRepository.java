@@ -3,6 +3,7 @@ package com.nine.baseballdiary.backend.user.repository;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.entity.UserFollow;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -21,4 +22,13 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
 
     /** 나를 팔로잉한 사람들 */
     List<UserFollow> findByFolloweeId_Id(Long followeeId);
+
+    //내가 팔로우하는사람들의 ID 리스트
+    @Query("select uf.followeeId.id from UserFollow uf where uf.followerId.id = :userId")
+    List<Long> findFollowingIds(Long userId);
+
+    //나를 팔로우하는 사람들의 ID 리스트
+    @Query("select uf.followerId.id from UserFollow uf where uf.followeeId.id = :userId")
+    List<Long> findFollowerIds(Long userId);
+
 }

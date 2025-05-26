@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.user.dto.UserDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -63,5 +64,14 @@ public class RecordController {
     public ResponseEntity<Void> deleteRecord(@PathVariable Long recordId) {
         service.deleteRecord(recordId);
         return ResponseEntity.noContent().build();
+    }
+
+    // 함께한 사람(맞팔+검색) 불러오기 API
+    @GetMapping("/{userId}/mutual-friends")
+    public List<UserDto> getMutualFriends(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String query
+    ) {
+        return service.getMutualFriends(userId, query);
     }
 }

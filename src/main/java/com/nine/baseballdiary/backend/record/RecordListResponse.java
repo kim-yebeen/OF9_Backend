@@ -7,35 +7,63 @@ import java.util.List;
 
 @Getter @Setter
 public class RecordListResponse {
+
+    //사용자 정보
+    private Long userId;
+    private String nickname;
+    private String profileImageUrl;
+    private String favTeam;
+
+    //레코드 생성 시간
+    private String createdAt;
+
+    //게임 정보
     private String gameDate;
     private String gameTime;
-    private Integer emotionCode;
-    private String emotionLabel;
     private String homeTeam;
     private String awayTeam;
+    private Integer homeScore;
+    private Integer awayScore;
     private String stadium;
-    private String seatInfo;
-    private String result;
+    private Integer emotionCode;
+    private String emotionLabel;
 
-    public RecordListResponse(String gameDate,
+    //일기 내용
+    private String longContent;
+    private List<String> mediaUrls;
+
+    public RecordListResponse(Long userId,
+                              String nickname,
+                              String profileImageUrl,
+                              String favTeam,
+                              String createdAt,
+                              String gameDate,
                               String gameTime,
-                              Integer emotionCode,
-                              String emotionLabel,
                               String homeTeam,
                               String awayTeam,
+                              Integer homeScore,
+                              Integer awayScore,
                               String stadium,
-                              String seatInfo,
-                              String result) {
+                              Integer emotionCode,
+                              String emotionLabel,
+                              String longContent,
+                              List<String> mediaUrls) {
+        this.userId = userId;
+        this.nickname = nickname;
+        this.profileImageUrl = profileImageUrl;
+        this.favTeam = favTeam;
+        this.createdAt = createdAt;
         this.gameDate = gameDate;
         this.gameTime = gameTime;
-        this.emotionCode = emotionCode;
-        this.emotionLabel = emotionLabel;
         this.homeTeam = homeTeam;
         this.awayTeam = awayTeam;
+        this.homeScore = homeScore;
+        this.awayScore = awayScore;
         this.stadium = stadium;
-        this.seatInfo = seatInfo;
-        this.result = result;
+        this.emotionCode = emotionCode;
+        this.emotionLabel = emotionLabel;
+        this.longContent = longContent;
+        this.mediaUrls = mediaUrls;
     }
 
-    // Getter, Setter 추가
 }

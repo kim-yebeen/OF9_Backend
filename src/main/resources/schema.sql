@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS record (
     best_player VARCHAR(50),
     food_tags TEXT[],
     media_urls TEXT[],
-    result VARCHAR(10),  -- WIN / LOSE / DRAW
+    result VARCHAR(10),  -- WIN / LOSE / DRAW /ETC
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
     );

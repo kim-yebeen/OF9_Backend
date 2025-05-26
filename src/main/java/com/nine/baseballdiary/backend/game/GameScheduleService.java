@@ -39,7 +39,7 @@ public class GameScheduleService {
     }
 
     //매주 월요일 새벽 1시 전체 크롤링
-    @Scheduled(cron = "0 0 3 * * 1")
+    @Scheduled(cron = "0 23 16 * * ?")
     public void weeklyInitialCrawl() {
         crawlSchedule(true);
     }
@@ -80,6 +80,7 @@ public class GameScheduleService {
             int startMonth = fullCrawl ? 1 : Integer.parseInt(currentMonth);
             int endMonth   = fullCrawl ? 12 : Integer.parseInt(currentMonth);
 
+            LocalDate today = LocalDate.now();
 
             for (int m = startMonth; m <= endMonth; m++) {
                 String monthVal = String.format("%02d", m);
@@ -99,7 +100,7 @@ public class GameScheduleService {
                         continue;
                     }
 
-                        List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
+                    List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
                     String currentDayRaw = "";
                     Map<String, Integer> doubleHeaderCounter = new HashMap<>();
 
@@ -127,64 +128,80 @@ public class GameScheduleService {
                         WebElement playCell = row.findElement(By.cssSelector("td.play"));
                         String playText = playCell.getText().trim(); // ex: "KT 3 vs 3 두산"
 
-                        logger.info("원본 텍스트: " + playText);
+                        // 하이라이트 링크 확인
+                        boolean hasHighlight = false;
+                        try {
+                            List<WebElement> highlightLinks = row.findElements(By.cssSelector("a[href*='highlight'], a[href*='Highlight']"));
+                            hasHighlight = !highlightLinks.isEmpty();
+                            if (hasHighlight) {
+                                logger.info("하이라이트 링크 발견: 경기 종료로 판단");
+                            }
+                        } catch (Exception e) {
+                            // 하이라이트 링크 확인 실패시 무시
+                        }
+
+                        logger.info("원본 텍스트: " + playText + ", 하이라이트 존재: " + hasHighlight);
 
                         String awayName = "", homeName = "";
                         int awayScore = 0, homeScore = 0;
                         String status = "SCHEDULED";
 
-                        String[] vsParts = playText.split("\\s*vs\\s*");
-                        if (vsParts.length == 2) {
-                            String left = vsParts[0].trim();
-                            String right = vsParts[1].trim();
-
-                            logger.info("분리된 텍스트 - 왼쪽: " + left + ", 오른쪽: " + right);
-
-                            // 원정팀(왼쪽) 처리
-                            Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d*).*");
-                            Matcher awayMatcher = awayPattern.matcher(left);
-                            if (awayMatcher.matches()) {
-                                awayName = awayMatcher.group(1).trim();
-                                String scoreStr = awayMatcher.group(2);
-                                if (scoreStr != null && !scoreStr.isEmpty()) {
-                                    try {
-                                        awayScore = Integer.parseInt(scoreStr);
-                                        status = "FINISHED";
-                                    } catch (NumberFormatException e) {
-                                        logger.warning("원정팀 점수 파싱 오류: " + scoreStr);
-                                    }
-                                }
-                            } else {
-                                awayName = left;
-                            }
-
-                            // 홈팀(오른쪽) 처리
-                            Pattern homePattern = Pattern.compile("(\\d*)\\s*([가-힣A-Z]+).*");
-                            Matcher homeMatcher = homePattern.matcher(right);
-                            if (homeMatcher.matches()) {
-                                String scoreStr = homeMatcher.group(1);
-                                homeName = homeMatcher.group(2).trim();
-                                if (scoreStr != null && !scoreStr.isEmpty()) {
-                                    try {
-                                        homeScore = Integer.parseInt(scoreStr);
-                                        if ("SCHEDULED".equals(status)) {
-                                            status = "FINISHED";
-                                        }
-                                    } catch (NumberFormatException e) {
-                                        logger.warning("홈팀 점수 파싱 오류: " + scoreStr);
-                                    }
-                                }
-                            } else {
-                                homeName = right;
-                            }
-
-                            logger.info("파싱 결과 - 원정팀: " + awayName + ", 원정점수: " + awayScore +
-                                    ", 홈팀: " + homeName + ", 홈점수: " + homeScore);
-                        }
-
+                        // 취소 상태 먼저 확인
                         String rowText = row.getText();
                         if (rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
                             status = "CANCELED";
+                        } else {
+                            String[] vsParts = playText.split("\\s*vs\\s*");
+                            if (vsParts.length == 2) {
+                                String left = vsParts[0].trim();
+                                String right = vsParts[1].trim();
+
+                                logger.info("분리된 텍스트 - 왼쪽: " + left + ", 오른쪽: " + right);
+
+                                boolean hasScore = false;
+
+                                // 원정팀(왼쪽) 처리
+                                Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d*).*");
+                                Matcher awayMatcher = awayPattern.matcher(left);
+                                if (awayMatcher.matches()) {
+                                    awayName = awayMatcher.group(1).trim();
+                                    String scoreStr = awayMatcher.group(2);
+                                    if (scoreStr != null && !scoreStr.isEmpty()) {
+                                        try {
+                                            awayScore = Integer.parseInt(scoreStr);
+                                            hasScore = true;
+                                        } catch (NumberFormatException e) {
+                                            logger.warning("원정팀 점수 파싱 오류: " + scoreStr);
+                                        }
+                                    }
+                                } else {
+                                    awayName = left;
+                                }
+
+                                // 홈팀(오른쪽) 처리
+                                Pattern homePattern = Pattern.compile("(\\d*)\\s*([가-힣A-Z]+).*");
+                                Matcher homeMatcher = homePattern.matcher(right);
+                                if (homeMatcher.matches()) {
+                                    String scoreStr = homeMatcher.group(1);
+                                    homeName = homeMatcher.group(2).trim();
+                                    if (scoreStr != null && !scoreStr.isEmpty()) {
+                                        try {
+                                            homeScore = Integer.parseInt(scoreStr);
+                                            hasScore = true;
+                                        } catch (NumberFormatException e) {
+                                            logger.warning("홈팀 점수 파싱 오류: " + scoreStr);
+                                        }
+                                    }
+                                } else {
+                                    homeName = right;
+                                }
+
+                                // 상태 결정 로직 개선
+                                status = determineGameStatus(gameDate, today, hasScore, awayScore, homeScore, rowText, hasHighlight);
+
+                                logger.info("파싱 결과 - 원정팀: " + awayName + ", 원정점수: " + awayScore +
+                                        ", 홈팀: " + homeName + ", 홈점수: " + homeScore + ", 상태: " + status);
+                            }
                         }
 
                         // 정확한 팀 코드로 게임 ID 생성
@@ -217,7 +234,11 @@ public class GameScheduleService {
                         if (fullCrawl) {
                             gameService.saveOrUpdateSchedule(game);
                         } else if (gameService.existsById(gameId)) {
-                            gameService.updateResult(game);
+                            // 기존 게임의 상태를 확인하여 업데이트 여부 결정
+                            Game existingGame = gameService.findById(gameId).orElse(null);
+                            if (existingGame != null && shouldUpdateGame(existingGame, game)) {
+                                gameService.updateResult(game);
+                            }
                         } else {
                             gameService.saveGame(game);
                         }
@@ -235,6 +256,69 @@ public class GameScheduleService {
             if (driver != null) driver.quit();
         }
         System.out.println("크롤링 작업 완료");
+    }
+
+    /**
+     * 게임 상태를 결정하는 로직
+     */
+    private String determineGameStatus(LocalDate gameDate, LocalDate today, boolean hasScore,
+                                       int awayScore, int homeScore, String rowText, boolean hasHighlight) {
+
+        // 취소 상태 확인
+        if (rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
+            return "CANCELED";
+        }
+
+        // 하이라이트가 있으면 경기 완료로 처리
+        if (hasHighlight && hasScore) {
+            logger.info("하이라이트 존재 + 점수 있음 -> FINISHED");
+            return "FINISHED";
+        }
+
+        // 경기 날짜가 오늘보다 이전인 경우
+        if (gameDate.isBefore(today)) {
+            if (hasScore) {
+                // 과거 경기이고 점수가 있으면 완료
+                return "FINISHED";
+            } else {
+                // 과거 경기인데 점수가 없으면 취소되었을 가능성
+                return "CANCELED";
+            }
+        }
+
+        // 경기 날짜가 오늘인 경우
+        if (gameDate.equals(today)) {
+            if (hasScore && (awayScore > 0 || homeScore > 0)) {
+                // 오늘 경기이고 0이 아닌 점수가 있으면 진행중
+                // 하이라이트가 없으면 아직 진행중일 가능성
+                return "IN_PROGRESS";
+            } else if (hasScore && awayScore == 0 && homeScore == 0) {
+                // 오늘 경기이고 0:0이면 경기 시작 전 또는 진행중
+                return "SCHEDULED";
+            } else {
+                // 점수 정보가 없으면 예정
+                return "SCHEDULED";
+            }
+        }
+
+        // 미래 경기
+        return "SCHEDULED";
+    }
+
+    /**
+     * 기존 게임과 새로운 게임 정보를 비교하여 업데이트 여부 결정
+     */
+    private boolean shouldUpdateGame(Game existingGame, Game newGame) {
+        // 이미 완료된 게임은 업데이트하지 않음 (단, 당일 경기는 예외)
+        if ("FINISHED".equals(existingGame.getStatus()) &&
+                !newGame.getDate().equals(LocalDate.now())) {
+            return false;
+        }
+
+        // 점수나 상태가 변경된 경우 업데이트
+        return existingGame.getAwayScore() != newGame.getAwayScore() ||
+                existingGame.getHomeScore() != newGame.getHomeScore() ||
+                !existingGame.getStatus().equals(newGame.getStatus());
     }
 
     private static String getTeamCode(String name) {

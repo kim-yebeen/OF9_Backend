@@ -24,7 +24,7 @@ public class GameController {
     }
 
     /** 기간검색: /games?from=2025-05-01&to=2025-05-31 */
-    @GetMapping
+    @GetMapping(produces = "application/json;charset=UTF-8")
     public ResponseEntity<List<GameResponse>> getGames(
             @RequestParam(name="from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(name="to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to

@@ -29,7 +29,7 @@ public class UserService {
     // 친구 검색
     public List<UserDto> searchUsers(String q) {
         return userRepo.findByNicknameContainingIgnoreCase(q).stream()
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl()))
+                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(),u.getFavTeam()))
                 .toList();
     }
 
@@ -135,7 +135,7 @@ public class UserService {
     public List<UserDto> getFollowing(Long userId) {
         return followRepo.findByFollowerId_Id(userId).stream()
                 .map(uf -> uf.getFolloweeId())                      // 엔티티 꺼내고
-                .map(u  -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl()))
+                .map(u  -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
                 .collect(Collectors.toList());
     }
 
@@ -144,7 +144,7 @@ public class UserService {
     public List<UserDto> getFollowers(Long userId) {
         return followRepo.findByFolloweeId_Id(userId).stream()
                 .map(uf -> uf.getFollowerId())
-                .map(u  -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl()))
+                .map(u  -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
                 .collect(Collectors.toList());
     }
 

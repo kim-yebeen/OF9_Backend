@@ -2,7 +2,9 @@ package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
+import com.nine.baseballdiary.backend.user.dto.UserDto;
 import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ public class RecordService {
     private final RecordRepository recordRepo;
     private final GameRepository   gameRepo;
     private final UserRepository   userRepo;
+    private final UserFollowRepository userflRepo;
 
     // 피드, 리스트에서 짧게 보여줄 때  —  "25/04/29 Fri"
     private static final DateTimeFormatter FEED_FMT =
@@ -149,16 +152,24 @@ public class RecordService {
         return recordRepo.findByUserId(userId).stream()
                 .map(r -> {
                     Game g = gameRepo.findById(r.getGameId()).orElseThrow();
+                    User user = userRepo.findById(r.getUserId()).orElseThrow();
                     return new RecordListResponse(
+                            user.getId(),
+                            user.getNickname(),
+                            user.getProfileImageUrl(),
+                            user.getFavTeam(),
+                            r.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
                             g.getDate().format(UPLOAD_FMT),
                             g.getTime().format(TIME_FMT),
-                            r.getEmotionCode(),
-                            convertEmotionLabel(r.getEmotionCode()),
                             convertHomeTeam(g.getHomeTeam()),
                             convertAwayTeam(g.getAwayTeam()),
-                            r.getStadium(),
-                            r.getSeatInfo(),
-                            r.getResult()
+                            g.getHomeScore(),
+                            g.getAwayScore(),
+                            convertStadium(r.getStadium()), // 사용자가 입력한 구장명 사용
+                            r.getEmotionCode(),
+                            convertEmotionLabel(r.getEmotionCode()),
+                            r.getLongContent(),
+                            r.getMediaUrls()
                     );
                 })
                 .collect(Collectors.toList());
@@ -192,12 +203,14 @@ public class RecordService {
         String shortFav = convertFavTeam(favTeam);
         boolean isHome = shortFav.equals(game.getHomeTeam());
         boolean isAway = shortFav.equals(game.getAwayTeam());
-        if (!isHome && !isAway) throw new IllegalArgumentException("즐겨찾는 팀 불일치");
 
-        int home = game.getHomeScore()==null?0:game.getHomeScore();
-        int away = game.getAwayScore()==null?0:game.getAwayScore();
+        // favTeam이 홈/어웨이 둘 다 아니면 "ETC"로 처리
+        if (!isHome && !isAway) return "ETC"; // 또는 "기타"
+
+        int home = game.getHomeScore() == null ? 0 : game.getHomeScore();
+        int away = game.getAwayScore() == null ? 0 : game.getAwayScore();
         if (home == away) return "DRAW";
-        boolean win = (isHome && home>away) || (isAway && away>home);
+        boolean win = (isHome && home > away) || (isAway && away > home);
         return win ? "WIN" : "LOSE";
     }
 
@@ -266,4 +279,32 @@ public class RecordService {
             default -> s;
         };
     }
+    /**
+     * 나와 맞팔(상호 팔로우)인 유저 중 닉네임으로 검색
+     */
+    @Transactional(readOnly = true)
+    public List<UserDto> getMutualFriends(Long userId, String query) {
+        // 1. 내가 팔로우하는 사람 id
+        List<Long> followingIds = userflRepo.findFollowingIds(userId);
+        // 2. 나를 팔로우하는 사람 id
+        List<Long> followerIds = userflRepo.findFollowerIds(userId);
+        // 3. 맞팔(교집합)
+        List<Long> mutualIds = followingIds.stream()
+                .filter(followerIds::contains)
+                .toList();
+
+        // 4. 검색 적용
+        List<User> users;
+        if (query != null && !query.isBlank()) {
+            users = userRepo.findByIdInAndNicknameContainingIgnoreCase(mutualIds, query);
+        } else {
+            users = userRepo.findByIdIn(mutualIds);
+        }
+
+        // 5. DTO 변환
+        return users.stream()
+                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
+                .toList();
+    }
+
 }
