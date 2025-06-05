@@ -2,9 +2,8 @@ package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
-import com.nine.baseballdiary.backend.reaction.ReactionResponse;
 import com.nine.baseballdiary.backend.reaction.ReactionService;
-import com.nine.baseballdiary.backend.reaction.RecordReactionSummary;
+import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
@@ -12,6 +11,7 @@ import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.nine.baseballdiary.backend.reaction.RecordReactionSummary;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -107,6 +107,10 @@ public class RecordService {
 
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
+        RecordReactionSummary summary = reactionService.getSummary(recordId);
+        List<ReactionStatsResponse> reactions = summary.getStats();
+        Integer totalReactionCount = summary.getTotalCount();
+
         return RecordDetailResponse.builder()
                 .recordId(rec.getRecordId())                    // Long
                 .gameDate(fmtDate)                              // String
@@ -127,16 +131,20 @@ public class RecordService {
                 .foodTags(rec.getFoodTags())                    // List<String>
                 .mediaUrls(rec.getMediaUrls())
                 .createdAt(createdAtStr)
+                .reactions(reactions)
+                .totalReactionCount(totalReactionCount)
                 .build();
     }
 
     // 3) 마이페이지 피드 조회
+    // getUserRecordsFeed에서 getById 문제 수정
     @Transactional(readOnly = true)
     public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
         return recordRepo.findByUserId(userId).stream()
                 .filter(r->r.getMediaUrls()!=null && !r.getMediaUrls().isEmpty())
                 .map(r->{
-                    Game g = gameRepo.getById(r.getGameId());
+                    // getById 대신 findById 사용
+                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
                     return new RecordFeedResponse(
                             r.getRecordId(),
                             g.getDate().format(FEED_FMT),
@@ -146,17 +154,18 @@ public class RecordService {
     }
 
 
-    // 4) 마이페이지 리스트 조회
+    // 4) 마이페이지 리스트 조회 - 수정
     @Transactional(readOnly = true)
     public List<RecordListResponse> getUserRecordsList(Long userId) {
         return recordRepo.findByUserId(userId).stream()
                 .map(r -> {
                     Game g = gameRepo.findById(r.getGameId()).orElseThrow();
                     User user = userRepo.findById(r.getUserId()).orElseThrow();
-// 리액션 정보 조회
-                    RecordReactionSummary reactionSummary = reactionService.getRecordReactions(r.getRecordId(), userId);
-                    List<ReactionResponse> reactions = reactionSummary.getReactions();
-                    int totalReactionCount = reactionSummary.getTotalCount();
+
+                    RecordReactionSummary summary =
+                            reactionService.getSummary(r.getRecordId());
+                    List<ReactionStatsResponse> reactions = summary.getStats();
+                    Integer totalReactionCount = summary.getTotalCount();
 
                     return new RecordListResponse(
                             user.getId(),
@@ -170,13 +179,14 @@ public class RecordService {
                             convertAwayTeam(g.getAwayTeam()),
                             g.getHomeScore(),
                             g.getAwayScore(),
-                            convertStadium(r.getStadium()), // 사용자가 입력한 구장명 사용
+                            convertStadium(r.getStadium()),
                             r.getEmotionCode(),
                             convertEmotionLabel(r.getEmotionCode()),
                             r.getLongContent(),
                             r.getMediaUrls(),
-                            reactions, // 추가
-                            totalReactionCount
+                            reactions,
+                            totalReactionCount,
+                            r.getRecordId()
                     );
                 })
                 .collect(Collectors.toList());

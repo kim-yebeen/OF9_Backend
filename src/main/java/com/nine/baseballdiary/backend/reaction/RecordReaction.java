@@ -22,16 +22,19 @@ public class RecordReaction {
     private Long userId;
 
     @Column(name = "reaction_type_id", nullable = false)
-    private Long reactionTypeId;
+    private Integer reactionTypeId;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Builder
-    public RecordReaction(Long recordId, Long userId, Long reactionTypeId) {
+    public RecordReaction(Long recordId, Long userId, Integer reactionTypeId) {
         this.recordId = recordId;
         this.userId = userId;
         this.reactionTypeId = reactionTypeId;
         this.createdAt = LocalDateTime.now();
+    }
+    public void updateReactionType(Integer reactionTypeId) {
+        this.reactionTypeId = reactionTypeId;
     }
 }

@@ -95,49 +95,45 @@ CREATE TABLE IF NOT EXISTS follow_request (
     updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
--- 1. 리액션 타입 테이블 (대분류, 소분류)
+-- 리액션 타입 테이블 (display_order를 Primary Key로 사용)
 CREATE TABLE IF NOT EXISTS reaction_type (
-                                             id SERIAL PRIMARY KEY,
-                                             category VARCHAR(20) NOT NULL,  -- '기쁨축하', '공감응원', '슬픔아쉬움'
-    name VARCHAR(20) NOT NULL,      -- '좋아요', '기뻐요', '공감해요' 등
-    display_order INT NOT NULL DEFAULT 0
+                                             display_order INT PRIMARY KEY,
+                                             category VARCHAR(20) NOT NULL,
+    name VARCHAR(20) NOT NULL,
+    UNIQUE(category, name)
     );
 
--- 초기 리액션 타입 데이터 삽입
-INSERT INTO reaction_type (category, name, display_order) VALUES
-('기쁨축하', '좋아요', 1),
-('기쁨축하', '기뻐요', 2),
-('기쁨축하', '신나요', 3),
-('기쁨축하', '멋져요', 4),
-('기쁨축하', '짜릿해요',5),
-('기쁨축하', '대단해요',6),
-('기쁨축하', '축하해요', 7),
+-- 초기 리액션 타입 데이터 삽입 (15개)
+INSERT INTO reaction_type (display_order, category, name) VALUES
+                                                              (1, '기쁨축하', '좋아요'),
+                                                              (2, '기쁨축하', '기뻐요'),
+                                                              (3, '기쁨축하', '신나요'),
+                                                              (4, '기쁨축하', '멋져요'),
+                                                              (5, '기쁨축하', '짜릿해요'),
+                                                              (6, '기쁨축하', '대단해요'),
+                                                              (7, '기쁨축하', '축하해요'),
+                                                              (8, '공감응원', '따뜻해요'),
+                                                              (9, '공감응원', '공감해요'),
+                                                              (10, '공감응원', '괜찮아요'),
+                                                              (11, '공감응원', '응원해요'),
+                                                              (12, '공감응원', '힘내요'),
+                                                              (13, '슬픔아쉬움', '아쉬워요'),
+                                                              (14, '슬픔아쉬움', '속상해요'),
+                                                              (15, '슬픔아쉬움', '슬퍼요')
+    ON CONFLICT DO NOTHING;
 
-('공감응원', '따뜻해요', 8),
-('공감응원', '공감해요', 9),
-('공감응원', '괜찮아요',10),
-('공감응원', '응원해요',11),
-('공감응원', '힘내요', 12),
-
-('슬픔아쉬움', '아쉬워요', 13),
-('슬픔아쉬움', '속상해요', 14),
-('슬픔아쉬움', '슬퍼요', 15)
-ON CONFLICT DO NOTHING;
-
-DROP VIEW IF EXISTS record_reaction_stats CASCADE;
-
--- 2. 사용자 리액션 테이블
+-- 사용자 리액션 테이블
 CREATE TABLE IF NOT EXISTS record_reaction (
-    id SERIAL PRIMARY KEY,
-    record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
+                                               id SERIAL PRIMARY KEY,
+                                               record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reaction_type_id INT NOT NULL REFERENCES reaction_type(id) ON DELETE CASCADE,
+    reaction_type_id INT NOT NULL REFERENCES reaction_type(display_order) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
 
     -- 한 사용자는 하나의 게시물에 하나의 리액션만 가능
     UNIQUE(record_id, user_id)
-);
+    );
 
--- 3. 인덱스 추가 (성능 최적화)
+-- 인덱스 추가 (성능 최적화)
 CREATE INDEX IF NOT EXISTS idx_record_reaction_record_id ON record_reaction(record_id);
 CREATE INDEX IF NOT EXISTS idx_record_reaction_user_id ON record_reaction(user_id);

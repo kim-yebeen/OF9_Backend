@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
 import lombok.Getter;
 import lombok.Builder;
 import lombok.Setter;
@@ -30,4 +31,8 @@ public class RecordDetailResponse {
     private List<String> foodTags;
     private List<String> mediaUrls;
     private String createdAt;
+    // 리액션 정보 추가
+    private List<ReactionStatsResponse> reactions;
+    private Integer totalReactionCount;
+
 }

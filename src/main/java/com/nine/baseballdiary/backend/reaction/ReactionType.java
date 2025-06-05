@@ -10,17 +10,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ReactionType {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "display_order")
+    private Integer displayOrder;  // id 대신 display_order를 Primary Key로
 
     @Column(nullable = false)
     private String category;
 
     @Column(nullable = false)
     private String name;
-
-    private String emoji;
-
-    @Column(name = "display_order")
-    private Integer displayOrder;
 }

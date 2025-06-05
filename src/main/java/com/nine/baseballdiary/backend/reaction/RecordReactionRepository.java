@@ -10,27 +10,22 @@ public interface RecordReactionRepository extends JpaRepository<RecordReaction, 
 
     Optional<RecordReaction> findByRecordIdAndUserId(Long recordId, Long userId);
 
-    List<RecordReaction> findByRecordId(Long recordId);
+    long countByRecordIdAndReactionTypeId(Long recordId, Integer reactionTypeId);
+
+    long countByRecordId(Long recordId);
 
     @Query("""
-        SELECT new com.nine.baseballdiary.backend.reaction.ReactionUserInfo(
-            u.id, u.nickname, u.profileImageUrl, u.favTeam, rt.name, rt.emoji
+        SELECT new com.nine.baseballdiary.backend.reaction.ReactionUserResponse(
+            u.id, u.nickname, u.profileImageUrl, u.favTeam, rt.name
         )
         FROM RecordReaction rr
         JOIN User u ON rr.userId = u.id
-        JOIN ReactionType rt ON rr.reactionTypeId = rt.id
+        JOIN ReactionType rt ON rr.reactionTypeId = rt.displayOrder
         WHERE rr.recordId = :recordId
         ORDER BY rr.createdAt DESC
-    """)
-    List<ReactionUserInfo> findReactionUsersByRecordId(@Param("recordId") Long recordId);
+        """)
+    List<ReactionUserResponse> findUsersByRecordId(@Param("recordId") Long recordId);
 
-    @Query("""
-        SELECT rt.category, rt.name, rt.emoji, COUNT(rr) as count
-        FROM RecordReaction rr
-        JOIN ReactionType rt ON rr.reactionTypeId = rt.id
-        WHERE rr.recordId = :recordId
-        GROUP BY rt.id, rt.category, rt.name, rt.emoji, rt.displayOrder
-        ORDER BY rt.displayOrder
-    """)
-    List<Object[]> findReactionStatsByRecordId(@Param("recordId") Long recordId);
+
 }
+
