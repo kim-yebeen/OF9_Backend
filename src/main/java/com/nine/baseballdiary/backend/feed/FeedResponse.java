@@ -33,6 +33,7 @@ public class FeedResponse {
     private List<String> mediaUrls;
 
     // 리액션 정보
-    private List<ReactionStatsResponse> reactions;
-    private Integer totalReactionCount;
+    private List<ReactionStatsResponse> top3Reactions;  // 상위 3개만
+    private Integer remainingReactionCount;             // 나머지 개수
+    private Integer totalReactionCount; // 전체 개수
 }

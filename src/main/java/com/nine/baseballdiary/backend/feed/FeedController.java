@@ -22,6 +22,7 @@ public class FeedController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String team,
+            @RequestParam(defaultValue = "popularity") String sortBy,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -29,6 +30,7 @@ public class FeedController {
                 .userId(userId)
                 .date(date)
                 .team(team)
+                .sortBy(sortBy)
                 .page(page)
                 .size(size)
                 .build();

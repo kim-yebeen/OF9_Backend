@@ -15,4 +15,5 @@ public class FeedRequest {
     private String team;    // "LG", "두산" 등
     private int page;
     private int size;
+    private String sortBy = "popularity";  // 기본값: 인기순
 }

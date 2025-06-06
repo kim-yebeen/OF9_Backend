@@ -94,4 +94,25 @@ public class ReactionService {
         reactionRepo.save(newReaction);
     }
 
+    // 상위 3개 공감 스티커 + 나머지 개수 반환
+    @Transactional(readOnly = true)
+    public TopReactionsResponse getTopReactions(Long recordId) {
+        List<ReactionStatsResponse> allStats = getStats(recordId);
+
+        // 개수 기준으로 내림차순 정렬
+        List<ReactionStatsResponse> sortedStats = allStats.stream()
+                .filter(stat -> stat.getCount() > 0)
+                .sorted((a, b) -> Long.compare(b.getCount(), a.getCount()))
+                .collect(Collectors.toList());
+
+        // 상위 3개 추출
+        List<ReactionStatsResponse> top3 = sortedStats.stream()
+                .limit(3)
+                .collect(Collectors.toList());
+
+        // 나머지 개수 계산
+        int remainingCount = Math.max(0, sortedStats.size() - 3);
+
+        return new TopReactionsResponse(top3, remainingCount);
+    }
 }

@@ -1,11 +1,11 @@
 package com.nine.baseballdiary.backend.feed;
 
+import com.nine.baseballdiary.backend.reaction.TopReactionsResponse;
 import com.nine.baseballdiary.backend.record.Record;
 import com.nine.baseballdiary.backend.record.RecordRepository;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.reaction.ReactionService;
-import com.nine.baseballdiary.backend.reaction.RecordReactionSummary;
 
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
@@ -18,8 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,102 +32,101 @@ public class FeedService {
     private final GameRepository gameRepo;
     private final UserRepository userRepo;
 
-    /**
-     * 전체 피드 조회
-     * - 모든 공개 계정의 게시물
-     * - 내가 팔로우한 비공개 계정의 게시물
-     * - 내 자신의 게시물 (비공개여도 표시)
-     */
     @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
-        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+        // 날짜는 필수
+        if (request.getDate() == null || request.getDate().trim().isEmpty()) {
+            throw new IllegalArgumentException("날짜는 필수입니다.");
+        }
 
-        // 날짜 필터 파싱
-        LocalDate dateFilter = parseDate(request.getDate());
-
-        // 팀 필터 처리
-        String teamFilter = parseTeam(request.getTeam());
-
-        // 내가 팔로우한 사람들의 ID 조회
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
 
-        System.out.println("=== 전체 피드 디버깅 ===");
-        System.out.println("현재 사용자 ID: " + request.getUserId());
-        System.out.println("팔로우한 사용자 수: " + followingIds.size());
-        System.out.println("팔로우한 사용자 IDs: " + followingIds);
+        List<Record> records;
 
-        List<Record> records = recordRepo.findAllFeedRecords(
-                request.getUserId(),
-                followingIds,
-                dateFilter,
-                teamFilter,
-                pageable
-        );
+        if ("latest".equals(request.getSortBy())) {
+            // 최신순 - JPQL 사용
+            LocalDate dateFilter = LocalDate.parse(request.getDate());
+            String teamFilter = parseTeam(request.getTeam());
+            Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        System.out.println("조회된 레코드 수: " + records.size());
+            records = recordRepo.findAllFeedRecordsByLatest(
+                    request.getUserId(), followingIds, dateFilter, teamFilter, pageable
+            );
+        } else {
+            // 인기순 (기본값) - Native Query 사용
+            String followingIdsStr = convertListToPostgresArray(followingIds);
+            String teamFilter = parseTeam(request.getTeam());
+            int offset = request.getPage() * request.getSize();
+
+            records = recordRepo.findAllFeedRecordsByPopularity(
+                    request.getUserId(),
+                    followingIdsStr,
+                    request.getDate(),
+                    teamFilter,
+                    request.getSize(),
+                    offset
+            );
+        }
 
         return records.stream()
                 .map(this::convertToFeedResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 팔로잉 피드 조회
-     * - 내가 팔로우한 사람들의 게시물만 (공개/비공개 상관없이)
-     * - 내 게시물은 포함하지 않음
-     */
     @Transactional(readOnly = true)
     public List<FeedResponse> getFollowingFeed(FeedRequest request) {
-        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+        // 날짜는 필수
+        if (request.getDate() == null || request.getDate().trim().isEmpty()) {
+            throw new IllegalArgumentException("날짜는 필수입니다.");
+        }
 
-        // 날짜 필터 파싱
-        LocalDate dateFilter = parseDate(request.getDate());
-
-        // 팀 필터 처리
-        String teamFilter = parseTeam(request.getTeam());
-
-        // 내가 팔로우한 사람들만 (나 자신 제외)
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
 
-        System.out.println("=== 팔로잉 피드 디버깅 ===");
-        System.out.println("현재 사용자 ID: " + request.getUserId());
-        System.out.println("팔로우한 사용자 수: " + followingIds.size());
-        System.out.println("팔로우한 사용자 IDs: " + followingIds);
-
-        // 팔로우한 사람이 없으면 빈 리스트 반환
         if (followingIds.isEmpty()) {
-            System.out.println("팔로우한 사용자가 없음");
             return List.of();
         }
 
-        List<Record> records = recordRepo.findFollowingFeedRecords(
-                followingIds,  // 나 자신 제외, 팔로우한 사람들만
-                dateFilter,
-                teamFilter,
-                pageable
-        );
+        List<Record> records;
 
-        System.out.println("조회된 레코드 수: " + records.size());
+        if ("latest".equals(request.getSortBy())) {
+            // 최신순 - JPQL 사용
+            LocalDate dateFilter = LocalDate.parse(request.getDate());
+            String teamFilter = parseTeam(request.getTeam());
+            Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+
+            records = recordRepo.findFollowingFeedRecordsByLatest(
+                    followingIds, dateFilter, teamFilter, pageable
+            );
+        } else {
+            // 인기순 (기본값) - Native Query 사용
+            String userIdsStr = convertListToPostgresArray(followingIds);
+            String teamFilter = parseTeam(request.getTeam());
+            int offset = request.getPage() * request.getSize();
+
+            records = recordRepo.findFollowingFeedRecordsByPopularity(
+                    userIdsStr,
+                    request.getDate(),
+                    teamFilter,
+                    request.getSize(),
+                    offset
+            );
+        }
 
         return records.stream()
                 .map(this::convertToFeedResponse)
                 .collect(Collectors.toList());
     }
 
-    // 안전한 날짜 파싱
-    private LocalDate parseDate(String dateString) {
-        if (dateString == null || dateString.trim().isEmpty()) {
-            return null;
+    // PostgreSQL 배열 형식으로 변환
+    private String convertListToPostgresArray(List<Long> list) {
+        if (list == null || list.isEmpty()) {
+            return "{}";
         }
-        try {
-            return LocalDate.parse(dateString.trim());
-        } catch (Exception e) {
-            System.out.println("날짜 파싱 오류: " + dateString);
-            return null;
-        }
+        return "{" + list.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(",")) + "}";
     }
 
-    // 안전한 팀 필터 처리
     private String parseTeam(String team) {
         return (team != null && !team.trim().isEmpty()) ? team.trim() : null;
     }
@@ -138,9 +135,10 @@ public class FeedService {
         User user = userRepo.findById(record.getUserId()).orElseThrow();
         Game game = gameRepo.findById(record.getGameId()).orElseThrow();
 
-        RecordReactionSummary summary = reactionService.getSummary(record.getRecordId());
+        // 상위 3개 공감 스티커 조회
+        TopReactionsResponse topReactions = reactionService.getTopReactions(record.getRecordId());
+        Integer totalCount = reactionService.getTotalCount(record.getRecordId());
 
-        // 안전한 mediaUrls 처리
         List<String> mediaUrls = record.getMediaUrls() != null ? record.getMediaUrls() : List.of();
 
         return FeedResponse.builder()
@@ -161,8 +159,9 @@ public class FeedService {
                 .emotionLabel(getEmotionLabel(record.getEmotionCode()))
                 .longContent(record.getLongContent())
                 .mediaUrls(mediaUrls)
-                .reactions(summary.getStats())
-                .totalReactionCount(summary.getTotalCount())
+                .top3Reactions(topReactions.getTop3Reactions())
+                .remainingReactionCount(topReactions.getRemainingCount())
+                .totalReactionCount(totalCount)
                 .build();
     }
 
