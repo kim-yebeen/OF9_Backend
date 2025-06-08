@@ -3,6 +3,7 @@ package com.nine.baseballdiary.backend.auth;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ public class KakaoService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public User processLogin(String accessToken, String favTeam) {
         Long kakaoId = kakaoClient.getKakaoId(accessToken);
         Optional<User> existing = userRepository.findByKakaoId(kakaoId);
