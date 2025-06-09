@@ -46,7 +46,7 @@ public class RecordService {
     @Transactional
     public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
         // 1) User 조회
-        User user = userRepo.findById(req.getUserId())
+        User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + req.getUserId()));
 
         // 2) Game 조회
@@ -219,7 +219,7 @@ public class RecordService {
         if (!record.getUserId().equals(currentUserId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
         }
-        recordRepo.deleteById(recordId);
+        recordRepo.delete(record);
     }
 
     // ——— Helpers ———
