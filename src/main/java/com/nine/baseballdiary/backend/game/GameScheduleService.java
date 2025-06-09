@@ -39,7 +39,7 @@ public class GameScheduleService {
     }
 
     //매주 월요일 새벽 1시 전체 크롤링
-    @Scheduled(cron = "0 23 16 * * ?")
+    @Scheduled(cron = "0 59 15 * * *") //@Scheduled(cron = "0 23 16 * ?")
     public void weeklyInitialCrawl() {
         crawlSchedule(true);
     }
