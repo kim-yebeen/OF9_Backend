@@ -9,14 +9,17 @@ import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.nine.baseballdiary.backend.reaction.RecordReactionSummary;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +44,7 @@ public class RecordService {
 
     // 레코드 업로드 (모든 정보를 한번에 처리)
     @Transactional
-    public RecordUploadResponse uploadRecord(CreateRecordRequest req) {
+    public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
         // 1) User 조회
         User user = userRepo.findById(req.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + req.getUserId()));
@@ -55,7 +58,7 @@ public class RecordService {
 
         // 4) Record 엔티티 빌드 (모든 정보 포함)
         Record record = Record.builder()
-                .userId(req.getUserId())
+                .userId(userId)
                 .gameId(req.getGameId())
                 .stadium(req.getStadium())
                 .seatInfo(req.getSeatInfo())
@@ -79,9 +82,11 @@ public class RecordService {
 
     // 레코드 수정
     @Transactional
-    public RecordDetailResponse updateRecord(Long recordId, UpdateRecordRequest req) {
+    public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
         Record rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
+        if (!rec.getUserId().equals(currentUserId))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
         // 선택입력값만 set
         rec.setComment   (req.getComment());
         rec.setLongContent(req.getLongContent());
@@ -206,10 +211,13 @@ public class RecordService {
                 .collect(Collectors.toList());
     }
 
+    //레코드 삭제
     @Transactional
-    public void deleteRecord(Long recordId) {
-        if (!recordRepo.existsById(recordId)) {
-            throw new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId);
+    public void deleteRecord(Long currentUserId, Long recordId) {
+        Record record = recordRepo.findById(recordId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 레코드"));
+        if (!record.getUserId().equals(currentUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
         }
         recordRepo.deleteById(recordId);
     }
@@ -301,27 +309,26 @@ public class RecordService {
      */
     @Transactional(readOnly = true)
     public List<UserDto> getMutualFriends(Long userId, String query) {
-        // 1. 내가 팔로우하는 사람 id
-        List<Long> followingIds = userflRepo.findFollowingIds(userId);
-        // 2. 나를 팔로우하는 사람 id
-        List<Long> followerIds = userflRepo.findFollowerIds(userId);
-        // 3. 맞팔(교집합)
-        List<Long> mutualIds = followingIds.stream()
-                .filter(followerIds::contains)
-                .toList();
+        // 1. 내가 팔로우하는 사람들의 ID 목록
+        List<Long> followingIds =userflRepo.findByFollowerId_Id(userId).stream()
+                .map(follow -> follow.getFolloweeId().getId())
+                .collect(Collectors.toList());
 
-        // 4. 검색 적용
-        List<User> users;
-        if (query != null && !query.isBlank()) {
-            users = userRepo.findByIdInAndNicknameContainingIgnoreCase(mutualIds, query);
-        } else {
-            users = userRepo.findByIdIn(mutualIds);
+        // 2. 나를 팔로우하는 사람들 중에서, 내가 팔로우하는 사람(1번 목록)만 필터링 -> 맞팔 관계
+        Stream<User> mutualFriendsStream = userflRepo.findByFolloweeId_Id(userId).stream()
+                .map(follow -> follow.getFollowerId()) // 나를 팔로우하는 User 엔티티
+                .filter(follower -> followingIds.contains(follower.getId())); // 그 중에서 내가 팔로우하는 사람
+
+        // 3. 검색어(query)가 있으면 닉네임으로 추가 필터링
+        if (query != null && !query.trim().isEmpty()) {
+            mutualFriendsStream = mutualFriendsStream
+                    .filter(user -> user.getNickname().toLowerCase().contains(query.toLowerCase()));
         }
 
-        // 5. DTO 변환
-        return users.stream()
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .toList();
+        // 4. DTO로 변환하여 반환
+        return mutualFriendsStream
+                .map(user -> new UserDto(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getFavTeam()))
+                .collect(Collectors.toList());
     }
 
 }

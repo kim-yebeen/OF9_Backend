@@ -2,8 +2,12 @@ package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -13,9 +17,18 @@ import java.util.List;
 public class RecordController {
     private final RecordService service;
 
+    private Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증된 사용자가 아닙니다.");
+        }
+        return Long.parseLong((String) authentication.getPrincipal());
+    }
+
     @PostMapping
     public ResponseEntity<RecordUploadResponse> upload(@RequestBody CreateRecordRequest req) {
-        RecordUploadResponse res = service.uploadRecord(req);
+        Long userId = getCurrentUserId();
+        RecordUploadResponse res = service.uploadRecord(userId, req);
         return ResponseEntity.status(201).body(res);
     }
 
@@ -25,7 +38,8 @@ public class RecordController {
             @PathVariable Long recordId,
             @RequestBody UpdateRecordRequest req
     ) {
-        RecordDetailResponse res = service.updateRecord(recordId, req);
+        Long userId = getCurrentUserId();
+        RecordDetailResponse res = service.updateRecord(userId, recordId, req);
         return ResponseEntity.ok(res);
     }
 
@@ -38,22 +52,25 @@ public class RecordController {
     }
 
     // 피드 형식으로 직관 기록 조회
-    @GetMapping("/feed/{userId}")
-    public ResponseEntity<List<RecordFeedResponse>> getUserRecordsFeed(@PathVariable Long userId) {
+    @GetMapping("/me/feed")
+    public ResponseEntity<List<RecordFeedResponse>> getUserRecordsFeed() {
+        Long userId = getCurrentUserId();
         List<RecordFeedResponse> response = service.getUserRecordsFeed(userId);
         return ResponseEntity.ok(response);
     }
 
     // 리스트 형식으로 직관 기록 조회
-    @GetMapping("/list/{userId}")
-    public ResponseEntity<List<RecordListResponse>> getUserRecordsList(@PathVariable Long userId) {
+    @GetMapping("/me/list")
+    public ResponseEntity<List<RecordListResponse>> getUserRecordsList() {
+        Long userId = getCurrentUserId();
         List<RecordListResponse> response = service.getUserRecordsList(userId);
         return ResponseEntity.ok(response);
     }
 
     // 캘린더 형식으로 직관 기록 조회
-    @GetMapping("/calendar/{userId}")
-    public ResponseEntity<List<RecordCalendarResponse>> getUserRecordsCalendar(@PathVariable Long userId) {
+    @GetMapping("/me/calendar")
+    public ResponseEntity<List<RecordCalendarResponse>> getUserRecordsCalendar() {
+        Long userId = getCurrentUserId();
         List<RecordCalendarResponse> response = service.getUserRecordsCalendar(userId);
         return ResponseEntity.ok(response);
     }
@@ -61,16 +78,17 @@ public class RecordController {
     //레코드 삭제
     @DeleteMapping("/{recordId}")
     public ResponseEntity<Void> deleteRecord(@PathVariable Long recordId) {
-        service.deleteRecord(recordId);
+        Long userId = getCurrentUserId();
+        service.deleteRecord(userId, recordId);
         return ResponseEntity.noContent().build();
     }
 
     // 함께한 사람(맞팔+검색) 불러오기 API
-    @GetMapping("/{userId}/mutual-friends")
+    @GetMapping("/me/mutual-friends")
     public List<UserDto> getMutualFriends(
-            @PathVariable Long userId,
             @RequestParam(required = false) String query
     ) {
+        Long userId = getCurrentUserId();
         return service.getMutualFriends(userId, query);
     }
 }
