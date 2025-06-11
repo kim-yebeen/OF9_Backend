@@ -38,8 +38,8 @@ public class Record {
     // 함께 한 친구들
     @ElementCollection
     @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"))
-    @Column(name = "companion")
-    private List<String> companions; // 함께 한 친구들
+    @Column(name = "companion_id")
+    private List<Long> companions; // 함께 한 친구들
 
     @ElementCollection
     @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
