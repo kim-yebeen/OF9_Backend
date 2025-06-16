@@ -153,7 +153,11 @@ public class RecordService {
                     return new RecordFeedResponse(
                             r.getRecordId(),
                             g.getDate().format(FEED_FMT),
-                            r.getMediaUrls().get(0)
+                            //r.getMediaUrls().get(0)
+                            // 첫 번째 이미지 URL만 반환 (없으면 null)
+                            r.getMediaUrls() != null && !r.getMediaUrls().isEmpty()
+                                    ? r.getMediaUrls().get(0)
+                                    : null
                     );
                 }).toList();
     }
