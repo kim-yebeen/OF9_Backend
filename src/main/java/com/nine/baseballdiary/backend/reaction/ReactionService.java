@@ -64,15 +64,15 @@ public class ReactionService {
         return Math.toIntExact(reactionRepo.countByRecordId(recordId));
     }
 
-    // 기존 toggleReaction 메서드...
-    public void toggleReaction(Long recordId, ReactionRequest request) {
+    // 공감 및 공감 취소 토글
+    public void toggleReaction(Long userId, Long recordId, ReactionRequest request) {
         Optional<RecordReaction> existing =
-                reactionRepo.findByRecordIdAndUserId(recordId, request.getUserId());
+                reactionRepo.findByRecordIdAndUserId(recordId, userId);
 
         if (existing.isPresent()) {
             handleExistingReaction(existing.get(), request.getReactionTypeId());
         } else {
-            createNewReaction(recordId, request);
+            createNewReaction(recordId, userId, request);
         }
     }
 
@@ -85,10 +85,10 @@ public class ReactionService {
         }
     }
 
-    private void createNewReaction(Long recordId, ReactionRequest request) {
+    private void createNewReaction(Long recordId, Long userId, ReactionRequest request) {
         RecordReaction newReaction = RecordReaction.builder()
                 .recordId(recordId)
-                .userId(request.getUserId())
+                .userId(userId)
                 .reactionTypeId(request.getReactionTypeId())
                 .build();
         reactionRepo.save(newReaction);

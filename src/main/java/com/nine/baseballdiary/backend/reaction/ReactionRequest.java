@@ -5,7 +5,6 @@ import lombok.Setter;
 
 @Getter @Setter
 public class ReactionRequest {
-    private Long userId;
     private Integer reactionTypeId;
 }
 

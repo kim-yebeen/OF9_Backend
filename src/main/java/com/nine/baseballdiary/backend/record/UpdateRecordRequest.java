@@ -11,7 +11,7 @@ public class UpdateRecordRequest {
     private String               comment;
     private String               longContent;
     private String               bestPlayer;
-    private List<String>         companions;
+    private List<Long>        companions;
     private List<String>         foodTags;
     private List<String>         mediaUrls;
 }

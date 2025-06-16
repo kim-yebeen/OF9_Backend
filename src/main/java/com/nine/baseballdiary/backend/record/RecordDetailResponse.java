@@ -1,6 +1,7 @@
 package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
+import com.nine.baseballdiary.backend.user.dto.UserDto;
 import lombok.Getter;
 import lombok.Builder;
 import lombok.Setter;
@@ -27,7 +28,7 @@ public class RecordDetailResponse {
     private String comment;
     private String longContent;
     private String bestPlayer;
-    private List<String> companions;
+    private List<UserDto> companions;
     private List<String> foodTags;
     private List<String> mediaUrls;
     private String createdAt;

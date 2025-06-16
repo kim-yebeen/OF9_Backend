@@ -106,6 +106,21 @@ public class RecordService {
         Game game = gameRepo.findById(rec.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
 
+        // 1. record에서 친구 ID 목록 (List<Long>)을 가져옵니다.
+        List<Long> companionIds = rec.getCompanions();
+        List<UserDto> companionDetails = List.of(); // 기본값은 빈 리스트
+
+        // 2. 친구 ID 목록이 비어있지 않은 경우에만 DB를 조회하여 UserDto 목록으로 변환합니다.
+        if (companionIds != null && !companionIds.isEmpty()) {
+            companionDetails = userRepo.findAllById(companionIds).stream()
+                    .map(companionUser -> new UserDto(
+                            companionUser.getId(),
+                            companionUser.getNickname(),
+                            companionUser.getProfileImageUrl(),
+                            companionUser.getFavTeam()
+                    ))
+                    .collect(Collectors.toList());
+        }
         String fmtDate = game.getDate().format(UPLOAD_FMT);
         String fmtTime = game.getTime().format(TIME_FMT);
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
@@ -132,7 +147,7 @@ public class RecordService {
                 .comment(rec.getComment())                      // String
                 .longContent(rec.getLongContent())              // String
                 .bestPlayer(rec.getBestPlayer())                // String
-                .companions(rec.getCompanions())                // List<String>
+                .companions(companionDetails)                // List<String>
                 .foodTags(rec.getFoodTags())                    // List<String>
                 .mediaUrls(rec.getMediaUrls())
                 .createdAt(createdAtStr)
