@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.user.service;
 
+import com.nine.baseballdiary.backend.reaction.RecordReactionRepository;
 import com.nine.baseballdiary.backend.record.RecordRepository;
 import com.nine.baseballdiary.backend.user.dto.*;
 import com.nine.baseballdiary.backend.user.entity.FollowRequest;
@@ -179,7 +180,6 @@ public class UserService {
     // 로그아웃: 경우에 따라 토큰 무효화 로직 추가
     public void logout(Long userId) { /* no-op or invalidate JWT */ }
 
-    // 회원탈퇴
     @Transactional
     public void deleteUser(Long userId) {
         userRepo.deleteById(userId);

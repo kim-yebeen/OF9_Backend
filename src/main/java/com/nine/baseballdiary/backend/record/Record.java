@@ -37,12 +37,18 @@ public class Record {
 
     // 함께 한 친구들
     @ElementCollection
-    @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"))
+    @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"),
+            foreignKey = @ForeignKey(
+                    name = "fk_record_companions_record_id"
+            ))
     @Column(name = "companion_id")
     private List<Long> companions; // 함께 한 친구들
 
     @ElementCollection
-    @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
+    @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"),
+            foreignKey = @ForeignKey(
+                    name = "fk_record_food_tags_record_id"
+            ))
     @Column(name = "tag")
     private List<String> foodTags;   // 음식 태그
 
@@ -55,7 +61,11 @@ public class Record {
     private List<String> mediaUrls;*/
 
     @ElementCollection
-    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
+    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"),
+            foreignKey = @ForeignKey(
+                    name = "fk_record_media_urls_record_id"
+            )
+    )
     @Column(name = "url", columnDefinition = "TEXT")
     private List<String> mediaUrls;
 

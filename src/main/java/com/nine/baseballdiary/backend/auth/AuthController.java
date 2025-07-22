@@ -18,18 +18,11 @@ public class AuthController {
     }
 
     @PostMapping("/kakao")
-    public ResponseEntity<AuthResponse> login(
-            @RequestHeader("Authorization") String authorization,
-            @RequestBody KakaoLoginRequestDto request
-    ) {
-        // 1) "Bearer {token}" → "token" 으로 파싱
-        String accessToken = authorization.replace("Bearer ", "").trim();
+    public ResponseEntity<AuthResponse> login(@RequestBody KakaoLoginRequestDto request) {
+        // ✅ @RequestHeader 제거, @RequestBody에서 accessToken 받기
+        User user = kakaoService.processLogin(request.getAccessToken(), request.getFavTeam());
 
-        // 2) 카카오 로그인 처리
-        User user = kakaoService.processLogin(accessToken, request.getFavTeam());
-
-        // 3) JWT 발급
-        String newAccessToken  = jwtProvider.createAccessToken(user.getId().toString());
+        String newAccessToken = jwtProvider.createAccessToken(user.getId().toString());
         String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
         return ResponseEntity.ok(new AuthResponse(newAccessToken, refreshToken));
