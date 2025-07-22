@@ -46,10 +46,18 @@ public class Record {
     @Column(name = "tag")
     private List<String> foodTags;   // 음식 태그
 
-    @ElementCollection
+    /*@ElementCollection
     @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "url")
-    private List<String> mediaUrls;  // 미디어 URL 리스트
+    private List<String> mediaUrls;  // 미디어 URL 리스트*/
+
+    /*@Column(name = "media_urls", columnDefinition = "TEXT[]")
+    private List<String> mediaUrls;*/
+
+    @ElementCollection
+    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
+    @Column(name = "url", columnDefinition = "TEXT")
+    private List<String> mediaUrls;
 
     private String result;           // 경기 결과 (WIN/LOSE/DRAW)
 

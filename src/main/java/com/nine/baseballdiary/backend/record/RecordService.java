@@ -165,11 +165,31 @@ public class RecordService {
                 .map(r->{
                     // getById 대신 findById 사용
                     Game g = gameRepo.findById(r.getGameId()).orElseThrow();
+                    // 기존 (mediaUrls.get(0)을 직접 넘김)
                     return new RecordFeedResponse(
                             r.getRecordId(),
                             g.getDate().format(FEED_FMT),
-                            r.getMediaUrls().get(0)
+                            (r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
+                                    ? List.of(r.getMediaUrls().get(0))
+                                    : List.of()
                     );
+
+                    /*return new RecordFeedResponse(
+                            r.getRecordId(),
+                            g.getDate().format(FEED_FMT),
+                            r.getMediaUrls() != null && !r.getMediaUrls().isEmpty()
+                                    ? r.getMediaUrls().get(0)
+                                    : null
+                    );*?
+                    /*return new RecordFeedResponse(
+                            r.getRecordId(),
+                            g.getDate().format(FEED_FMT),
+                            //r.getMediaUrls().get(0)
+                            // 첫 번째 이미지 URL만 반환 (없으면 null)
+                            r.getMediaUrls() != null && !r.getMediaUrls().isEmpty()
+                                    ? r.getMediaUrls().get(0)
+                                    : null
+                    );*/
                 }).toList();
     }
 
