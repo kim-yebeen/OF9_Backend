@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.reaction.ReactionService;
@@ -29,6 +30,7 @@ public class RecordService {
     private final UserRepository   userRepo;
     private final UserFollowRepository userflRepo;
     private final ReactionService reactionService;
+    private final NotificationService notificationService;
 
     // 피드, 리스트에서 짧게 보여줄 때  —  "25/04/29 Fri"
     private static final DateTimeFormatter FEED_FMT =
@@ -74,6 +76,8 @@ public class RecordService {
 
         // 5) 저장
         Record savedRecord = recordRepo.save(record);
+
+        notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
 
         // 6) 단순한 응답 반환 (recordId와 gameDate만)
         String dateStr = game.getDate().format(UPLOAD_FMT);

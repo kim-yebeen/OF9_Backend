@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.user.service;
 
+import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.reaction.RecordReactionRepository;
 import com.nine.baseballdiary.backend.record.RecordRepository;
 import com.nine.baseballdiary.backend.user.dto.*;
@@ -26,6 +27,7 @@ public class UserService {
     private final UserFollowRepository followRepo;
     private final RecordRepository      recordRepo;
     private final FollowRequestRepository reqRepo;
+    private final NotificationService notificationService;
 
     // 친구 검색
     public List<UserDto> searchUsers(String q) {
@@ -53,10 +55,12 @@ public class UserService {
                     .status(FollowRequestStatus.PENDING)
                     .build();
             req = reqRepo.save(req);
+            notificationService.createFollowRequestNotification(targetId, meId);
             return new FollowResponse(true, true, req.getId());
         } else {
             // 공개 계정: 즉시 팔로우
             followRepo.save(new UserFollow(null, me, target));
+            notificationService.createFollowNotification(targetId, meId);
             return new FollowResponse(true, false, null);
         }
     }

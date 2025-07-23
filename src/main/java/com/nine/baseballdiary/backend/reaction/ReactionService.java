@@ -1,5 +1,7 @@
 package com.nine.baseballdiary.backend.reaction;
 
+import com.nine.baseballdiary.backend.record.Record;
+import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.record.RecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -15,7 +17,8 @@ public class ReactionService {
 
     private final RecordReactionRepository reactionRepo;
     private final ReactionTypeRepository reactionTypeRepo;
-
+    private final RecordRepository recordRepo;
+    private final NotificationService notificationService;
     // 15가지 타입 목록 조회
     @Transactional(readOnly = true)
     public List<ReactionTypeResponse> getAllTypes() {
@@ -73,6 +76,12 @@ public class ReactionService {
             handleExistingReaction(existing.get(), request.getReactionTypeId());
         } else {
             createNewReaction(recordId, userId, request);
+
+            Record record = recordRepo.findById(recordId).orElseThrow();
+            if (!record.getUserId().equals(userId)) { // 자신의 기록이 아닌 경우에만
+                notificationService.createReactionNotification(
+                        record.getUserId(), userId, recordId, request.getReactionTypeId());
+                }
         }
     }
 

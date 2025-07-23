@@ -143,7 +143,25 @@ CREATE TABLE IF NOT EXISTS food (
     stadium_id INT REFERENCES stadium(id)
     );
 
+CREATE TABLE IF NOT EXISTS notifications (
+                                             id SERIAL PRIMARY KEY,
+                                             user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(20) NOT NULL, -- 'FOLLOW', 'FOLLOW_REQUEST', 'REACTION', 'NEW_RECORD', 'SYSTEM'
+    title VARCHAR(100) NOT NULL,
+    content TEXT NOT NULL,
+    related_user_id INT REFERENCES users(id) ON DELETE CASCADE, -- 알림을 발생시킨 사용자
+    related_record_id INT REFERENCES record(record_id) ON DELETE CASCADE, -- 관련 기록
+    reaction_type_id INT REFERENCES reaction_type(display_order), -- 공감 타입 (공감 알림일 때)
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+    );
+
+
 -- 성능 최적화 인덱스
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_record_reaction_record_id ON record_reaction(record_id);
 CREATE INDEX IF NOT EXISTS idx_record_reaction_user_id ON record_reaction(user_id);
 CREATE INDEX IF NOT EXISTS idx_record_user_id ON record(user_id);
