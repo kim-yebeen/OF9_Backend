@@ -1,0 +1,67 @@
+name: Auto Deploy Spring Boot to EC2
+
+on:
+  push:
+    branches: [ deploy ]  # deploy 브랜치 사용
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build -x test  # 테스트 제외하고 빌드
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
+          # SSH 키 파일 생성 및 권한 설정
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # 빌드된 JAR 파일을 서버로 전송
+          echo " Uploading JAR file to server..."
+          scp -o StrictHostKeyChecking=no -i private_key.pem build/libs/*.jar ${USER}@${HOST}:~/
+          
+          # SSH 연결 테스트
+          echo "Testing SSH connection..."
+          ssh -v -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} 'echo "✅ SSH connection successful"'
+          
+          # 배포 실행
+          echo "Starting deployment..."
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} '
+            echo " Stopping existing application..."
+            pkill -f "java.*jar" || echo "No running application found"
+          
+            echo "Moving to project directory..."
+            cd ~ || exit 1
+          
+            echo "Starting Spring Boot application..."
+            nohup java -jar *.jar > app.log 2>&1 &
+          
+            echo "Waiting for application to start..."
+            sleep 15
+          
+            echo "Testing API..."
+            curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080/ || echo "API test failed"
+          
+            echo "Deployment completed!"
+          '
+          
+          # 클린업
+          rm -f private_key.pem

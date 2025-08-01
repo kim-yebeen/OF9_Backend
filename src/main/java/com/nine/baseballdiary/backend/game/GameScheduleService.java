@@ -39,27 +39,27 @@ public class GameScheduleService {
     }
 
     //매주 월요일 새벽 1시 전체 크롤링
-    @Scheduled(cron = "0 59 15 * * *") //@Scheduled(cron = "0 23 16 * ?")
+    //@Scheduled(cron = "0 59 15 * * *") //@Scheduled(cron = "0 23 16 * ?")
     public void weeklyInitialCrawl() {
         crawlSchedule(true);
     }
     //매일 아침 11시 해당 월 크롤링
-    @Scheduled(cron = "0 0 18 * * *")
+    //@Scheduled(cron = "0 0 18 * * *")
     public void dailyUpdate11() {
         crawlSchedule(false);
     }
     //매일 21시 해당 월 크롤링
-    @Scheduled(cron = "0 0 21 * * *")
+    //@Scheduled(cron = "0 0 21 * * *")
     public void dailyUpdate21() {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 0 22 * * *")
+    //@Scheduled(cron = "0 0 22 * * *")
     public void dailyUpdate22() {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 0 23 * * *")
+    //@Scheduled(cron = "0 0 23 * * *")
     public void dailyUpdate23() {
         crawlSchedule(false);
     }
