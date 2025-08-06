@@ -1,5 +1,5 @@
 # Dockerfile
-FROM openjdk:11-jre-slim
+FROM openjdk:17-jre-slim
 
 # 작업 디렉토리 설정
 WORKDIR /app
