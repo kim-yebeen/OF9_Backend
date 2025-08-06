@@ -11,6 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Optional;
+
 
 @RestController
 @RequestMapping("/auth")
@@ -49,5 +53,26 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
     }
+
+    // AuthController.java에 추가 (기존 구조 그대로)
+    // AuthController.java - 더 간단한 버전
+    @PostMapping("/kakao/test")
+    public ResponseEntity<AuthResponse> testLogin(@RequestBody Map<String, String> request) {
+        try {
+            String favTeam = request.getOrDefault("favTeam", "KIA");
+
+            // KakaoService에 테스트용 메서드 호출
+            User testUser = kakaoService.createTestUser(favTeam);
+
+            String accessToken = jwtProvider.createAccessToken(testUser.getId().toString());
+            String refreshToken = jwtProvider.createRefreshToken(testUser.getId().toString());
+
+            return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+
 }
 

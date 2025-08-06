@@ -49,4 +49,23 @@ public class KakaoService {
         Random r = new Random();
         return list.get(r.nextInt(list.size())) + " " + (1000 + r.nextInt(9000));
     }
+
+    // KakaoService.java에 추가
+    public User createTestUser(String favTeam) {
+        Optional<User> existing = userRepository.findByKakaoId(999999L);
+
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        User testUser = new User();
+        testUser.setKakaoId(999999L);
+        testUser.setNickname("테스트유저" + System.currentTimeMillis());
+        testUser.setFavTeam(favTeam);
+        testUser.setCreatedAt(LocalDateTime.now());
+        testUser.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(testUser);
+    }
+
 }
