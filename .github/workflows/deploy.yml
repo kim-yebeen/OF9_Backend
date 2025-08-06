@@ -1,8 +1,9 @@
-name: Auto Deploy Spring Boot to EC2
+# .github/workflows/deploy.yml
+name: Docker Deploy to EC2
 
 on:
   push:
-    branches: [ deploy ]  # deploy 브랜치 사용
+    branches: [ deploy ]
 
 jobs:
   deploy:
@@ -22,46 +23,54 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build -x test  # 테스트 제외하고 빌드
+        run: ./gradlew build -x test
 
-      - name: Deploy to EC2
+      - name: Build Docker image
+        run: |
+          docker build -t baseball-diary:latest .
+
+      - name: Save Docker image
+        run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
+
+      - name: Copy Docker image to EC2
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
         run: |
-          # SSH 키 파일 생성 및 권한 설정
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           
-          # 빌드된 JAR 파일을 서버로 전송
-          echo " Uploading JAR file to server..."
-          scp -o StrictHostKeyChecking=no -i private_key.pem build/libs/*.jar ${USER}@${HOST}:~/
-          
-          # SSH 연결 테스트
-          echo "Testing SSH connection..."
-          ssh -v -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} 'echo "✅ SSH connection successful"'
-          
-          # 배포 실행
-          echo "Starting deployment..."
+          scp -o StrictHostKeyChecking=no -i private_key.pem baseball-diary.tar.gz ${USER}@${HOST}:~/
+
+      - name: Deploy on EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
           ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} '
-            echo " Stopping existing application..."
-            pkill -f "java.*jar" || echo "No running application found"
+            # 기존 컨테이너 중지 및 제거
+            docker stop baseball-diary || true
+            docker rm baseball-diary || true
           
-            echo "Moving to project directory..."
-            cd ~ || exit 1
+            # 이미지 로드
+            docker load < baseball-diary.tar.gz
           
-            echo "Starting Spring Boot application..."
-            nohup java -jar *.jar > app.log 2>&1 &
+            # 새 컨테이너 실행
+            docker run -d \
+              --name baseball-diary \
+              -p 8080:8080 \
+              --restart unless-stopped \
+              --env-file ~/.env \
+              baseball-diary:latest
           
-            echo "Waiting for application to start..."
+            # 컨테이너 상태 확인
+            docker ps
             sleep 15
           
-            echo "Testing API..."
-            curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080/ || echo "API test failed"
-          
-            echo "Deployment completed!"
+            # API 테스트
+            curl -f http://localhost:8080/actuator/health && echo "✅ 배포 성공!" || echo "❌ 배포 실패!"
           '
           
-          # 클린업
           rm -f private_key.pem

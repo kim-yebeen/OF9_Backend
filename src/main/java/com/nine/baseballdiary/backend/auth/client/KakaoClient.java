@@ -1,4 +1,4 @@
-package com.nine.baseballdiary.backend.auth;
+package com.nine.baseballdiary.backend.auth.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

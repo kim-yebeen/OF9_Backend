@@ -1,6 +1,6 @@
 package com.nine.baseballdiary.backend.config;
 
-import com.nine.baseballdiary.backend.auth.JwtAuthenticationFilter;
+import com.nine.baseballdiary.backend.auth.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

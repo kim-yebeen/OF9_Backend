@@ -1,5 +1,6 @@
-package com.nine.baseballdiary.backend.auth;
+package com.nine.baseballdiary.backend.auth.service;
 
+import com.nine.baseballdiary.backend.auth.client.KakaoClient;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import org.springframework.stereotype.Service;

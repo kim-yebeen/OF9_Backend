@@ -1,4 +1,4 @@
-package com.nine.baseballdiary.backend.auth;
+package com.nine.baseballdiary.backend.auth.dto.request;
 
 public class KakaoLoginRequestDto {
     private String accessToken;

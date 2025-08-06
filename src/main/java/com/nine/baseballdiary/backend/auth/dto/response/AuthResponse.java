@@ -1,5 +1,5 @@
 // src/main/java/com/nine/baseballdiary/backend/auth/AuthResponse.java
-package com.nine.baseballdiary.backend.auth;
+package com.nine.baseballdiary.backend.auth.dto.response;
 
 public class AuthResponse {
     private String accessToken;

@@ -1,10 +1,16 @@
 // src/main/java/com/nine/baseballdiary/backend/auth/AuthController.java
-package com.nine.baseballdiary.backend.auth;
+package com.nine.baseballdiary.backend.auth.controller;
 
+import com.nine.baseballdiary.backend.auth.dto.request.KakaoLoginRequestDto;
+import com.nine.baseballdiary.backend.auth.dto.request.RefreshTokenRequest;
+import com.nine.baseballdiary.backend.auth.dto.response.AuthResponse;
+import com.nine.baseballdiary.backend.auth.security.JwtProvider;
+import com.nine.baseballdiary.backend.auth.service.KakaoService;
 import com.nine.baseballdiary.backend.user.entity.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 
 @RestController
 @RequestMapping("/auth")
