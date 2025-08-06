@@ -3,7 +3,7 @@ name: Docker Deploy to EC2
 
 on:
   push:
-    branches: [ deploy ]
+    branches: [ develop ]
 
 jobs:
   deploy:
