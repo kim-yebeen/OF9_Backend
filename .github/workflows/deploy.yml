@@ -26,7 +26,12 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t baseball-diary:latest .
+          echo "Pulling Chrome base image first..."
+          docker pull kimyebeen125/java-chrome-base:v2
+          echo "Building application image..."
+          docker build --no-cache -t baseball-diary:latest .
+          echo "Verifying Chrome installation..."
+          docker run --rm baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome not found!"
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
@@ -40,7 +45,7 @@ jobs:
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           
-          scp -o StrictHostKeyChecking=no -i private_key.pem baseball-diary.tar.gz ${USER}@${HOST}:~/
+          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3 -i private_key.pem baseball-diary.tar.gz ${USER}@${HOST}:~/
 
       - name: Deploy on EC2
         env:
@@ -55,13 +60,17 @@ jobs:
           JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
           JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} "
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
             # 기존 컨테이너 중지 및 제거
             docker stop baseball-diary || true
             docker rm baseball-diary || true
           
             # 이미지 로드
             docker load < baseball-diary.tar.gz
+          
+            # Chrome 설치 확인
+            echo 'Checking Chrome in deployed image...'
+            docker run --rm baseball-diary:latest google-chrome-stable --version || echo '❌ Chrome verification failed!'
           
             # 새 컨테이너 실행 (환경변수 직접 전달)
             docker run -d \
@@ -82,7 +91,13 @@ jobs:
               baseball-diary:latest
           
             # 컨테이너 상태 확인
+            echo 'Container status:'
             docker ps
+          
+            # 실행된 컨테이너에서도 Chrome 확인
+            echo 'Final Chrome check in running container:'
+            docker exec baseball-diary google-chrome-stable --version || echo '❌ Chrome not working in container!'
+          
             sleep 15
           
             # API 테스트
