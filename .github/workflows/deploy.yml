@@ -26,12 +26,14 @@ jobs:
 
       - name: Build Docker image
         run: |
-          echo "Pulling Chrome base image first..."
+          echo "=== Pulling Chrome base image ==="
           docker pull kimyebeen125/java-chrome-base:v2
-          echo "Building application image..."
+          echo "=== Testing base image Chrome ==="
+          docker run --rm kimyebeen125/java-chrome-base:v2 google-chrome-stable --version
+          echo "=== Building application image ==="
           docker build --no-cache -t baseball-diary:latest .
-          echo "Verifying Chrome installation..."
-          docker run --rm baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome not found!"
+          echo "=== Verifying Chrome in built image ==="
+          docker run --rm baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome verification failed!"
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
@@ -61,18 +63,17 @@ jobs:
           JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
-            # 기존 컨테이너 중지 및 제거
+            echo '=== 기존 컨테이너 정리 ==='
             docker stop baseball-diary || true
             docker rm baseball-diary || true
           
-            # 이미지 로드
+            echo '=== 이미지 로드 ==='
             docker load < baseball-diary.tar.gz
           
-            # Chrome 설치 확인
-            echo 'Checking Chrome in deployed image...'
+            echo '=== Chrome 설치 확인 ==='
             docker run --rm baseball-diary:latest google-chrome-stable --version || echo '❌ Chrome verification failed!'
           
-            # 새 컨테이너 실행 (환경변수 직접 전달)
+            echo '=== 새 컨테이너 실행 ==='
             docker run -d \
               --name baseball-diary \
               -p 8080:8080 \
@@ -83,24 +84,26 @@ jobs:
               -e SPRING_DATASOURCE_DRIVER_CLASS_NAME='org.postgresql.Driver' \
               -e SPRING_JPA_HIBERNATE_DDL_AUTO='validate' \
               -e SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT='org.hibernate.dialect.PostgreSQLDialect' \
-              -e JWT_SECRET='$JWT_SECRET' \
-              -e JWT_ACCESS_EXPIRATION='$JWT_ACCESS_EXPIRATION' \
-              -e JWT_REFRESH_EXPIRATION='$JWT_REFRESH_EXPIRATION' \
+              -e jwt.secret='$JWT_SECRET' \
+              -e jwt.access-expiration='$JWT_ACCESS_EXPIRATION' \
+              -e jwt.refresh-expiration='$JWT_REFRESH_EXPIRATION' \
               -e INITIAL_CRAWL_ENABLED='true' \
               -e SPRING_PROFILES_ACTIVE='default' \
               baseball-diary:latest
           
-            # 컨테이너 상태 확인
-            echo 'Container status:'
+            echo '=== 컨테이너 상태 확인 ==='
             docker ps
           
-            # 실행된 컨테이너에서도 Chrome 확인
-            echo 'Final Chrome check in running container:'
+            echo '=== 컨테이너 내부 Chrome 확인 ==='
             docker exec baseball-diary google-chrome-stable --version || echo '❌ Chrome not working in container!'
           
-            sleep 15
+            echo '=== 애플리케이션 시작 대기 ==='
+            sleep 20
           
-            # API 테스트
+            echo '=== 컨테이너 로그 확인 ==='
+            docker logs baseball-diary --tail 20
+          
+            echo '=== API 헬스 체크 ==='
             curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '❌ 배포 실패!'
           "
           
