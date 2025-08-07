@@ -1,4 +1,3 @@
-# .github/workflows/deploy.yml
 name: Docker Deploy to EC2
 
 on:
@@ -48,8 +47,15 @@ jobs:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
+          # GitHub Secrets에서 환경변수 가져오기
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
+          JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
         run: |
-          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} '
+          ssh -o StrictHostKeyChecking=no -i private_key.pem ${USER}@${HOST} "
             # 기존 컨테이너 중지 및 제거
             docker stop baseball-diary || true
             docker rm baseball-diary || true
@@ -57,12 +63,22 @@ jobs:
             # 이미지 로드
             docker load < baseball-diary.tar.gz
           
-            # 새 컨테이너 실행
+            # 새 컨테이너 실행 (환경변수 직접 전달)
             docker run -d \
               --name baseball-diary \
               -p 8080:8080 \
               --restart unless-stopped \
-              --env-file ~/.env \
+              -e SPRING_DATASOURCE_URL='$DB_URL' \
+              -e SPRING_DATASOURCE_USERNAME='$DB_USERNAME' \
+              -e SPRING_DATASOURCE_PASSWORD='$DB_PASSWORD' \
+              -e SPRING_DATASOURCE_DRIVER_CLASS_NAME='org.postgresql.Driver' \
+              -e SPRING_JPA_HIBERNATE_DDL_AUTO='validate' \
+              -e SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT='org.hibernate.dialect.PostgreSQLDialect' \
+              -e JWT_SECRET='$JWT_SECRET' \
+              -e JWT_ACCESS_EXPIRATION='$JWT_ACCESS_EXPIRATION' \
+              -e JWT_REFRESH_EXPIRATION='$JWT_REFRESH_EXPIRATION' \
+              -e INITIAL_CRAWL_ENABLED='true' \
+              -e SPRING_PROFILES_ACTIVE='default' \
               baseball-diary:latest
           
             # 컨테이너 상태 확인
@@ -70,7 +86,7 @@ jobs:
             sleep 15
           
             # API 테스트
-            curl -f http://localhost:8080/actuator/health && echo "✅ 배포 성공!" || echo "❌ 배포 실패!"
-          '
+            curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '❌ 배포 실패!'
+          "
           
           rm -f private_key.pem
