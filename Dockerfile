@@ -1,10 +1,11 @@
-FROM openjdk:17-jdk-slim
+# 기존 Dockerfile을 이렇게 수정
+FROM your-dockerhub-username/java-chrome-base:latest
 
 WORKDIR /app
 COPY build/libs/backend-0.0.1-SNAPSHOT.jar app.jar
 
 ENV JAVA_OPTS="-Xms128m -Xmx256m -XX:+UseG1GC"
-ENV JWT_SECRET=c29tZXZlcnlzZWN1cmVhbmRsb25nYmFzZTY0ZW5jb2RlZHNlY3JldGtleWZvcmhzNTEyIQ==
+ENV JWT_SECRET=c29tZXZlcnlzZWN1cmVhbmRsb25nYmFzZTY0ZW5jb2RlZHNlY3JldGkQ==
 ENV JWT_ACCESS_EXPIRATION=86400000
 ENV JWT_REFRESH_EXPIRATION=604800000
 ENV SPRING_DATASOURCE_URL=jdbc:postgresql://of9-db.cvs68wqogubb.ap-northeast-2.rds.amazonaws.com:5432/postgres
