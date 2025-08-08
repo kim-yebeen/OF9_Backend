@@ -38,7 +38,7 @@ public class SecurityConfig {
                 // ✅ 이 부분이 핵심: SecurityContext의 저장 및 로드 방식을 명시적으로 설정합니다.
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/error").permitAll()
+                        .requestMatchers("/auth/**", "/error", "/actuator/health").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
