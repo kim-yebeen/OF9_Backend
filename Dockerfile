@@ -1,4 +1,4 @@
-FROM kimyebeen125/java-chrome-base:v2
+FROM kimyebeen125/java-chrome-base:v3
 
 WORKDIR /app
 COPY build/libs/backend-0.0.1-SNAPSHOT.jar app.jar
