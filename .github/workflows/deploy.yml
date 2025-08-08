@@ -33,7 +33,7 @@ jobs:
           echo "=== Building application image ==="
           docker build --no-cache -t baseball-diary:latest .
           echo "=== Verifying Chrome in built image ==="
-          docker run --rm baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome verification failed!"
+          docker run --rm --entrypoint="" baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome verification failed!"
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
@@ -54,13 +54,6 @@ jobs:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
-          # GitHub Secrets에서 환경변수 가져오기
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
-          JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
             echo '=== 기존 컨테이너 정리 ==='
@@ -71,31 +64,22 @@ jobs:
             docker load < baseball-diary.tar.gz
           
             echo '=== Chrome 설치 확인 ==='
-            docker run --rm baseball-diary:latest google-chrome-stable --version || echo '❌ Chrome verification failed!'
+            docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version || echo '❌ Chrome verification failed!'
           
             echo '=== 새 컨테이너 실행 ==='
             docker run -d \
               --name baseball-diary \
               -p 8080:8080 \
               --restart unless-stopped \
-              -e SPRING_DATASOURCE_URL='$DB_URL' \
-              -e SPRING_DATASOURCE_USERNAME='$DB_USERNAME' \
-              -e SPRING_DATASOURCE_PASSWORD='$DB_PASSWORD' \
-              -e SPRING_DATASOURCE_DRIVER_CLASS_NAME='org.postgresql.Driver' \
-              -e SPRING_JPA_HIBERNATE_DDL_AUTO='validate' \
-              -e SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT='org.hibernate.dialect.PostgreSQLDialect' \
-              -e jwt.secret='$JWT_SECRET' \
-              -e jwt.access-expiration='$JWT_ACCESS_EXPIRATION' \
-              -e jwt.refresh-expiration='$JWT_REFRESH_EXPIRATION' \
+              -v /home/ubuntu/config/application-db.properties:/app/config/application-db.properties \
+              -v /home/ubuntu/config/application-jwt.properties:/app/config/application-jwt.properties \
+              -e SPRING_CONFIG_LOCATION='classpath:/,/app/config/' \
               -e INITIAL_CRAWL_ENABLED='true' \
-              -e SPRING_PROFILES_ACTIVE='default' \
+              -e SPRING_PROFILES_ACTIVE='jwt,db' \
               baseball-diary:latest
           
             echo '=== 컨테이너 상태 확인 ==='
             docker ps
-          
-            echo '=== 컨테이너 내부 Chrome 확인 ==='
-            docker exec baseball-diary google-chrome-stable --version || echo '❌ Chrome not working in container!'
           
             echo '=== 애플리케이션 시작 대기 ==='
             sleep 20
