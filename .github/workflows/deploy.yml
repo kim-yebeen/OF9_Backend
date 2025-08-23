@@ -27,9 +27,9 @@ jobs:
       - name: Build Docker image
         run: |
           echo "=== Pulling Chrome base image ==="
-          docker pull kimyebeen125/java-chrome-base:v2
+          docker pull kimyebeen125/java-chrome-base:v3
           echo "=== Testing base image Chrome ==="
-          docker run --rm kimyebeen125/java-chrome-base:v2 google-chrome-stable --version
+          docker run --rm kimyebeen125/java-chrome-base:v3 google-chrome-stable --version
           echo "=== Building application image ==="
           docker build --no-cache -t baseball-diary:latest .
           echo "=== Verifying Chrome in built image ==="
@@ -60,6 +60,15 @@ jobs:
             docker stop baseball-diary || true
             docker rm baseball-diary || true
           
+            echo '=== 기존 이미지 정리 (최신 2개만 유지) ==='
+            docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}\t{{.ID}}' | grep baseball-diary | tail -n +3 | awk '{print \$3}' | xargs -r docker rmi -f || true
+          
+            echo '=== 사용하지 않는 이미지 정리 ==='
+            docker image prune -f
+          
+            echo '=== 디스크 사용량 확인 ==='
+            df -h
+          
             echo '=== 이미지 로드 ==='
             docker load < baseball-diary.tar.gz
           
@@ -89,6 +98,12 @@ jobs:
           
             echo '=== API 헬스 체크 ==='
             curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '❌ 배포 실패!'
+          
+            echo '=== 최종 디스크 사용량 ==='
+            df -h
+          
+            echo '=== tar 파일 정리 ==='
+            rm -f ~/baseball-diary.tar.gz
           "
           
           rm -f private_key.pem
