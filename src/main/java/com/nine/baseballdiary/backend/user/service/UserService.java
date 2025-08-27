@@ -189,5 +189,22 @@ public class UserService {
         userRepo.deleteById(userId);
     }
 
+    public boolean isNicknameAvailable(String nickname) {
+        // 닉네임 유효성 검사
+        if (nickname == null || nickname.trim().isEmpty()) {
+            return false;
+        }
+
+        if (nickname.length() < 1 || nickname.length() > 15) {
+            return false;
+        }
+
+        if (!nickname.matches("^[가-힣a-zA-Z0-9\\s_-]+$")) {
+            return false;
+        }
+
+        // 중복 확인
+        return !userRepo.existsByNickname(nickname);
+    }
 }
 

@@ -1,7 +1,7 @@
 package com.nine.baseballdiary.backend.user.controller;
 
+import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import com.nine.baseballdiary.backend.user.dto.*;
-import com.nine.baseballdiary.backend.user.entity.FollowRequest;
 import com.nine.baseballdiary.backend.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +13,16 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
-@RestController @RequestMapping("/users") @RequiredArgsConstructor
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
-    private final UserService svc;
 
-    //jwt 토큰에서 현재 사용자 id를 가져오는 헬퍼 메서드
+    private final UserService userService;
+
+    // JWT 토큰에서 현재 사용자 ID 추출
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
@@ -27,106 +31,128 @@ public class UserController {
         return Long.parseLong((String) authentication.getPrincipal());
     }
 
-    //내 정보 조회
+    // ✅ 1. 내 정보 조회
     @GetMapping("/me")
-    public UserProfileDto me() {
+    public ResponseEntity<ApiResponse<UserProfileDto>> getMyProfile() {
         Long userId = getCurrentUserId();
-        return svc.getMyProfile(userId);
+        UserProfileDto profile = userService.getMyProfile(userId);
+
+        return ResponseEntity.ok(ApiResponse.success("프로필을 조회했습니다", profile));
     }
 
-    //내 정보 수정
+    // ✅ 2. 내 정보 수정
     @PatchMapping("/me")
-    public ResponseEntity<UserProfileDto> updateMe(
-            @RequestBody @Valid UpdateUserRequest req) {
+    public ResponseEntity<ApiResponse<UserProfileDto>> updateMyProfile(@Valid @RequestBody UpdateUserRequest request) {
         Long userId = getCurrentUserId();
-        svc.updateUser(userId, req);
-        UserProfileDto updated = svc.getMyProfile(userId);
-        return ResponseEntity.ok(updated);
+        userService.updateUser(userId, request);
+
+        UserProfileDto updatedProfile = userService.getMyProfile(userId);
+        return ResponseEntity.ok(ApiResponse.success("프로필이 수정되었습니다", updatedProfile));
     }
 
-    //친구 검색
+    // ✅ 3. 닉네임 중복 확인
+    @GetMapping("/nickname/check")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> checkNickname(@RequestParam String nickname) {
+        boolean isAvailable = userService.isNicknameAvailable(nickname);
+        String message = isAvailable ? "사용 가능한 닉네임입니다" : "이미 사용중인 닉네임입니다";
+
+        Map<String, Object> result = Map.of(
+                "available", isAvailable,
+                "message", message
+        );
+
+        return ResponseEntity.ok(ApiResponse.success("닉네임 중복 확인 완료", result));
+    }
+
+    // ✅ 4. 사용자 검색
     @GetMapping("/search")
-    public List<UserDto> search(
-            @RequestParam("nickname") String nickname
-    ) {
-        return svc.searchUsers(nickname);
+    public ResponseEntity<ApiResponse<List<UserDto>>> searchUsers(@RequestParam String nickname) {
+        List<UserDto> users = userService.searchUsers(nickname);
+
+        return ResponseEntity.ok(ApiResponse.success("사용자 검색이 완료되었습니다", users));
     }
 
-    //follow request
+    // ✅ 5. 팔로우 요청/즉시 팔로우
     @PostMapping("/{targetId}/follow")
-    public ResponseEntity<FollowResponse> follow(
-            @PathVariable Long targetId
-    ) {
-        Long me = getCurrentUserId();
-        FollowResponse res = svc.requestFollow(me, targetId);
-        HttpStatus status = res.isPending() ? HttpStatus.ACCEPTED : HttpStatus.OK;
-        return ResponseEntity.status(status).body(res);
+    public ResponseEntity<ApiResponse<FollowResponse>> followUser(@PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId();
+        FollowResponse response = userService.requestFollow(currentUserId, targetId);
+
+        String message = response.isPending() ?
+                "팔로우 요청을 보냈습니다" :
+                "팔로우했습니다";
+
+        HttpStatus status = response.isPending() ? HttpStatus.ACCEPTED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(ApiResponse.success(message, response));
     }
 
-    /** 2) 비공개 계정 주인의 PENDING 요청 조회 */
-    @GetMapping("/me/requests")
-    public List<FollowRequestDto> incomingRequests() {
-        Long me = getCurrentUserId();
-        return svc.listIncomingRequests(me);
-    }
-
-    /** 3) 비공개 계정 주인의 수락 */
-    @PatchMapping("/me/requests/{reqId}/accept")
-    public ResponseEntity<Void> accept(
-            @PathVariable Long reqId
-    ) {
-        Long me = getCurrentUserId();
-        svc.acceptFollowRequest(me, reqId);
-        return ResponseEntity.ok().build();
-    }
-
-    /** 4) 비공개 계정 주인의 거절 */
-    @PatchMapping("/me/requests/{reqId}/reject")
-    public ResponseEntity<Void> reject(
-            @PathVariable Long reqId
-    ) {
-        Long me = getCurrentUserId();
-        svc.rejectFollowRequest(me, reqId);
-        return ResponseEntity.noContent().build();
-    }
-
-    // 언팔로우
+    // ✅ 6. 언팔로우
     @DeleteMapping("/{targetId}/follow")
-    public ResponseEntity<Void> unfollow(
-            @PathVariable Long targetId
-    ) {
-        Long me = getCurrentUserId();
-        svc.unfollow(me, targetId);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<ApiResponse<Void>> unfollowUser(@PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId();
+        userService.unfollow(currentUserId, targetId);
+
+        return ResponseEntity.ok(ApiResponse.success("언팔로우했습니다"));
     }
 
-    //특정 사용자의 팔로잉 목록
-    @GetMapping("/{userId}/following")
-    public List<UserDto> following(@PathVariable Long userId) {
-        return svc.getFollowing(userId);
+    // ✅ 7. 받은 팔로우 요청 목록 조회
+    @GetMapping("/me/follow-requests")
+    public ResponseEntity<ApiResponse<List<FollowRequestDto>>> getFollowRequests() {
+        Long currentUserId = getCurrentUserId();
+        List<FollowRequestDto> requests = userService.listIncomingRequests(currentUserId);
+
+        return ResponseEntity.ok(ApiResponse.success("팔로우 요청 목록을 조회했습니다", requests));
     }
 
-    //특정사용자의 팔로워 목록
+    // ✅ 8. 팔로우 요청 수락
+    @PostMapping("/me/follow-requests/{requestId}/accept")
+    public ResponseEntity<ApiResponse<Void>> acceptFollowRequest(@PathVariable Long requestId) {
+        Long currentUserId = getCurrentUserId();
+        userService.acceptFollowRequest(currentUserId, requestId);
+
+        return ResponseEntity.ok(ApiResponse.success("팔로우 요청을 수락했습니다"));
+    }
+
+    // ✅ 9. 팔로우 요청 거절
+    @PostMapping("/me/follow-requests/{requestId}/reject")
+    public ResponseEntity<ApiResponse<Void>> rejectFollowRequest(@PathVariable Long requestId) {
+        Long currentUserId = getCurrentUserId();
+        userService.rejectFollowRequest(currentUserId, requestId);
+
+        return ResponseEntity.ok(ApiResponse.success("팔로우 요청을 거절했습니다"));
+    }
+
+    // ✅ 10. 특정 사용자의 팔로워 목록
     @GetMapping("/{userId}/followers")
-    public List<UserDto> followers(@PathVariable Long userId) {
-        return svc.getFollowers(userId);
+    public ResponseEntity<ApiResponse<List<UserDto>>> getFollowers(@PathVariable Long userId) {
+        List<UserDto> followers = userService.getFollowers(userId);
+
+        return ResponseEntity.ok(ApiResponse.success("팔로워 목록을 조회했습니다", followers));
     }
 
-    //logout
+    // ✅ 11. 특정 사용자의 팔로잉 목록
+    @GetMapping("/{userId}/following")
+    public ResponseEntity<ApiResponse<List<UserDto>>> getFollowing(@PathVariable Long userId) {
+        List<UserDto> following = userService.getFollowing(userId);
+
+        return ResponseEntity.ok(ApiResponse.success("팔로잉 목록을 조회했습니다", following));
+    }
+
+    // ✅ 12. 로그아웃
     @PostMapping("/me/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout() {
         Long userId = getCurrentUserId();
-        svc.logout(userId);
-        return ResponseEntity.noContent().build();
+        userService.logout(userId);
+
+        return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다"));
     }
 
-    //withdraw
+    // ✅ 13. 회원 탈퇴
     @DeleteMapping("/me")
-    public ResponseEntity<Void> delete() {
+    public ResponseEntity<ApiResponse<Void>> deleteAccount() {
         Long userId = getCurrentUserId();
-        svc.deleteUser(userId);
-        return ResponseEntity.noContent().build();
+        userService.deleteUser(userId);
+
+        return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다"));
     }
-
-
 }

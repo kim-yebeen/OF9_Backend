@@ -7,7 +7,6 @@ import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -141,23 +139,6 @@ public class NotificationService {
                 .map(this::convertToDto)
                 .filter(dto -> category.equals("ALL") || category.equals(dto.getCategory()))
                 .collect(Collectors.toList());
-    }
-
-    // ✅ 7. 팔로우 요청 처리 메서드 추가
-    @Transactional
-    public void handleFollowRequest(Long userId, Long requesterId, boolean accept) {
-        if (accept) {
-            // 팔로우 관계 생성 로직 (UserService에 위임하는 것이 좋음)
-            // 예시: userFollowService.followUser(requesterId, userId);
-
-            // 요청 수락 후 팔로우 완료 알림 생성
-            createFollowNotification(requesterId, userId);
-        }
-
-        // 팔로우 요청 알림 삭제 또는 상태 변경
-        // 예시: followRequestService.updateRequestStatus(requesterId, userId, accept);
-
-        log.info("팔로우 요청 처리: userId={}, requesterId={}, accept={}", userId, requesterId, accept);
     }
 
     // ✅ DTO 변환 메서드
