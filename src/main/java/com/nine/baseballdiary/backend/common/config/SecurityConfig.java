@@ -1,4 +1,4 @@
-package com.nine.baseballdiary.backend.config;
+package com.nine.baseballdiary.backend.common.config;
 
 import com.nine.baseballdiary.backend.auth.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;

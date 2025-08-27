@@ -1,15 +1,15 @@
 package com.nine.baseballdiary.backend.Notifiation;
 
+import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/notifications")
@@ -26,36 +26,35 @@ public class NotificationController {
         return Long.parseLong((String) authentication.getPrincipal());
     }
 
-    // 1. 알림 목록 조회
+    // ✅ 1. 알림 목록 조회 (카테고리별 필터링 지원)
     @GetMapping
-    public ResponseEntity<List<NotificationDto>> getNotifications(
-            @RequestParam(required = false, defaultValue = "ALL") String type,
-            @RequestParam(required = false) Boolean isRead) {
+    public ResponseEntity<ApiResponse<List<NotificationDto>>> getNotifications(
+            @RequestParam(required = false, defaultValue = "ALL") String category) {
+
         Long userId = getCurrentUserId();
-        List<NotificationDto> notifications = notificationService.getNotifications(userId, type, isRead);
-        return ResponseEntity.ok(notifications);
+        List<NotificationDto> notifications = notificationService.getNotifications(userId, category);
+
+        return ResponseEntity.ok(ApiResponse.success("알림 목록을 조회했습니다", notifications));
     }
 
-    // 2. 읽지 않은 알림 개수
-    @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount() {
+    // ✅ 2. 팔로우 요청 처리
+    @PostMapping("/follow-request/{requesterId}")
+    public ResponseEntity<ApiResponse<Void>> handleFollowRequest(
+            @PathVariable Long requesterId,
+            @RequestParam boolean accept) {
+
         Long userId = getCurrentUserId();
-        Long count = notificationService.getUnreadCount(userId);
-        return ResponseEntity.ok(Map.of("count", count));
+        notificationService.handleFollowRequest(userId, requesterId, accept);
+
+        String message = accept ? "팔로우 요청을 수락했습니다" : "팔로우 요청을 거절했습니다";
+        return ResponseEntity.ok(ApiResponse.success(message));
     }
 
-    // 3. 알림 읽음 처리
-    @PatchMapping("/{notificationId}/read")
-    public ResponseEntity<Void> markAsRead(@PathVariable Long notificationId) {
-        Long userId = getCurrentUserId();
-        notificationService.markAsRead(userId, notificationId);
-        return ResponseEntity.ok().build();
-    }
-
-    // 4. 시스템 알림 생성 (관리자용)
+    // ✅ 3. 시스템 알림 생성 (관리자용)
     @PostMapping("/system")
-    public ResponseEntity<Void> createSystemNotification(@RequestBody SystemNotificationRequest request) {
+    public ResponseEntity<ApiResponse<Void>> createSystemNotification(@RequestBody SystemNotificationRequest request) {
         notificationService.createSystemNotification(request.getTitle(), request.getContent());
-        return ResponseEntity.status(201).build();
+
+        return ResponseEntity.ok(ApiResponse.success("시스템 알림이 생성되었습니다"));
     }
 }

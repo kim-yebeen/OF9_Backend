@@ -1,12 +1,13 @@
 package com.nine.baseballdiary.backend.Notifiation;
 
-import com.nine.baseballdiary.backend.record.Record; // ✅ 명시적 import 추가
-import com.nine.baseballdiary.backend.record.RecordRepository; // ✅ 추가
+import com.nine.baseballdiary.backend.record.Record;
+import com.nine.baseballdiary.backend.record.RecordRepository;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -37,6 +39,7 @@ public class NotificationService {
     private String getEmotionName(Integer code) {
         return EMOTION_MAP.getOrDefault(code, "공감");
     }
+
     // 1. 공감 알림 생성
     public void createReactionNotification(Long recordOwnerId, Long reactorId, Long recordId, Integer reactionTypeId) {
         if (recordOwnerId.equals(reactorId)) return;
@@ -47,8 +50,8 @@ public class NotificationService {
         Notification notification = Notification.builder()
                 .userId(recordOwnerId)
                 .type(NotificationType.REACTION)
-                .title("공감 알림") // title은 간단히
-                .content(reactor.getNickname() + "님이 나의 직관기록에 " + emotionName + " 이모지를 남겼어요") // ✅ 수정된 content
+                .title("반응 공감")
+                .content(reactor.getNickname() + "님이 나의 직관기록에 " + emotionName + " 반응을 남겼어요")
                 .relatedUserId(reactorId)
                 .relatedRecordId(recordId)
                 .reactionTypeId(reactionTypeId)
@@ -58,15 +61,15 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // 팔로우 알림
+    // 2. 팔로우 알림
     public void createFollowNotification(Long followeeId, Long followerId) {
         User follower = userRepo.findById(followerId).orElseThrow();
 
         Notification notification = Notification.builder()
                 .userId(followeeId)
                 .type(NotificationType.FOLLOW)
-                .title("팔로우 알림")
-                .content(follower.getNickname() + "님이 팔로우를 시작했어요") // ✅ 간단하게 수정
+                .title("친구의 직관기록")
+                .content(follower.getNickname() + "님이 나를 팔로우 했어요")
                 .relatedUserId(followerId)
                 .isRead(false)
                 .build();
@@ -74,15 +77,15 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // 팔로우 요청 알림
+    // 3. 팔로우 요청 알림
     public void createFollowRequestNotification(Long targetId, Long requesterId) {
         User requester = userRepo.findById(requesterId).orElseThrow();
 
         Notification notification = Notification.builder()
                 .userId(targetId)
                 .type(NotificationType.FOLLOW_REQUEST)
-                .title("팔로우 요청")
-                .content(requester.getNickname() + "님이 팔로우를 요청했어요") // ✅ 간단하게 수정
+                .title("친구의 직관기록")
+                .content(requester.getNickname() + "님의 팔로우 요청")
                 .relatedUserId(requesterId)
                 .isRead(false)
                 .build();
@@ -90,7 +93,7 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // 새 게시글 알림
+    // 4. 새 게시글 알림
     public void createNewRecordNotification(Long recordOwnerId, Long recordId) {
         User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
 
@@ -103,8 +106,8 @@ public class NotificationService {
                 .map(followerId -> Notification.builder()
                         .userId(followerId)
                         .type(NotificationType.NEW_RECORD)
-                        .title("새 게시글")
-                        .content(recordOwner.getNickname() + "님이 새로운 직관 기록을 작성했어요") // ✅ 간단하게 수정
+                        .title("친구의 직관기록")
+                        .content(recordOwner.getNickname() + "님이 직관 기록을 업로드했어요")
                         .relatedUserId(recordOwnerId)
                         .relatedRecordId(recordId)
                         .isRead(false)
@@ -114,7 +117,7 @@ public class NotificationService {
         notificationRepo.saveAll(notifications);
     }
 
-    // 4. 시스템 소식 생성
+    // 5. 시스템 소식 생성
     public void createSystemNotification(String title, String content) {
         List<User> allUsers = userRepo.findAll();
 
@@ -122,7 +125,7 @@ public class NotificationService {
                 .map(user -> Notification.builder()
                         .userId(user.getId())
                         .type(NotificationType.SYSTEM)
-                        .title(title)
+                        .title("소식")
                         .content(content)
                         .build())
                 .collect(Collectors.toList());
@@ -130,50 +133,47 @@ public class NotificationService {
         notificationRepo.saveAll(systemNotifications);
     }
 
-    // 5. 알림 목록 조회
-    public List<NotificationDto> getNotifications(Long userId, String type, Boolean isRead) {
-        List<Notification> notifications;
-
-        if (type != null && !type.equals("ALL")) {
-            NotificationType notificationType = NotificationType.valueOf(type.toUpperCase());
-            notifications = notificationRepo.findByUserIdAndTypeOrderByCreatedAtDesc(userId, notificationType);
-        } else {
-            notifications = notificationRepo.findByUserIdOrderByCreatedAtDesc(userId);
-        }
+    // ✅ 6. 알림 목록 조회 - 카테고리 필터링으로 변경
+    public List<NotificationDto> getNotifications(Long userId, String category) {
+        List<Notification> notifications = notificationRepo.findByUserIdOrderByCreatedAtDesc(userId);
 
         return notifications.stream()
-                .filter(n -> isRead == null || n.getIsRead().equals(isRead))
                 .map(this::convertToDto)
+                .filter(dto -> category.equals("ALL") || category.equals(dto.getCategory()))
                 .collect(Collectors.toList());
     }
 
-    // 6. 읽지 않은 알림 개수
-    public Long getUnreadCount(Long userId) {
-        return notificationRepo.countByUserIdAndIsReadFalse(userId);
-    }
-
-    // 7. 알림 읽음 처리
+    // ✅ 7. 팔로우 요청 처리 메서드 추가
     @Transactional
-    public void markAsRead(Long userId, Long notificationId) {
-        Notification notification = notificationRepo.findByIdAndUserId(notificationId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다"));
-        notification.setIsRead(true);
+    public void handleFollowRequest(Long userId, Long requesterId, boolean accept) {
+        if (accept) {
+            // 팔로우 관계 생성 로직 (UserService에 위임하는 것이 좋음)
+            // 예시: userFollowService.followUser(requesterId, userId);
+
+            // 요청 수락 후 팔로우 완료 알림 생성
+            createFollowNotification(requesterId, userId);
+        }
+
+        // 팔로우 요청 알림 삭제 또는 상태 변경
+        // 예시: followRequestService.updateRequestStatus(requesterId, userId, accept);
+
+        log.info("팔로우 요청 처리: userId={}, requesterId={}, accept={}", userId, requesterId, accept);
     }
 
-    // NotificationService.java의 convertToDto 메서드 수정
+    // ✅ DTO 변환 메서드
     private NotificationDto convertToDto(Notification notification) {
         NotificationDto dto = NotificationDto.builder()
                 .id(notification.getId())
                 .type(notification.getType().name())
-                // .title(notification.getTitle()) // ✅ title 제거
                 .content(notification.getContent())
-                .isRead(notification.getIsRead())
-                .timeAgo(formatTimeAgo(notification.getCreatedAt())) // ✅ "3분 전" 형태
+                .timeAgo(formatTimeAgo(notification.getCreatedAt()))
                 .createdAt(notification.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
                 .relatedRecordId(notification.getRelatedRecordId())
+                .category(getCategoryFromType(notification.getType()))
+                .actionButton(getActionButtonForType(notification.getType()))
                 .build();
 
-        // ✅ 사용자 정보 설정 (닉네임, 프로필 이미지)
+        // 사용자 정보 설정
         if (notification.getRelatedUserId() != null) {
             userRepo.findById(notification.getRelatedUserId()).ifPresent(user -> {
                 dto.setUserNickname(user.getNickname());
@@ -184,13 +184,34 @@ public class NotificationService {
             dto.setUserProfileImage("/images/lookit-logo.png");
         }
 
-        // ✅ 공감 타입 정보 추가
+        // 공감 타입 정보
         if (notification.getReactionTypeId() != null) {
             dto.setEmotionName(getEmotionName(notification.getReactionTypeId()));
             dto.setEmotionCode(notification.getReactionTypeId());
         }
 
+        // NEW 뱃지 (24시간 이내)
+        if (Duration.between(notification.getCreatedAt(), LocalDateTime.now()).toHours() < 24) {
+            dto.setBadge("NEW");
+        }
+
         return dto;
+    }
+
+    private String getCategoryFromType(NotificationType type) {
+        return switch (type) {
+            case FOLLOW, NEW_RECORD, FOLLOW_REQUEST -> "친구의 직관기록";
+            case REACTION -> "반응 공감";
+            case SYSTEM -> "소식";
+        };
+    }
+
+    private String getActionButtonForType(NotificationType type) {
+        return switch (type) {
+            case FOLLOW_REQUEST -> "수락";
+            case REACTION, NEW_RECORD, FOLLOW -> "확인";
+            case SYSTEM -> "확인";
+        };
     }
 
     private String formatTimeAgo(LocalDateTime createdAt) {
@@ -206,7 +227,6 @@ public class NotificationService {
         if (hours < 24) return hours + "시간 전";
         if (days < 7) return days + "일 전";
 
-        // 1주일 이상은 명확한 날짜 표시
         if (days < 365) {
             return createdAt.format(DateTimeFormatter.ofPattern("M월 d일"));
         } else {
