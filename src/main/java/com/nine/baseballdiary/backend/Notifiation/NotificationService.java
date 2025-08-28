@@ -131,13 +131,13 @@ public class NotificationService {
         notificationRepo.saveAll(systemNotifications);
     }
 
-    // ✅ 6. 알림 목록 조회 - 카테고리 필터링으로 변경
+    // 알림 목록 조회 - 카테고리 필터링으로 변경
     public List<NotificationDto> getNotifications(Long userId, String category) {
         List<Notification> notifications = notificationRepo.findByUserIdOrderByCreatedAtDesc(userId);
 
         return notifications.stream()
                 .map(this::convertToDto)
-                .filter(dto -> category.equals("ALL") || category.equals(dto.getCategory()))
+                .filter(dto -> "ALL".equals(category) || category.equals(dto.getCategory()))
                 .collect(Collectors.toList());
     }
 
@@ -171,27 +171,22 @@ public class NotificationService {
             dto.setEmotionCode(notification.getReactionTypeId());
         }
 
-        // NEW 뱃지 (24시간 이내)
-        if (Duration.between(notification.getCreatedAt(), LocalDateTime.now()).toHours() < 24) {
-            dto.setBadge("NEW");
-        }
-
         return dto;
     }
 
     private String getCategoryFromType(NotificationType type) {
         return switch (type) {
-            case FOLLOW, NEW_RECORD, FOLLOW_REQUEST -> "친구의 직관기록";
-            case REACTION -> "반응 공감";
-            case SYSTEM -> "소식";
+            case NEW_RECORD -> "FRIEND_RECORD";  // 친구가 새 게시글 올림
+            case REACTION -> "REACTION";         // 내 게시글에 공감
+            case FOLLOW, FOLLOW_REQUEST, SYSTEM -> "NEWS";  // 팔로우 관련 + 시스템
         };
     }
 
     private String getActionButtonForType(NotificationType type) {
         return switch (type) {
-            case FOLLOW_REQUEST -> "수락";
-            case REACTION, NEW_RECORD, FOLLOW -> "확인";
-            case SYSTEM -> "확인";
+            case FOLLOW_REQUEST -> "ACCEPT_REJECT";  // 수락/거절 버튼
+            case FOLLOW -> "FOLLOW_BUTTON";          // 맞팔/팔로잉 버튼 (상황에 따라)
+            case REACTION, NEW_RECORD, SYSTEM -> null;  // 액션 버튼 없음
         };
     }
 
