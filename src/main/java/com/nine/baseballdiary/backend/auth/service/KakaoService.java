@@ -3,11 +3,21 @@ package com.nine.baseballdiary.backend.auth.service;
 import com.nine.baseballdiary.backend.auth.client.KakaoClient;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
@@ -15,12 +25,20 @@ import java.util.Random;
 public class KakaoService {
     private final KakaoClient kakaoClient;
     private final UserRepository userRepository;
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Value("${kakao.client-id}")
+    private String kakaoClientId;
+
+    @Value("${kakao.redirect-uri}")
+    private String kakaoRedirectUri;
 
     public KakaoService(KakaoClient kakaoClient, UserRepository userRepository) {
         this.kakaoClient = kakaoClient;
         this.userRepository = userRepository;
     }
 
+    // 기존 앱용 토큰 방식 (호환성 유지)
     @Transactional
     public User processLogin(String accessToken, String favTeam) {
         Long kakaoId = kakaoClient.getKakaoId(accessToken);
@@ -30,10 +48,112 @@ public class KakaoService {
         User newUser = new User();
         newUser.setKakaoId(kakaoId);
         newUser.setNickname(generateRandomNickname());
-        newUser.setFavTeam(favTeam); // ✅ 등록 시 구단명 저장
+        newUser.setFavTeam(favTeam);
         newUser.setCreatedAt(LocalDateTime.now());
         newUser.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(newUser);
+    }
+
+    // 통일된 Authorization Code 방식
+    @Transactional
+    public User processKakaoLogin(String authCode, String favTeam) {
+        // 1. Authorization Code로 액세스 토큰 획득
+        String accessToken = getKakaoAccessToken(authCode);
+
+        // 2. 액세스 토큰으로 사용자 정보 조회
+        Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
+
+        // 3. 사용자 생성/조회
+        Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
+        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
+
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        // 4. 새 사용자 생성
+        Map<String, Object> properties = (Map<String, Object>) kakaoUserInfo.get("properties");
+        String kakaoNickname = properties != null ? (String) properties.get("nickname") : null;
+
+        String nickname = (kakaoNickname != null && !kakaoNickname.isEmpty()) ?
+                kakaoNickname : generateRandomNickname();
+
+        // 닉네임 중복 체크
+        String finalNickname = nickname;
+        int counter = 1;
+        while (userRepository.existsByNickname(finalNickname)) {
+            finalNickname = nickname + counter;
+            counter++;
+        }
+
+        User newUser = new User();
+        newUser.setKakaoId(kakaoId);
+        newUser.setNickname(finalNickname);
+        newUser.setFavTeam(favTeam);
+        newUser.setIsPrivate(false);
+        newUser.setCreatedAt(LocalDateTime.now());
+        newUser.setUpdatedAt(LocalDateTime.now());
+
+        if (properties != null && properties.get("profile_image") != null) {
+            newUser.setProfileImageUrl((String) properties.get("profile_image"));
+        }
+
+        return userRepository.save(newUser);
+    }
+
+    // Authorization Code로 액세스 토큰 획득
+    private String getKakaoAccessToken(String authCode) {
+        String tokenUrl = "https://kauth.kakao.com/oauth/token";
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "authorization_code");
+        params.add("client_id", kakaoClientId);
+        params.add("redirect_uri", kakaoRedirectUri);
+        params.add("code", authCode);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(tokenUrl, request, Map.class);
+
+        return (String) response.getBody().get("access_token");
+    }
+
+    // 액세스 토큰으로 사용자 정보 조회
+    private Map<String, Object> getKakaoUserInfo(String accessToken) {
+        String userInfoUrl = "https://kapi.kakao.com/v2/user/me";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                userInfoUrl, HttpMethod.GET, request, Map.class);
+
+        return response.getBody();
+    }
+
+    // 테스트용 사용자 생성
+    @Transactional
+    public User createTestUser(String favTeam) {
+        Long testKakaoId = System.currentTimeMillis();
+
+        Optional<User> existing = userRepository.findByKakaoId(testKakaoId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        User testUser = new User();
+        testUser.setKakaoId(testKakaoId);
+        testUser.setNickname(generateRandomNickname());
+        testUser.setFavTeam(favTeam);
+        testUser.setCreatedAt(LocalDateTime.now());
+        testUser.setUpdatedAt(LocalDateTime.now());
+
+        return userRepository.save(testUser);
     }
 
     private String generateRandomNickname() {
@@ -49,23 +169,4 @@ public class KakaoService {
         Random r = new Random();
         return list.get(r.nextInt(list.size())) + " " + (1000 + r.nextInt(9000));
     }
-
-    // KakaoService.java에 추가
-    public User createTestUser(String favTeam) {
-        Optional<User> existing = userRepository.findByKakaoId(999999L);
-
-        if (existing.isPresent()) {
-            return existing.get();
-        }
-
-        User testUser = new User();
-        testUser.setKakaoId(999999L);
-        testUser.setNickname("테스트유저" + System.currentTimeMillis());
-        testUser.setFavTeam(favTeam);
-        testUser.setCreatedAt(LocalDateTime.now());
-        testUser.setUpdatedAt(LocalDateTime.now());
-
-        return userRepository.save(testUser);
-    }
-
 }
