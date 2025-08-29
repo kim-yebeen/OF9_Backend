@@ -1,5 +1,8 @@
 package com.nine.baseballdiary.backend.auth.controller;
 
+import com.nine.baseballdiary.backend.auth.dto.request.KakaoLoginRequestDto;
+import com.nine.baseballdiary.backend.auth.dto.request.RefreshTokenRequest;
+import com.nine.baseballdiary.backend.auth.dto.response.AuthResponse;
 import com.nine.baseballdiary.backend.auth.security.JwtProvider;
 import com.nine.baseballdiary.backend.auth.service.KakaoService;
 import com.nine.baseballdiary.backend.common.response.ApiResponse;
@@ -26,6 +29,42 @@ public class AuthController {
 
     @Value("${kakao.redirect-uri}")
     private String kakaoRedirectUri;
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody KakaoLoginRequestDto request) {
+        try {
+            User user = kakaoService.processLogin(request.getAccessToken(), request.getFavTeam());
+
+            String accessToken = jwtProvider.createAccessToken(user.getId().toString());
+            String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
+
+            AuthResponse authResponse = new AuthResponse(accessToken, refreshToken);
+            return ResponseEntity.ok(ApiResponse.success(authResponse));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(ApiResponse.error("LOGIN_ERROR", "로그인 처리 중 오류가 발생했습니다"));
+        }
+    }
+
+    // 토큰 갱신
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestBody RefreshTokenRequest request) {
+        try {
+            // 리프레시 토큰 검증 로직 (JwtProvider에 메서드 추가 필요)
+            String userId = jwtProvider.getUserIdFromToken(request.getRefreshToken());
+
+            String newAccessToken = jwtProvider.createAccessToken(userId);
+            String newRefreshToken = jwtProvider.createRefreshToken(userId);
+
+            AuthResponse authResponse = new AuthResponse(newAccessToken, newRefreshToken);
+            return ResponseEntity.ok(ApiResponse.success(authResponse));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.error("INVALID_REFRESH_TOKEN", "유효하지 않은 리프레시 토큰입니다"));
+        }
+    }
 
     // 1. 카카오 로그인 + 팀 선택 통합 URL
     @GetMapping("/kakao")
