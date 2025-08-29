@@ -137,7 +137,7 @@ public class AuthController {
                     async function testAPI() {
                         const token = document.getElementById('accessToken').textContent;
                         try {
-                            const response = await fetch('/api/users/me', {
+                            const response = await fetch('/users/me', {
                                 headers: { 'Authorization': 'Bearer ' + token }
                             });
                             const data = await response.json();
