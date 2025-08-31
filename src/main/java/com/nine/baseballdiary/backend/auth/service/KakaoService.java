@@ -33,10 +33,15 @@ public class KakaoService {
     @Value("${kakao.redirect-uri}")
     private String kakaoRedirectUri;
 
+    @Value("${kakao.web.redirect-uri}")
+    private String kakaoWebRedirectUri;
+
     public KakaoService(KakaoClient kakaoClient, UserRepository userRepository) {
         this.kakaoClient = kakaoClient;
         this.userRepository = userRepository;
     }
+
+    // === 앱용 메서드들 (기존 유지) ===
 
     // 기존 앱용 토큰 방식 (호환성 유지)
     @Transactional
@@ -49,16 +54,19 @@ public class KakaoService {
         newUser.setKakaoId(kakaoId);
         newUser.setNickname(generateRandomNickname());
         newUser.setFavTeam(favTeam);
+        newUser.setIsPrivate(false);
         newUser.setCreatedAt(LocalDateTime.now());
         newUser.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(newUser);
     }
 
-    // 통일된 Authorization Code 방식
+    // === 웹용 메서드들 (새로 추가) ===
+
+    // 웹용 Authorization Code 방식
     @Transactional
-    public User processKakaoLogin(String authCode, String favTeam) {
-        // 1. Authorization Code로 액세스 토큰 획득
-        String accessToken = getKakaoAccessToken(authCode);
+    public User processKakaoWebLogin(String authCode, String favTeam) {
+        // 1. Authorization Code로 액세스 토큰 획득 (웹용 redirect-uri 사용)
+        String accessToken = getKakaoAccessToken(authCode, kakaoWebRedirectUri);
 
         // 2. 액세스 토큰으로 사용자 정보 조회
         Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
@@ -101,14 +109,60 @@ public class KakaoService {
         return userRepository.save(newUser);
     }
 
-    // Authorization Code로 액세스 토큰 획득
-    private String getKakaoAccessToken(String authCode) {
+    // === 기존 통합 메서드 (앱용 redirect-uri 사용) ===
+
+    // 통일된 Authorization Code 방식 (앱용 - 호환성을 위해 유지)
+    @Transactional
+    public User processKakaoLogin(String authCode, String favTeam) {
+        // 앱용 redirect-uri 사용
+        String accessToken = getKakaoAccessToken(authCode, kakaoRedirectUri);
+
+        Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
+        Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
+        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
+
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Map<String, Object> properties = (Map<String, Object>) kakaoUserInfo.get("properties");
+        String kakaoNickname = properties != null ? (String) properties.get("nickname") : null;
+
+        String nickname = (kakaoNickname != null && !kakaoNickname.isEmpty()) ?
+                kakaoNickname : generateRandomNickname();
+
+        String finalNickname = nickname;
+        int counter = 1;
+        while (userRepository.existsByNickname(finalNickname)) {
+            finalNickname = nickname + counter;
+            counter++;
+        }
+
+        User newUser = new User();
+        newUser.setKakaoId(kakaoId);
+        newUser.setNickname(finalNickname);
+        newUser.setFavTeam(favTeam);
+        newUser.setIsPrivate(false);
+        newUser.setCreatedAt(LocalDateTime.now());
+        newUser.setUpdatedAt(LocalDateTime.now());
+
+        if (properties != null && properties.get("profile_image") != null) {
+            newUser.setProfileImageUrl((String) properties.get("profile_image"));
+        }
+
+        return userRepository.save(newUser);
+    }
+
+    // === 공통 private 메서드들 ===
+
+    // Authorization Code로 액세스 토큰 획득 (redirect-uri를 파라미터로 받음)
+    private String getKakaoAccessToken(String authCode, String redirectUri) {
         String tokenUrl = "https://kauth.kakao.com/oauth/token";
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
         params.add("client_id", kakaoClientId);
-        params.add("redirect_uri", kakaoRedirectUri);
+        params.add("redirect_uri", redirectUri); // 파라미터로 받은 redirect-uri 사용
         params.add("code", authCode);
 
         HttpHeaders headers = new HttpHeaders();
@@ -150,6 +204,7 @@ public class KakaoService {
         testUser.setKakaoId(testKakaoId);
         testUser.setNickname(generateRandomNickname());
         testUser.setFavTeam(favTeam);
+        testUser.setIsPrivate(false);
         testUser.setCreatedAt(LocalDateTime.now());
         testUser.setUpdatedAt(LocalDateTime.now());
 

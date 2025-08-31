@@ -29,8 +29,8 @@ public class AuthController {
     @Value("${kakao.client-id}")
     private String kakaoClientId;
 
-    @Value("${kakao.redirect-uri}")
-    private String kakaoRedirectUri;
+    @Value("${kakao.web.redirect-uri}")
+    private String kakaoWebRedirectUri;
 
     // === 기존 앱용 엔드포인트들 ===
 
@@ -56,10 +56,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
-            // 1) Refresh Token 검증
             String userId = jwtProvider.getUserIdFromToken(request.getRefreshToken());
-
-            // 2) 새로운 Access Token 발급 (Refresh Token은 그대로 유지)
             String newAccessToken = jwtProvider.createAccessToken(userId);
 
             return ResponseEntity.ok(ApiResponse.success(new AuthResponse(newAccessToken, request.getRefreshToken())));
@@ -86,7 +83,7 @@ public class AuthController {
                         "state=%s&" +
                         "scope=profile_nickname,profile_image",
                 kakaoClientId,
-                URLEncoder.encode(kakaoRedirectUri, StandardCharsets.UTF_8),
+                URLEncoder.encode(kakaoWebRedirectUri, StandardCharsets.UTF_8),
                 URLEncoder.encode(favTeam, StandardCharsets.UTF_8)
         );
 
@@ -110,7 +107,7 @@ public class AuthController {
         try {
             String favTeam = (state != null && !state.isEmpty()) ? state : "KIA 타이거즈";
 
-            User user = kakaoService.processKakaoLogin(code, favTeam);
+            User user = kakaoService.processKakaoWebLogin(code, favTeam);
 
             String accessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
