@@ -9,13 +9,15 @@ import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import com.nine.baseballdiary.backend.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import jakarta.servlet.http.HttpServletResponse;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -30,15 +32,18 @@ public class AuthController {
     @Value("${kakao.redirect-uri}")
     private String kakaoRedirectUri;
 
-    @PostMapping("/login")
+    // === 기존 앱용 엔드포인트들 ===
+
+    // 1. 앱용 카카오 로그인 (기존 POST 방식 유지)
+    @PostMapping("/kakao")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody KakaoLoginRequestDto request) {
         try {
             User user = kakaoService.processLogin(request.getAccessToken(), request.getFavTeam());
 
-            String accessToken = jwtProvider.createAccessToken(user.getId().toString());
+            String newAccessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
-            AuthResponse authResponse = new AuthResponse(accessToken, refreshToken);
+            AuthResponse authResponse = new AuthResponse(newAccessToken, refreshToken);
             return ResponseEntity.ok(ApiResponse.success(authResponse));
 
         } catch (Exception e) {
@@ -47,28 +52,29 @@ public class AuthController {
         }
     }
 
-    // 토큰 갱신
+    // 2. 토큰 갱신 (기존 유지)
     @PostMapping("/refresh")
-    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
-            // 리프레시 토큰 검증 로직 (JwtProvider에 메서드 추가 필요)
+            // 1) Refresh Token 검증
             String userId = jwtProvider.getUserIdFromToken(request.getRefreshToken());
 
+            // 2) 새로운 Access Token 발급 (Refresh Token은 그대로 유지)
             String newAccessToken = jwtProvider.createAccessToken(userId);
-            String newRefreshToken = jwtProvider.createRefreshToken(userId);
 
-            AuthResponse authResponse = new AuthResponse(newAccessToken, newRefreshToken);
-            return ResponseEntity.ok(ApiResponse.success(authResponse));
+            return ResponseEntity.ok(ApiResponse.success(new AuthResponse(newAccessToken, request.getRefreshToken())));
 
         } catch (Exception e) {
-            return ResponseEntity.status(401)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error("INVALID_REFRESH_TOKEN", "유효하지 않은 리프레시 토큰입니다"));
         }
     }
 
-    // 1. 카카오 로그인 + 팀 선택 통합 URL
-    @GetMapping("/kakao")
-    public void kakaoLogin(
+    // === 새로 추가되는 웹용 엔드포인트들 ===
+
+    // 3. 웹용 카카오 로그인 시작
+    @GetMapping("/web/kakao")
+    public void webKakaoLogin(
             @RequestParam(required = false, defaultValue = "KIA 타이거즈") String favTeam,
             HttpServletResponse response) throws IOException {
 
@@ -87,9 +93,9 @@ public class AuthController {
         response.sendRedirect(kakaoAuthUrl);
     }
 
-    // 2. 카카오 콜백 - 사용자 생성 + 토큰 반환
-    @GetMapping("/kakao/callback")
-    public void kakaoCallback(
+    // 4. 웹용 카카오 콜백
+    @GetMapping("/web/kakao/callback")
+    public void webKakaoCallback(
             @RequestParam String code,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) String error,
@@ -104,14 +110,11 @@ public class AuthController {
         try {
             String favTeam = (state != null && !state.isEmpty()) ? state : "KIA 타이거즈";
 
-            // 카카오 로그인 처리 + 사용자 생성
             User user = kakaoService.processKakaoLogin(code, favTeam);
 
-            // JWT 토큰 생성
             String accessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
-            // 성공 페이지 반환 (토큰 포함)
             String successPage = createSuccessPage(user, accessToken, refreshToken);
             response.setContentType("text/html; charset=UTF-8");
             response.getWriter().write(successPage);
@@ -125,7 +128,7 @@ public class AuthController {
         }
     }
 
-    // 3. 성공 페이지 HTML 생성
+    // 웹용 성공 페이지 생성
     private String createSuccessPage(User user, String accessToken, String refreshToken) {
         return String.format("""
             <!DOCTYPE html>
@@ -176,19 +179,24 @@ public class AuthController {
                     async function testAPI() {
                         const token = document.getElementById('accessToken').textContent;
                         try {
-                            const response = await fetch('/users/me', {
+                            const response = await fetch('/api/users/me', {
                                 headers: { 'Authorization': 'Bearer ' + token }
                             });
+                            
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                            }
+                            
                             const data = await response.json();
                             document.getElementById('apiResult').innerHTML = 
-                                '<h4>API 테스트 결과:</h4><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                                '<h4>API 테스트 결과:</h4><pre style="background:#f5f5f5;padding:10px;border-radius:5px;">' + 
+                                JSON.stringify(data, null, 2) + '</pre>';
                         } catch (error) {
                             document.getElementById('apiResult').innerHTML = 
                                 '<h4 style="color:red">API 테스트 실패:</h4><p>' + error.message + '</p>';
                         }
                     }
                     
-                    // 자동으로 토큰을 localStorage에 저장 (선택사항)
                     localStorage.setItem('access_token', '%s');
                     localStorage.setItem('refresh_token', '%s');
                 </script>
