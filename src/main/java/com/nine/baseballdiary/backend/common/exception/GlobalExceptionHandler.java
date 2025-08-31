@@ -4,6 +4,8 @@ import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -17,7 +19,38 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ✅ Validation 에러 처리
+    // 인증 에러 처리 (JWT 토큰 관련)
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAuthenticationException(AuthenticationException ex) {
+        log.warn("Authentication failed: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error("인증에 실패했습니다", "AUTHENTICATION_FAILED"));
+    }
+
+    // 권한 에러 처리
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error("접근 권한이 없습니다", "ACCESS_DENIED"));
+    }
+
+    // 인증 상태 에러 처리 (커스텀)
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException ex) {
+        log.warn("Illegal state: {}", ex.getMessage());
+
+        // 토큰 관련 메시지인지 확인
+        if (ex.getMessage().contains("토큰") || ex.getMessage().contains("인증") || ex.getMessage().contains("로그인")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error(ex.getMessage(), "UNAUTHORIZED"));
+        }
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage(), "BAD_REQUEST"));
+    }
+
+    // Validation 에러 처리
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationException(
             MethodArgumentNotValidException ex) {
@@ -30,29 +63,30 @@ public class GlobalExceptionHandler {
         });
 
         log.warn("Validation error: {}", errors);
-        return ResponseEntity.badRequest()
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("입력값 검증에 실패했습니다", "VALIDATION_FAILED", errors));
     }
 
-    // ✅ ResponseStatusException 처리
+    // ResponseStatusException 처리
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException ex) {
         log.warn("ResponseStatusException: {} - {}", ex.getStatusCode(), ex.getReason());
 
         return ResponseEntity.status(ex.getStatusCode())
-                .body(ApiResponse.error(ex.getReason(), ex.getStatusCode().toString()));
+                .body(ApiResponse.error(ex.getReason() != null ? ex.getReason() : "요청 처리 중 오류가 발생했습니다",
+                        ex.getStatusCode().toString()));
     }
 
-    // ✅ IllegalArgumentException 처리
+    // IllegalArgumentException 처리
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
         log.warn("IllegalArgumentException: {}", ex.getMessage());
 
-        return ResponseEntity.badRequest()
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage(), "INVALID_ARGUMENT"));
     }
 
-    // ✅ 일반적인 RuntimeException 처리
+    // 일반적인 RuntimeException 처리
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Void>> handleRuntimeException(RuntimeException ex) {
         log.error("Unexpected runtime exception", ex);
@@ -61,7 +95,7 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("서버 내부 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
     }
 
-    // ✅ 모든 예외 처리 (최종 방어선)
+    // 모든 예외 처리 (최종 방어선)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unexpected exception", ex);
