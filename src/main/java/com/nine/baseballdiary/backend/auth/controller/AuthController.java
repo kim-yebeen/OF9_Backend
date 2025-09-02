@@ -32,21 +32,26 @@ public class AuthController {
     @Value("${kakao.web.redirect-uri}")
     private String kakaoWebRedirectUri;
 
-    // === 기존 앱용 엔드포인트들 ===
+    // === 기존 앱용 엔드포인트들 (유지) ===
 
     // 1. 앱용 카카오 로그인 (기존 POST 방식 유지)
     @PostMapping("/kakao")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@RequestBody KakaoLoginRequestDto request) {
         try {
+            System.out.println("📱 앱 카카오 로그인 요청 - favTeam: " + request.getFavTeam());
+
             User user = kakaoService.processLogin(request.getAccessToken(), request.getFavTeam());
 
             String newAccessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
             AuthResponse authResponse = new AuthResponse(newAccessToken, refreshToken);
+
+            System.out.println("✅ 앱 로그인 성공 - userId: " + user.getId());
             return ResponseEntity.ok(ApiResponse.success(authResponse));
 
         } catch (Exception e) {
+            System.err.println("❌ 앱 로그인 실패: " + e.getMessage());
             return ResponseEntity.status(500)
                     .body(ApiResponse.error("LOGIN_ERROR", "로그인 처리 중 오류가 발생했습니다"));
         }
@@ -67,13 +72,15 @@ public class AuthController {
         }
     }
 
-    // === 새로 추가되는 웹용 엔드포인트들 ===
+    // === 웹 로그인용 엔드포인트들 (수정) ===
 
     // 3. 웹용 카카오 로그인 시작
     @GetMapping("/web/kakao")
     public void webKakaoLogin(
             @RequestParam(required = false, defaultValue = "KIA 타이거즈") String favTeam,
             HttpServletResponse response) throws IOException {
+
+        System.out.println("🌐 웹 카카오 로그인 시작 - favTeam: " + favTeam);
 
         String kakaoAuthUrl = String.format(
                 "https://kauth.kakao.com/oauth/authorize?" +
@@ -87,10 +94,11 @@ public class AuthController {
                 URLEncoder.encode(favTeam, StandardCharsets.UTF_8)
         );
 
+        System.out.println("➡️ 카카오 인증 페이지로 리다이렉트: " + kakaoAuthUrl);
         response.sendRedirect(kakaoAuthUrl);
     }
 
-    // 4. 웹용 카카오 콜백
+    // 4. 웹용 카카오 콜백 (핵심 수정 부분)
     @GetMapping("/web/kakao/callback")
     public void webKakaoCallback(
             @RequestParam String code,
@@ -98,114 +106,63 @@ public class AuthController {
             @RequestParam(required = false) String error,
             HttpServletResponse response) throws IOException {
 
+        System.out.println("⬅️ 카카오 콜백 수신");
+        System.out.println("   code: " + (code != null ? code.substring(0, Math.min(10, code.length())) + "..." : "null"));
+        System.out.println("   state: " + state);
+        System.out.println("   error: " + error);
+
         if (error != null) {
-            response.getWriter().write(String.format(
-                    "<html><body><h2>로그인 실패</h2><p>%s</p></body></html>", error));
+            System.err.println("❌ 카카오 인증 에러: " + error);
+
+            // 에러 시 앱으로 리다이렉트
+            String errorRedirect = String.format("kakao%s://oauth?error=%s",
+                    kakaoClientId, URLEncoder.encode(error, StandardCharsets.UTF_8));
+
+            System.out.println("🔄 에러로 인한 앱 리다이렉트: " + errorRedirect);
+            response.sendRedirect(errorRedirect);
             return;
         }
 
         try {
             String favTeam = (state != null && !state.isEmpty()) ? state : "KIA 타이거즈";
+            System.out.println("🏟️ 선택된 팀: " + favTeam);
 
+            // 카카오 웹 로그인 처리
             User user = kakaoService.processKakaoWebLogin(code, favTeam);
+            System.out.println("👤 로그인된 사용자: " + user.getNickname() + " (ID: " + user.getId() + ")");
 
+            // JWT 토큰 생성
             String accessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
 
-            String successPage = createSuccessPage(user, accessToken, refreshToken);
-            response.setContentType("text/html; charset=UTF-8");
-            response.getWriter().write(successPage);
+            System.out.println("🔑 토큰 생성 완료");
+            System.out.println("   accessToken: " + accessToken.substring(0, 20) + "...");
+            System.out.println("   refreshToken: " + refreshToken.substring(0, 20) + "...");
+
+            // 🎯 핵심: 앱으로 바로 리다이렉트 (HTML 페이지 대신)
+            String successRedirect = String.format(
+                    "kakao%s://oauth?access_token=%s&refresh_token=%s&user_id=%s&nickname=%s&fav_team=%s",
+                    kakaoClientId,
+                    URLEncoder.encode(accessToken, StandardCharsets.UTF_8),
+                    URLEncoder.encode(refreshToken, StandardCharsets.UTF_8),
+                    URLEncoder.encode(user.getId().toString(), StandardCharsets.UTF_8),
+                    URLEncoder.encode(user.getNickname(), StandardCharsets.UTF_8),
+                    URLEncoder.encode(user.getFavTeam(), StandardCharsets.UTF_8)
+            );
+
+            System.out.println("🚀 앱으로 리다이렉트: " + successRedirect);
+            response.sendRedirect(successRedirect);
 
         } catch (Exception e) {
-            String errorPage = String.format(
-                    "<html><body><h2>로그인 처리 오류</h2><p>%s</p></body></html>",
-                    e.getMessage()
-            );
-            response.getWriter().write(errorPage);
-        }
-    }
+            System.err.println("❌ 웹 로그인 처리 오류: " + e.getMessage());
+            e.printStackTrace();
 
-    // 웹용 성공 페이지 생성
-    private String createSuccessPage(User user, String accessToken, String refreshToken) {
-        return String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>로그인 완료</title>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-                    .success-box { background: #f0f8ff; border: 2px solid #4CAF50; padding: 20px; border-radius: 10px; }
-                    .token-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; word-break: break-all; }
-                    button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-                    button:hover { background: #45a049; }
-                </style>
-            </head>
-            <body>
-                <div class="success-box">
-                    <h2>🎉 로그인 성공!</h2>
-                    <p><strong>환영합니다, %s님!</strong></p>
-                    <p>선택한 팀: <strong>%s</strong></p>
-                    
-                    <h3>발급된 토큰:</h3>
-                    <div class="token-box">
-                        <strong>Access Token:</strong><br>
-                        <span id="accessToken">%s</span>
-                        <button onclick="copyToken('accessToken')">복사</button>
-                    </div>
-                    
-                    <div class="token-box">
-                        <strong>Refresh Token:</strong><br>
-                        <span id="refreshToken">%s</span>
-                        <button onclick="copyToken('refreshToken')">복사</button>
-                    </div>
-                    
-                    <h3>API 테스트:</h3>
-                    <button onclick="testAPI()">내 정보 조회 테스트</button>
-                    <div id="apiResult"></div>
-                </div>
-                
-                <script>
-                    function copyToken(elementId) {
-                        const token = document.getElementById(elementId).textContent;
-                        navigator.clipboard.writeText(token).then(() => {
-                            alert('토큰이 클립보드에 복사되었습니다!');
-                        });
-                    }
-                    
-                    async function testAPI() {
-                        const token = document.getElementById('accessToken').textContent;
-                        try {
-                            const response = await fetch('/api/users/me', {
-                                headers: { 'Authorization': 'Bearer ' + token }
-                            });
-                            
-                            if (!response.ok) {
-                                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                            }
-                            
-                            const data = await response.json();
-                            document.getElementById('apiResult').innerHTML = 
-                                '<h4>API 테스트 결과:</h4><pre style="background:#f5f5f5;padding:10px;border-radius:5px;">' + 
-                                JSON.stringify(data, null, 2) + '</pre>';
-                        } catch (error) {
-                            document.getElementById('apiResult').innerHTML = 
-                                '<h4 style="color:red">API 테스트 실패:</h4><p>' + error.message + '</p>';
-                        }
-                    }
-                    
-                    localStorage.setItem('access_token', '%s');
-                    localStorage.setItem('refresh_token', '%s');
-                </script>
-            </body>
-            </html>
-            """,
-                user.getNickname(),
-                user.getFavTeam(),
-                accessToken,
-                refreshToken,
-                accessToken,
-                refreshToken
-        );
+            // 예외 발생 시 앱으로 에러 리다이렉트
+            String errorRedirect = String.format("kakao%s://oauth?error=%s",
+                    kakaoClientId, URLEncoder.encode("로그인 처리 중 오류가 발생했습니다: " + e.getMessage(), StandardCharsets.UTF_8));
+
+            System.out.println("🔄 예외로 인한 앱 리다이렉트: " + errorRedirect);
+            response.sendRedirect(errorRedirect);
+        }
     }
 }
