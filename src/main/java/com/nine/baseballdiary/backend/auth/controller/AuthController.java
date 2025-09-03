@@ -145,85 +145,87 @@ public class AuthController {
     // 웹용 성공 페이지 생성
     private String createSuccessPage(User user, String accessToken, String refreshToken) {
         return String.format("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>로그인 완료</title>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-                    .success-box { background: #f0f8ff; border: 2px solid #4CAF50; padding: 20px; border-radius: 10px; }
-                    .token-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; word-break: break-all; }
-                    button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-                    button:hover { background: #45a049; }
-                </style>
-            </head>
-            <body>
-                <div class="success-box">
-                    <h2>🎉 로그인 성공!</h2>
-                    <p><strong>환영합니다, %s님!</strong></p>
-                    <p>선택한 팀: <strong>%s</strong></p>
-                    
-                    <h3>발급된 토큰:</h3>
-                    <div class="token-box">
-                        <strong>Access Token:</strong><br>
-                        <span id="accessToken">%s</span>
-                        <button onclick="copyToken('accessToken')">복사</button>
-                    </div>
-                    
-                    <div class="token-box">
-                        <strong>Refresh Token:</strong><br>
-                        <span id="refreshToken">%s</span>
-                        <button onclick="copyToken('refreshToken')">복사</button>
-                    </div>
-                    
-                    <h3>API 테스트:</h3>
-                    <button onclick="testAPI()">내 정보 조회 테스트</button>
-                    <div id="apiResult"></div>
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>로그인 완료</title>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+                .success-box { background: #f0f8ff; border: 2px solid #4CAF50; padding: 20px; border-radius: 10px; }
+                .token-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; word-break: break-all; }
+                button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+                button:hover { background: #45a049; }
+            </style>
+        </head>
+        <body>
+            <div class="success-box">
+                <h2>🎉 로그인 성공!</h2>
+                <p><strong>환영합니다, %s님!</strong></p>
+                <p>선택한 팀: <strong>%s</strong></p>
+                
+                <h3>발급된 토큰:</h3>
+                <div class="token-box">
+                    <strong>Access Token:</strong><br>
+                    <span id="accessToken">%s</span>
+                    <button onclick="copyToken('accessToken')">복사</button>
                 </div>
                 
-                <script>
-                    function copyToken(elementId) {
-                        const token = document.getElementById(elementId).textContent;
-                        navigator.clipboard.writeText(token).then(() => {
-                            alert('토큰이 클립보드에 복사되었습니다!');
-                        });
-                    }
-                    
-                    async function testAPI() {
-                        const token = document.getElementById('accessToken').textContent;
-                        try {
-                            const response = await fetch('/api/users/me', {
-                                headers: { 'Authorization': 'Bearer ' + token }
-                            });
-                            
-                            if (!response.ok) {
-                                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                            }
-                            
-                            const data = await response.json();
-                            document.getElementById('apiResult').innerHTML = 
-                                '<h4>API 테스트 결과:</h4><pre style="background:#f5f5f5;padding:10px;border-radius:5px;">' + 
-                                JSON.stringify(data, null, 2) + '</pre>';
-                        } catch (error) {
-                            document.getElementById('apiResult').innerHTML = 
-                                '<h4 style="color:red">API 테스트 실패:</h4><p>' + error.message + '</p>';
-                        }
-                    }
-                    
-                    localStorage.setItem('access_token', '%s');
-                    localStorage.setItem('refresh_token', '%s');
-                    
-                    fetch(`/auth/web/login-completed?accessToken=${encodeURIComponent('%s')}&refreshToken=${encodeURIComponent('%s')}`, {
-                        method: 'GET'
-                    }).catch(e => console.log('신호 전송:', e));
+                <div class="token-box">
+                    <strong>Refresh Token:</strong><br>
+                    <span id="refreshToken">%s</span>
+                    <button onclick="copyToken('refreshToken')">복사</button>
+                </div>
                 
-                </script>
-            </body>
-            </html>
-            """,
+                <h3>API 테스트:</h3>
+                <button onclick="testAPI()">내 정보 조회 테스트</button>
+                <div id="apiResult"></div>
+            </div>
+            
+            <script>
+                function copyToken(elementId) {
+                    const token = document.getElementById(elementId).textContent;
+                    navigator.clipboard.writeText(token).then(() => {
+                        alert('토큰이 클립보드에 복사되었습니다!');
+                    });
+                }
+                
+                async function testAPI() {
+                    const token = document.getElementById('accessToken').textContent;
+                    try {
+                        const response = await fetch('/api/users/me', {
+                            headers: { 'Authorization': 'Bearer ' + token }
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+                        
+                        const data = await response.json();
+                        document.getElementById('apiResult').innerHTML = 
+                            '<h4>API 테스트 결과:</h4><pre style="background:#f5f5f5;padding:10px;border-radius:5px;">' + 
+                            JSON.stringify(data, null, 2) + '</pre>';
+                    } catch (error) {
+                        document.getElementById('apiResult').innerHTML = 
+                            '<h4 style="color:red">API 테스트 실패:</h4><p>' + error.message + '</p>';
+                    }
+                }
+                
+                localStorage.setItem('access_token', '%s');
+                localStorage.setItem('refresh_token', '%s');
+                
+                fetch('/auth/web/login-completed?accessToken=' + encodeURIComponent('%s') + '&refreshToken=' + encodeURIComponent('%s'), {
+                    method: 'GET'
+                }).catch(e => console.log('신호 전송:', e));
+            
+            </script>
+        </body>
+        </html>
+        """,
                 user.getNickname(),
                 user.getFavTeam(),
+                accessToken,
+                refreshToken,
                 accessToken,
                 refreshToken,
                 accessToken,
