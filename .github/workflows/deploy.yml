@@ -33,7 +33,7 @@ jobs:
           echo "=== Building application image ==="
           docker build --no-cache -t baseball-diary:latest .
           echo "=== Verifying Chrome in built image ==="
-          docker run --rm --entrypoint="" baseball-diary:latest google-chrome-stable --version || echo "❌ Chrome verification failed!"
+          docker run --rm --entrypoint="" baseball-diary:latest google-chrome-stable --version || echo "⚠ Chrome verification failed!"
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
@@ -57,8 +57,9 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
             echo '=== 기존 컨테이너 정리 ==='
-            docker stop baseball-diary || true
-            docker rm baseball-diary || true
+            docker-compose down || true
+            docker stop baseball-diary baseball-redis || true
+            docker rm baseball-diary baseball-redis || true
           
             echo '=== 기존 이미지 정리 (최신 2개만 유지) ==='
             docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}\t{{.ID}}' | grep baseball-diary | tail -n +3 | awk '{print \$3}' | xargs -r docker rmi -f || true
@@ -73,31 +74,25 @@ jobs:
             docker load < baseball-diary.tar.gz
           
             echo '=== Chrome 설치 확인 ==='
-            docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version || echo '❌ Chrome verification failed!'
+            docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version || echo '⚠ Chrome verification failed!'
           
-            echo '=== 새 컨테이너 실행 ==='
-            docker run -d \
-              --name baseball-diary \
-              -p 8080:8080 \
-              --restart unless-stopped \
-              -v /home/ubuntu/config/application-db.properties:/app/config/application-db.properties \
-              -v /home/ubuntu/config/application-jwt.properties:/app/config/application-jwt.properties \
-              -e SPRING_CONFIG_LOCATION='classpath:/,/app/config/' \
-              -e INITIAL_CRAWL_ENABLED='true' \
-              -e SPRING_PROFILES_ACTIVE='jwt,db' \
-              baseball-diary:latest
+            echo '=== Docker Compose로 Redis + App 실행 ==='
+            docker-compose up -d
           
             echo '=== 컨테이너 상태 확인 ==='
             docker ps
           
             echo '=== 애플리케이션 시작 대기 ==='
-            sleep 20
+            sleep 30
+          
+            echo '=== Redis 연결 테스트 ==='
+            docker exec baseball-redis redis-cli ping || echo '⚠ Redis connection failed!'
           
             echo '=== 컨테이너 로그 확인 ==='
             docker logs baseball-diary --tail 20
           
             echo '=== API 헬스 체크 ==='
-            curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '❌ 배포 실패!'
+            curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '⚠ 배포 실패!'
           
             echo '=== 최종 디스크 사용량 ==='
             df -h

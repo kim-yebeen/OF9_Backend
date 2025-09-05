@@ -12,4 +12,7 @@ public interface FollowRequestRepository extends JpaRepository<FollowRequest, Lo
 
     // requester/target 조합으로 단일 요청
     Optional<FollowRequest> findByRequester_IdAndTarget_Id(Long requesterId, Long targetId);
+
+    // 검색 기능을 위한 메서드 추가 (팔로우 상태 확인용)
+    boolean existsByRequester_IdAndTarget_IdAndStatus(Long requesterId, Long targetId, FollowRequestStatus status);
 }

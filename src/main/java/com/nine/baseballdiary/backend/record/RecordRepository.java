@@ -123,4 +123,57 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     long countByUserId(Long userId);
 
     List<Record> findByUserId(Long userId);
+
+    // 검색 기능을 위한 메서드 추가
+    @Query(value = """
+    SELECT r.*, 
+           (CASE 
+               WHEN LOWER(r.comment) LIKE CONCAT('%', :query, '%') THEN 3
+               WHEN LOWER(r.long_content) LIKE CONCAT('%', :query, '%') THEN 2
+               WHEN LOWER(r.best_player) LIKE CONCAT('%', :query, '%') THEN 1
+               WHEN LOWER(u.nickname) LIKE CONCAT('%', :query, '%') THEN 2
+               ELSE 0
+           END +
+           COALESCE((LENGTH(r.comment) - LENGTH(REPLACE(LOWER(r.comment), :query, ''))) / LENGTH(:query) * 0.3, 0) +
+           COALESCE((LENGTH(r.long_content) - LENGTH(REPLACE(LOWER(r.long_content), :query, ''))) / LENGTH(:query) * 0.2, 0) +
+           COALESCE((LENGTH(r.best_player) - LENGTH(REPLACE(LOWER(r.best_player), :query, ''))) / LENGTH(:query) * 0.1, 0)
+           ) as relevance_score
+    FROM record r
+    JOIN users u ON r.user_id = u.id
+    WHERE (
+        (u.is_private = false) OR 
+        (u.is_private = true AND u.id = ANY(CAST(:followingUserIds AS bigint[]))) OR
+        (u.id = :currentUserId)
+    )
+    AND (
+        LOWER(r.comment) LIKE CONCAT('%', :query, '%') OR
+        LOWER(r.long_content) LIKE CONCAT('%', :query, '%') OR
+        LOWER(r.best_player) LIKE CONCAT('%', :query, '%') OR
+        LOWER(u.nickname) LIKE CONCAT('%', :query, '%')
+    )
+    ORDER BY relevance_score DESC, r.created_at DESC
+    """,
+            countQuery = """
+    SELECT COUNT(*)
+    FROM record r
+    JOIN users u ON r.user_id = u.id
+    WHERE (
+        (u.is_private = false) OR 
+        (u.is_private = true AND u.id = ANY(CAST(:followingUserIds AS bigint[]))) OR
+        (u.id = :currentUserId)
+    )
+    AND (
+        LOWER(r.comment) LIKE CONCAT('%', :query, '%') OR
+        LOWER(r.long_content) LIKE CONCAT('%', :query, '%') OR
+        LOWER(r.best_player) LIKE CONCAT('%', :query, '%') OR
+        LOWER(u.nickname) LIKE CONCAT('%', :query, '%')
+    )
+    """,
+            nativeQuery = true)
+    Page<Record> searchRecordsWithAccess(
+            @Param("query") String query,
+            @Param("currentUserId") Long currentUserId,
+            @Param("followingUserIds") String followingUserIds,  // 기존 패턴과 맞춤
+            Pageable pageable
+    );
 }

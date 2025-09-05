@@ -1,8 +1,10 @@
 package com.nine.baseballdiary.backend.user.repository;
 
 import com.nine.baseballdiary.backend.user.entity.User;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import org.springframework.data.domain.Pageable;  //
 import java.util.List;
 import java.util.Optional;
 
@@ -18,5 +20,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // [추가] id 리스트 + 닉네임 검색
     List<User> findByIdInAndNicknameContainingIgnoreCase(List<Long> ids, String nickname);
+
+    // 검색 기능을 위한 메서드 추가 (자신 제외하고 페이징)
+    Page<User> findByNicknameContainingIgnoreCaseAndIdNot(String nickname, Long excludeUserId, Pageable pageable);
 }
 
