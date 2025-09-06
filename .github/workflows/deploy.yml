@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -38,7 +37,7 @@ jobs:
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
 
-      - name: Copy Docker image to EC2
+      - name: Copy files to EC2
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
@@ -46,8 +45,8 @@ jobs:
         run: |
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-          
           scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3 -i private_key.pem baseball-diary.tar.gz ${USER}@${HOST}:~/
+          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3 -i private_key.pem docker-compose.yml ${USER}@${HOST}:~/
 
       - name: Deploy on EC2
         env:
@@ -56,8 +55,9 @@ jobs:
           USER: ${{ secrets.EC2_USER }}
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
+            set -e
             echo '=== 기존 컨테이너 정리 ==='
-            docker-compose down || true
+            docker compose down || true
             docker stop baseball-diary baseball-redis || true
             docker rm baseball-diary baseball-redis || true
           
@@ -76,23 +76,59 @@ jobs:
             echo '=== Chrome 설치 확인 ==='
             docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version || echo '⚠ Chrome verification failed!'
           
-            echo '=== Docker Compose로 Redis + App 실행 ==='
-            docker-compose up -d
+            echo '=== Docker Compose로 Redis 먼저 시작 ==='
+            docker compose up -d redis
+          
+            echo '=== Redis 준비 대기 (최대 30초) ==='
+            for i in {1..30}; do
+              if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
+                echo 'Redis가 준비되었습니다.'
+                break
+              fi
+              echo \"Redis 대기 중... (\$i/30)\"
+              sleep 1
+            done
+          
+            echo '=== 애플리케이션 시작 ==='
+            docker compose up -d baseball-diary
           
             echo '=== 컨테이너 상태 확인 ==='
             docker ps
           
-            echo '=== 애플리케이션 시작 대기 ==='
-            sleep 30
+            echo '=== 애플리케이션 시작 대기 (최대 120초) ==='
+            for i in {1..120}; do
+              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                echo '✅ 애플리케이션이 성공적으로 시작되었습니다!'
+                break
+              fi
+              if [ \$i -eq 120 ]; then
+                echo '⚠ 애플리케이션 시작 타임아웃!'
+                echo '=== 최근 로그 확인 ==='
+                docker logs baseball-diary --tail 50
+                exit 1
+              fi
+              echo \"애플리케이션 대기 중... (\$i/120)\"
+              sleep 1
+            done
           
             echo '=== Redis 연결 테스트 ==='
-            docker exec baseball-redis redis-cli ping || echo '⚠ Redis connection failed!'
+            if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
+              echo '✅ Redis 연결 성공!'
+            else
+              echo '⚠ Redis 연결 실패!'
+              exit 1
+            fi
           
-            echo '=== 컨테이너 로그 확인 ==='
-            docker logs baseball-diary --tail 20
+            echo '=== 최종 상태 확인 ==='
+            docker ps
           
             echo '=== API 헬스 체크 ==='
-            curl -f http://localhost:8080/actuator/health && echo '✅ 배포 성공!' || echo '⚠ 배포 실패!'
+            if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              echo '✅ 배포 성공!'
+            else
+              echo '⚠ 배포 실패!'
+              exit 1
+            fi
           
             echo '=== 최종 디스크 사용량 ==='
             df -h
@@ -100,5 +136,4 @@ jobs:
             echo '=== tar 파일 정리 ==='
             rm -f ~/baseball-diary.tar.gz
           "
-          
           rm -f private_key.pem
