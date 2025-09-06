@@ -53,9 +53,26 @@ jobs:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
+          # JWT 환경변수 추가 (핵심!)
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
+          JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
+          # 데이터베이스 환경변수 (필요시)
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
             set -e
+          
+            # 환경변수 내보내기 (핵심!)
+            export JWT_SECRET='${JWT_SECRET}'
+            export JWT_ACCESS_EXPIRATION='${JWT_ACCESS_EXPIRATION}'
+            export JWT_REFRESH_EXPIRATION='${JWT_REFRESH_EXPIRATION}'
+            export DB_URL='${DB_URL}'
+            export DB_USERNAME='${DB_USERNAME}'
+            export DB_PASSWORD='${DB_PASSWORD}'
+          
             echo '=== 기존 컨테이너 정리 ==='
             docker compose down || true
             docker stop baseball-diary baseball-redis || true
@@ -74,7 +91,10 @@ jobs:
             docker load < baseball-diary.tar.gz
           
             echo '=== Chrome 설치 확인 ==='
-            docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version || echo '⚠ Chrome verification failed!'
+            if ! docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version; then
+              echo '⚠ Chrome이 설치되지 않았습니다. 배포를 중단합니다.'
+              exit 1
+            fi
           
             echo '=== Docker Compose로 Redis 먼저 시작 ==='
             docker compose up -d redis
@@ -82,7 +102,7 @@ jobs:
             echo '=== Redis 준비 대기 (최대 30초) ==='
             for i in {1..30}; do
               if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
-                echo 'Redis가 준비되었습니다.'
+                echo '✅ Redis가 준비되었습니다.'
                 break
               fi
               echo \"Redis 대기 중... (\$i/30)\"
@@ -127,6 +147,8 @@ jobs:
               echo '✅ 배포 성공!'
             else
               echo '⚠ 배포 실패!'
+              echo '=== 컨테이너 로그 확인 ==='
+              docker logs baseball-diary --tail 20
               exit 1
             fi
           
