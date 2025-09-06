@@ -3,6 +3,10 @@ package com.nine.baseballdiary.backend.user.repository;
 import com.nine.baseballdiary.backend.user.entity.FollowRequest;
 import com.nine.baseballdiary.backend.user.entity.FollowRequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +19,12 @@ public interface FollowRequestRepository extends JpaRepository<FollowRequest, Lo
 
     // 검색 기능을 위한 메서드 추가 (팔로우 상태 확인용)
     boolean existsByRequester_IdAndTarget_IdAndStatus(Long requesterId, Long targetId, FollowRequestStatus status);
+
+    // 팔로우 요청 삭제 (차단 시 사용)
+    void deleteByRequester_IdAndTarget_Id(Long requesterId, Long targetId);
+
+    @Modifying
+    @Query("DELETE FROM FollowRequest fr WHERE (fr.requester.id = :userId1 AND fr.target.id = :userId2) OR (fr.requester.id = :userId2 AND fr.target.id = :userId1)")
+    void deleteByBothUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+
 }

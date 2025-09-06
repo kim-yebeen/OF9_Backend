@@ -64,10 +64,11 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("닉네임 중복 확인 완료", result));
     }
 
-    // ✅ 4. 사용자 검색
+    // ✅ 4. 사용자 검색 (수정)
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<UserDto>>> searchUsers(@RequestParam String nickname) {
-        List<UserDto> users = userService.searchUsers(nickname);
+        Long currentUserId = getCurrentUserId();
+        List<UserDto> users = userService.searchUsers(currentUserId, nickname);
 
         return ResponseEntity.ok(ApiResponse.success("사용자 검색이 완료되었습니다", users));
     }
@@ -125,7 +126,8 @@ public class UserController {
     // ✅ 10. 특정 사용자의 팔로워 목록
     @GetMapping("/{userId}/followers")
     public ResponseEntity<ApiResponse<List<UserDto>>> getFollowers(@PathVariable Long userId) {
-        List<UserDto> followers = userService.getFollowers(userId);
+        Long currentUserId = getCurrentUserId();
+        List<UserDto> followers = userService.getFollowers(userId, currentUserId);
 
         return ResponseEntity.ok(ApiResponse.success("팔로워 목록을 조회했습니다", followers));
     }
@@ -133,10 +135,12 @@ public class UserController {
     // ✅ 11. 특정 사용자의 팔로잉 목록
     @GetMapping("/{userId}/following")
     public ResponseEntity<ApiResponse<List<UserDto>>> getFollowing(@PathVariable Long userId) {
-        List<UserDto> following = userService.getFollowing(userId);
+        Long currentUserId = getCurrentUserId();
+        List<UserDto> following = userService.getFollowing(userId, currentUserId);
 
         return ResponseEntity.ok(ApiResponse.success("팔로잉 목록을 조회했습니다", following));
     }
+
 
     // ✅ 12. 로그아웃
     @PostMapping("/me/logout")
@@ -154,5 +158,31 @@ public class UserController {
         userService.deleteUser(userId);
 
         return ResponseEntity.ok(ApiResponse.success("회원 탈퇴가 완료되었습니다"));
+    }
+    // ✅ 14. 사용자 차단
+    @PostMapping("/{targetId}/block")
+    public ResponseEntity<ApiResponse<Void>> blockUser(@PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId();
+        userService.blockUser(currentUserId, targetId);
+
+        return ResponseEntity.ok(ApiResponse.success("사용자를 차단했습니다"));
+    }
+
+    // ✅ 15. 차단 해제
+    @DeleteMapping("/{targetId}/block")
+    public ResponseEntity<ApiResponse<Void>> unblockUser(@PathVariable Long targetId) {
+        Long currentUserId = getCurrentUserId();
+        userService.unblockUser(currentUserId, targetId);
+
+        return ResponseEntity.ok(ApiResponse.success("차단을 해제했습니다"));
+    }
+
+    // ✅ 16. 차단된 사용자 목록 조회
+    @GetMapping("/me/blocked")
+    public ResponseEntity<ApiResponse<List<BlockedUserDto>>> getBlockedUsers() {
+        Long currentUserId = getCurrentUserId();
+        List<BlockedUserDto> blockedUsers = userService.getBlockedUsers(currentUserId);
+
+        return ResponseEntity.ok(ApiResponse.success("차단된 사용자 목록을 조회했습니다", blockedUsers));
     }
 }

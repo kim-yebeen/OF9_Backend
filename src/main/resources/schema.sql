@@ -156,6 +156,19 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP NOT NULL DEFAULT now()
     );
 
+CREATE TABLE IF NOT EXISTS user_block (
+                                          id SERIAL PRIMARY KEY,
+                                          blocker_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- 차단하는 사용자
+    blocked_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- 차단당하는 사용자
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE(blocker_id, blocked_id),
+    CONSTRAINT no_self_block CHECK (blocker_id <> blocked_id)
+    );
+
+-- 성능 최적화를 위한 인덱스 추가
+CREATE INDEX IF NOT EXISTS idx_user_block_blocker_id ON user_block(blocker_id);
+CREATE INDEX IF NOT EXISTS idx_user_block_blocked_id ON user_block(blocked_id);
+
 
 -- 성능 최적화 인덱스
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
