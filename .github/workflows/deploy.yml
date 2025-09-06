@@ -53,25 +53,10 @@ jobs:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           HOST: ${{ secrets.EC2_HOST }}
           USER: ${{ secrets.EC2_USER }}
-          # JWT 환경변수 추가 (핵심!)
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
-          JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
-          # 데이터베이스 환경변수 (필요시)
-          DB_URL: ${{ secrets.DB_URL }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          # DB 환경변수 모두 제거! JWT도 파일에서 읽을 예정
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
             set -e
-          
-            # 환경변수 내보내기 (핵심!)
-            export JWT_SECRET='${JWT_SECRET}'
-            export JWT_ACCESS_EXPIRATION='${JWT_ACCESS_EXPIRATION}'
-            export JWT_REFRESH_EXPIRATION='${JWT_REFRESH_EXPIRATION}'
-            export DB_URL='${DB_URL}'
-            export DB_USERNAME='${DB_USERNAME}'
-            export DB_PASSWORD='${DB_PASSWORD}'
           
             echo '=== 기존 컨테이너 정리 ==='
             docker compose down || true
@@ -95,6 +80,9 @@ jobs:
               echo '⚠ Chrome이 설치되지 않았습니다. 배포를 중단합니다.'
               exit 1
             fi
+          
+            echo '=== 설정 파일 확인 ==='
+            ls -la ~/config/
           
             echo '=== Docker Compose로 Redis 먼저 시작 ==='
             docker compose up -d redis
