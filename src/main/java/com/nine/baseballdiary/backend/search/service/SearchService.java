@@ -65,7 +65,7 @@ public class SearchService {
                 .build();
     }
 
-    // 게시글 검색 (기존 Repository 패턴에 맞춤)
+    // 게시글 검색 (PostgreSQL 배열 형식으로 수정)
     @Transactional(readOnly = true)
     public SearchRecordResponse searchRecords(Long userId, String query, int page, int size) {
         // 내가 팔로우하는 사용자들의 ID 목록
@@ -74,10 +74,15 @@ public class SearchService {
                 .map(follow -> follow.getFolloweeId().getId())
                 .collect(Collectors.toSet());
 
-        // 기존 Repository 패턴에 맞춘 방식 (PostgreSQL bigint[] 사용)
-        String followingIdsStr = followingUserIds.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(","));
+        // PostgreSQL 배열 형식으로 변환: {1,2,3}
+        String followingIdsStr;
+        if (followingUserIds.isEmpty()) {
+            followingIdsStr = "{}"; // 빈 배열
+        } else {
+            followingIdsStr = "{" + followingUserIds.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")) + "}";
+        }
 
         Pageable pageable = PageRequest.of(page, size);
         Page<Record> recordPage = recordRepository.searchRecordsWithAccess(
