@@ -188,16 +188,30 @@ public class UserService {
     // 내 정보 수정
     @Transactional
     public void updateUser(Long userId, UpdateUserRequest req) {
-        User u = userRepo.findById(userId).orElseThrow();
+        User u = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        // 닉네임 중복 확인 (닉네임이 변경된 경우만)
         if (!u.getNickname().equals(req.getNickname())
                 && userRepo.existsByNickname(req.getNickname())) {
             throw new IllegalArgumentException("이미 사용중인 닉네임입니다.");
         }
+
+        // ✅ 필수 값들 업데이트
         u.setNickname(req.getNickname());
-        u.setProfileImageUrl(req.getProfileImageUrl());
-        u.setFavTeam(req.getFavTeam());
-        u.setIsPrivate(req.getIsPrivate());
-        // 변경감지로 자동 업데이트
+        u.setFavTeam(req.getFavTeam()); // 필수값이므로 validation에서 이미 체크됨
+
+        // ✅ nullable 값 안전하게 처리 (profileImageUrl만)
+        u.setProfileImageUrl(req.getProfileImageUrl() != null && !req.getProfileImageUrl().trim().isEmpty()
+                ? req.getProfileImageUrl().trim() : null);
+
+        // ✅ Boolean 처리 (null인 경우 기존 값 유지)
+        if (req.getIsPrivate() != null) {
+            u.setIsPrivate(req.getIsPrivate());
+        }
+
+        // ✅ @PreUpdate로 updatedAt이 자동 설정됨
+        // JPA dirty checking으로 자동 업데이트
     }
 
     // 로그아웃: 경우에 따라 토큰 무효화 로직 추가

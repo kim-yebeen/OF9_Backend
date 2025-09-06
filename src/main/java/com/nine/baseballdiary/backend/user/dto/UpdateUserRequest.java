@@ -17,6 +17,7 @@ public class UpdateUserRequest {
     @Size(max = 500, message = "프로필 이미지 URL은 500자를 초과할 수 없습니다")
     private String profileImageUrl;
 
+    @NotBlank(message = "응원 팀은 필수입니다")
     @Size(max = 20, message = "팬팀 이름은 20자를 초과할 수 없습니다")
     private String favTeam;
 
