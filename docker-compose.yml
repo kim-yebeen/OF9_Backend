@@ -24,8 +24,8 @@ services:
       # 설정 파일 마운트 (핵심!)
       - ~/config:/app/config
     environment:
-      - SPRING_REDIS_HOST=redis
-      - SPRING_REDIS_PORT=6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - SPRING_PROFILES_ACTIVE=jwt,db,prod
       # DB 관련 환경변수 모두 제거!
     healthcheck:
