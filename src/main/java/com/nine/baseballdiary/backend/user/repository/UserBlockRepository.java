@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
@@ -27,4 +28,13 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
 
     // 차단 관계 삭제
     void deleteByBlocker_IdAndBlocked_Id(Long blockerId, Long blockedId);
+
+    // 내가 차단한 사용자의 ID 목록 조회 (새로 추가)
+    @Query("SELECT ub.blocked.id FROM UserBlock ub WHERE ub.blocker.id = :userId")
+    Set<Long> findBlockedIdsByBlockerId(@Param("userId") Long userId);
+
+    // 나를 차단한 사용자의 ID 목록 조회 (새로 추가)
+    @Query("SELECT ub.blocker.id FROM UserBlock ub WHERE ub.blocked.id = :userId")
+    Set<Long> findBlockerIdsByBlockedId(@Param("userId") Long userId);
+
 }

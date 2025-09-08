@@ -23,6 +23,12 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
     /** 나를 팔로잉한 사람들 */
     List<UserFollow> findByFolloweeId_Id(Long followeeId);
 
+    // ✅ 팔로잉 숫자 카운트 (추가)
+    long countByFollowerId_Id(Long followerId);
+
+    // ✅ 팔로워 숫자 카운트 (추가)
+    long countByFolloweeId_Id(Long followeeId);
+
     //내가 팔로우하는사람들의 ID 리스트
     @Query("select uf.followeeId.id from UserFollow uf where uf.followerId.id = :userId")
     List<Long> findFollowingIds(Long userId);

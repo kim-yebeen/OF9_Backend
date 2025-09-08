@@ -15,11 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service @RequiredArgsConstructor
+@Service
+@RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepo;
     private final UserFollowRepository followRepo;
@@ -27,17 +28,63 @@ public class UserService {
     private final FollowRequestRepository reqRepo;
     private final NotificationService notificationService;
     private final UserBlockRepository userBlockRepo;
-    private final RecordReactionRepository recordReactionRepo; // 기존 필드
+    private final RecordReactionRepository recordReactionRepo;
 
-
+    // ✅ 기존의 간단한 사용자 검색 메서드 (수정 완료)
+    // 이 메서드는 UserDto를 반환하며, 페이징이 필요 없는 간단한 검색에 사용됩니다.
+    @Transactional(readOnly = true)
     public List<UserDto> searchUsers(Long currentUserId, String q) {
+        // DB에서 닉네임으로 사용자 검색
         List<User> users = userRepo.findByNicknameContainingIgnoreCase(q);
 
+        // 메모리에서 상호 차단된 사용자를 필터링
         return users.stream()
-                .filter(user -> !isBlockedEachOther(currentUserId, user.getId())) // 상호 차단된 사용자 제외
+                .filter(user -> !isBlockedEachOther(currentUserId, user.getId()))
                 .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .toList();
+                .collect(Collectors.toList());
     }
+
+    // ❌ SearchService에서 잘못 복사해 온 searchUsers 메서드는 여기서 삭제되었습니다.
+
+    // ✅ 팔로잉 목록 (수정 완료)
+    @Transactional(readOnly = true)
+    public List<UserDto> getFollowing(Long userId, Long currentUserId) {
+        List<Long> followingIds = followRepo.findByFollowerId_Id(userId).stream()
+                .map(uf -> uf.getFolloweeId().getId())
+                .collect(Collectors.toList());
+
+        if (followingIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // UserRepository의 DB 필터링 메서드 사용
+        List<User> users = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
+
+        return users.stream()
+                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
+                .collect(Collectors.toList());
+    }
+
+    // ✅ 팔로워 목록 (수정 완료)
+    @Transactional(readOnly = true)
+    public List<UserDto> getFollowers(Long userId, Long currentUserId) {
+        List<Long> followerIds = followRepo.findByFolloweeId_Id(userId).stream()
+                .map(uf -> uf.getFollowerId().getId())
+                .collect(Collectors.toList());
+
+        if (followerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // UserRepository의 DB 필터링 메서드 사용
+        List<User> users = userRepo.findByIdInExcludingBlocked(followerIds, currentUserId);
+
+        return users.stream()
+                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
+                .collect(Collectors.toList());
+    }
+
+    // ... (requestFollow, acceptFollowRequest 등 나머지 메서드는 그대로 유지) ...
 
     /**
      * 1) 팔로우 요청 (공개면 즉시, 비공개면 PENDING 생성)
@@ -152,31 +199,11 @@ public class UserService {
         followRepo.deleteByFollowerId_IdAndFolloweeId_Id(meId, targetId);
     }
 
-    // ✅ 팔로잉 목록 (차단된 사용자 제외)
-    @Transactional(readOnly = true)
-    public List<UserDto> getFollowing(Long userId, Long currentUserId) {
-        return followRepo.findByFollowerId_Id(userId).stream()
-                .map(uf -> uf.getFolloweeId())
-                .filter(user -> !isBlockedEachOther(currentUserId, user.getId())) // 차단된 사용자 제외
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .collect(Collectors.toList());
-    }
-
-    /// ✅ 팔로워 목록 (차단된 사용자 제외)
-    @Transactional(readOnly = true)
-    public List<UserDto> getFollowers(Long userId, Long currentUserId) {
-        return followRepo.findByFolloweeId_Id(userId).stream()
-                .map(uf -> uf.getFollowerId())
-                .filter(user -> !isBlockedEachOther(currentUserId, user.getId())) // 차단된 사용자 제외
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .collect(Collectors.toList());
-    }
-
     // 내 프로필 조회
     public UserProfileDto getMyProfile(Long userId) {
         User u = userRepo.findById(userId).orElseThrow();
-        long followerCnt = followRepo.findByFolloweeId_Id(userId).size();
-        long followingCnt = followRepo.findByFollowerId_Id(userId).size();
+        long followerCnt = followRepo.countByFolloweeId_Id(userId);
+        long followingCnt = followRepo.countByFollowerId_Id(userId);
         long recordCnt = recordRepo.countByUserId(userId);
         return new UserProfileDto(
                 u.getId(), u.getNickname(), u.getProfileImageUrl(),
@@ -197,25 +224,18 @@ public class UserService {
             throw new IllegalArgumentException("이미 사용중인 닉네임입니다.");
         }
 
-        // ✅ 필수 값들 업데이트
         u.setNickname(req.getNickname());
-        u.setFavTeam(req.getFavTeam()); // 필수값이므로 validation에서 이미 체크됨
-
-        // ✅ nullable 값 안전하게 처리 (profileImageUrl만)
+        u.setFavTeam(req.getFavTeam());
         u.setProfileImageUrl(req.getProfileImageUrl() != null && !req.getProfileImageUrl().trim().isEmpty()
                 ? req.getProfileImageUrl().trim() : null);
 
-        // ✅ Boolean 처리 (null인 경우 기존 값 유지)
         if (req.getIsPrivate() != null) {
             u.setIsPrivate(req.getIsPrivate());
         }
-
-        // ✅ @PreUpdate로 updatedAt이 자동 설정됨
-        // JPA dirty checking으로 자동 업데이트
     }
 
-    // 로그아웃: 경우에 따라 토큰 무효화 로직 추가
-    public void logout(Long userId) { /* no-op or invalidate JWT */ }
+    // 로그아웃
+    public void logout(Long userId) { /* JWT 토큰 무효화 로직 (필요시) */ }
 
     @Transactional
     public void deleteUser(Long userId) {
@@ -223,77 +243,36 @@ public class UserService {
     }
 
     public boolean isNicknameAvailable(String nickname) {
-        // 닉네임 유효성 검사
-        if (nickname == null || nickname.trim().isEmpty()) {
+        if (nickname == null || nickname.trim().isEmpty() || nickname.length() > 15) {
             return false;
         }
-
-        if (nickname.length() < 1 || nickname.length() > 15) {
-            return false;
-        }
-
-        if (!nickname.matches("^[가-힣a-zA-Z0-9\\s_-]+$")) {
-            return false;
-        }
-
-        // 중복 확인
         return !userRepo.existsByNickname(nickname);
     }
 
     @Transactional
     public void blockUser(Long blockerId, Long targetId) {
-        // 자기 자신을 차단할 수 없음
-        if (blockerId.equals(targetId)) {
-            throw new IllegalArgumentException("자기 자신을 차단할 수 없습니다");
-        }
+        if (blockerId.equals(targetId)) throw new IllegalArgumentException("자기 자신을 차단할 수 없습니다");
+        User target = userRepo.findById(targetId).orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+        User blocker = userRepo.findById(blockerId).orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+        if (userBlockRepo.existsByBlocker_IdAndBlocked_Id(blockerId, targetId)) throw new IllegalArgumentException("이미 차단된 사용자입니다");
 
-        // 대상 사용자가 존재하는지 확인
-        User target = userRepo.findById(targetId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+        userBlockRepo.save(UserBlock.builder().blocker(blocker).blocked(target).build());
 
-        User blocker = userRepo.findById(blockerId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
-
-        // 이미 차단 중인지 확인
-        if (userBlockRepo.existsByBlocker_IdAndBlocked_Id(blockerId, targetId)) {
-            throw new IllegalArgumentException("이미 차단된 사용자입니다");
-        }
-
-        // 차단 처리
-        UserBlock userBlock = UserBlock.builder()
-                .blocker(blocker)
-                .blocked(target)
-                .build();
-
-        userBlockRepo.save(userBlock);
-
-        // 차단 시 팔로우 관계 정리
-        // 1. 내가 상대방을 팔로우하고 있다면 언팔로우
+        // 차단 시 관련 데이터 정리
         followRepo.deleteByFollowerId_IdAndFolloweeId_Id(blockerId, targetId);
-
-        // 2. 상대방이 나를 팔로우하고 있다면 언팔로우
         followRepo.deleteByFollowerId_IdAndFolloweeId_Id(targetId, blockerId);
-
-        // 3. 서로의 팔로우 요청 삭제 (양방향)
         reqRepo.deleteByBothUsers(blockerId, targetId);
-
-        // 4. 서로의 리액션 삭제 (양방향)
         recordReactionRepo.deleteByBothUsers(blockerId, targetId);
     }
 
-    // ✅ 차단 해제
     @Transactional
     public void unblockUser(Long blockerId, Long targetId) {
-        // 차단 관계가 존재하는지 확인
         if (!userBlockRepo.existsByBlocker_IdAndBlocked_Id(blockerId, targetId)) {
             throw new IllegalArgumentException("차단되지 않은 사용자입니다");
         }
-
-        // 차단 해제
         userBlockRepo.deleteByBlocker_IdAndBlocked_Id(blockerId, targetId);
     }
 
-    // ✅ 차단된 사용자 목록 조회
     @Transactional(readOnly = true)
     public List<BlockedUserDto> getBlockedUsers(Long blockerId) {
         return userBlockRepo.findByBlocker_IdOrderByCreatedAtDesc(blockerId)
@@ -308,12 +287,6 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-    // ✅ 차단 여부 확인 (다른 메서드에서 사용할 유틸리티 메서드)
-    public boolean isBlocked(Long blockerId, Long targetId) {
-        return userBlockRepo.existsByBlocker_IdAndBlocked_Id(blockerId, targetId);
-    }
-
-    // ✅ 상호 차단 여부 확인
     public boolean isBlockedEachOther(Long userId1, Long userId2) {
         return userBlockRepo.existsByBlocker_IdAndBlocked_Id(userId1, userId2) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(userId2, userId1);

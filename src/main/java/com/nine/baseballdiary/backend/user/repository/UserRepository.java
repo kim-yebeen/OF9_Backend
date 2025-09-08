@@ -27,20 +27,34 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // 검색 기능을 위한 메서드 추가 (자신 제외하고 페이징)
     Page<User> findByNicknameContainingIgnoreCaseAndIdNot(String nickname, Long excludeUserId, Pageable pageable);
 
-    // 차단된 사용자를 제외한 닉네임 검색
-    @Query("""
-    SELECT u FROM User u 
-    WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', :nickname, '%'))
-    AND NOT EXISTS (
-        SELECT 1 FROM UserBlock ub 
-        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
-           OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
-    )
-    """)
-    List<User> findByNicknameContainingIgnoreCaseExcludingBlocked(
+
+
+    @Query(value = """
+        SELECT u FROM User u
+        WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', :nickname, '%'))
+        AND u.id != :currentUserId
+        AND NOT EXISTS (
+            SELECT 1 FROM UserBlock ub
+            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
+               OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
+        )
+        """,
+            countQuery = """
+        SELECT count(u) FROM User u
+        WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', '||:nickname||', '%'))
+        AND u.id != :currentUserId
+        AND NOT EXISTS (
+            SELECT 1 FROM UserBlock ub
+            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
+               OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
+        )
+        """)
+    Page<User> findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
             @Param("nickname") String nickname,
-            @Param("currentUserId") Long currentUserId
+            @Param("currentUserId") Long currentUserId,
+            Pageable pageable
     );
+
 
     // 특정 사용자 목록에서 차단된 사용자 제외
     @Query("""

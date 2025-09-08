@@ -11,6 +11,7 @@ import com.nine.baseballdiary.backend.user.entity.FollowRequestStatus;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.FollowRequestRepository;
+import com.nine.baseballdiary.backend.user.repository.UserBlockRepository; // 추가
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +35,7 @@ public class SearchService {
     private final GameRepository gameRepository;
     private final UserFollowRepository userFollowRepository;
     private final FollowRequestRepository followRequestRepository;
+    private final UserBlockRepository userBlockRepository; // 추가
     private final RedisTemplate<String, String> redisTemplate;
 
     private static final String RECENT_SEARCH_PREFIX = "search:recent:";
@@ -48,73 +50,87 @@ public class SearchService {
             DateTimeFormatter.ofPattern("H:mm");
 
     // 통합 검색
-    @Transactional(readOnly = true)
+    @Transactional
     public SearchResultResponse search(Long userId, String query, int recordPage, int userPage, int recordSize, int userSize) {
-        // 검색어 저장 (최근 검색어 & 인기 검색어)
         saveSearchQuery(userId, query);
-
-        // 게시글 검색
         SearchRecordResponse recordResult = searchRecords(userId, query, recordPage, recordSize);
-
-        // 사용자 검색
         SearchUserResponse userResult = searchUsers(userId, query, userPage, userSize);
-
         return SearchResultResponse.builder()
                 .records(recordResult)
                 .users(userResult)
                 .build();
     }
 
-    // 게시글 검색 (PostgreSQL 배열 형식으로 수정)
+    // ✅ 차단된 사용자 ID 목록 조회 (새로 추가)
+    private Set<Long> getBlockedUserIds(Long currentUserId) {
+        // 내가 차단한 사용자들
+        Set<Long> myBlockedUsers = userBlockRepository.findBlockedIdsByBlockerId(currentUserId);
+
+        // 나를 차단한 사용자들
+        Set<Long> usersWhoBlockedMe = userBlockRepository.findBlockerIdsByBlockedId(currentUserId);
+
+        // 합치기
+        Set<Long> allBlockedUsers = new HashSet<>(myBlockedUsers);
+        allBlockedUsers.addAll(usersWhoBlockedMe);
+
+        return allBlockedUsers;
+    }
+
+
+    // ✅ 게시글 검색 (차단된 사용자 필터링 추가)
     @Transactional(readOnly = true)
     public SearchRecordResponse searchRecords(Long userId, String query, int page, int size) {
-        // 내가 팔로우하는 사용자들의 ID 목록
-        Set<Long> followingUserIds = userFollowRepository.findByFollowerId_Id(userId)
-                .stream()
+        Set<Long> followingUserIds = userFollowRepository.findByFollowerId_Id(userId).stream()
                 .map(follow -> follow.getFolloweeId().getId())
                 .collect(Collectors.toSet());
 
-        // PostgreSQL 배열 형식으로 변환: {1,2,3}
-        String followingIdsStr;
-        if (followingUserIds.isEmpty()) {
-            followingIdsStr = "{}"; // 빈 배열
-        } else {
-            followingIdsStr = "{" + followingUserIds.stream()
-                    .map(String::valueOf)
-                    .collect(Collectors.joining(",")) + "}";
-        }
+        // ✅ 'followingIdsStr' 선언 부분을 추가하여 오류 해결
+        String followingIdsStr = followingUserIds.isEmpty() ? "{}" : "{" + followingUserIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(",")) + "}";
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<Record> recordPage = recordRepository.searchRecordsWithAccess(
+
+        Page<Record> recordPage = recordRepository.searchRecordsWithAccessAndBlockFilter(
                 query.toLowerCase(), userId, followingIdsStr, pageable);
 
+        // ✅ DTO의 정적 메서드를 사용하여 변환 (코드가 훨씬 깔끔해짐)
         List<SearchRecordDto> records = recordPage.getContent().stream()
-                .map(this::convertToSearchRecordDto)
+                .map(record -> {
+                    Game game = gameRepository.findById(record.getGameId()).orElseThrow();
+                    User author = userRepository.findById(record.getUserId()).orElseThrow();
+                    return SearchRecordDto.from(record, game, author);
+                })
                 .collect(Collectors.toList());
 
         return SearchRecordResponse.builder()
                 .records(records)
-                .currentPage(page)
+                .currentPage(recordPage.getNumber())
                 .totalPages(recordPage.getTotalPages())
                 .totalElements(recordPage.getTotalElements())
                 .hasNext(recordPage.hasNext())
                 .build();
     }
 
-    // 사용자 검색
+    // ✅ 사용자 검색 (차단된 사용자 필터링 추가)
     @Transactional(readOnly = true)
     public SearchUserResponse searchUsers(Long currentUserId, String query, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<User> userPage = userRepository.findByNicknameContainingIgnoreCaseAndIdNot(
+
+        Page<User> userPage = userRepository.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
                 query, currentUserId, pageable);
 
+        // ✅ DTO의 정적 메서드를 사용하여 변환
         List<SearchUserDto> users = userPage.getContent().stream()
-                .map(user -> convertToSearchUserDto(currentUserId, user))
+                .map(user -> {
+                    FollowStatus followStatus = getFollowStatus(currentUserId, user.getId());
+                    return SearchUserDto.of(user, followStatus);
+                })
                 .collect(Collectors.toList());
 
         return SearchUserResponse.builder()
                 .users(users)
-                .currentPage(page)
+                .currentPage(userPage.getNumber())
                 .totalPages(userPage.getTotalPages())
                 .totalElements(userPage.getTotalElements())
                 .hasNext(userPage.hasNext())
