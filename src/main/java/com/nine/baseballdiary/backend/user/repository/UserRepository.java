@@ -30,25 +30,25 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 
     @Query(value = """
-        SELECT u FROM User u
-        WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', :nickname, '%'))
-        AND u.id != :currentUserId
-        AND NOT EXISTS (
-            SELECT 1 FROM UserBlock ub
-            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
-               OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
-        )
-        """,
+    SELECT u FROM User u
+    WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', :nickname, '%'))
+    AND u.id != :currentUserId
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
+           OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
+    )
+    """,
             countQuery = """
-        SELECT count(u) FROM User u
-        WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', '||:nickname||', '%'))
-        AND u.id != :currentUserId
-        AND NOT EXISTS (
-            SELECT 1 FROM UserBlock ub
-            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
-               OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
-        )
-        """)
+    SELECT count(u) FROM User u
+    WHERE LOWER(u.nickname) LIKE LOWER(CONCAT('%', :nickname, '%'))
+    AND u.id != :currentUserId
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = u.id)
+           OR (ub.blocker.id = u.id AND ub.blocked.id = :currentUserId)
+    )
+    """)
     Page<User> findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
             @Param("nickname") String nickname,
             @Param("currentUserId") Long currentUserId,
