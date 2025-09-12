@@ -4,9 +4,11 @@ import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.entity.UserFollow;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Set;
 
 @Repository
 public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
@@ -36,5 +38,8 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
     //나를 팔로우하는 사람들의 ID 리스트
     @Query("select uf.followerId.id from UserFollow uf where uf.followeeId.id = :userId")
     List<Long> findFollowerIds(Long userId);
+
+    @Query("SELECT uf.followeeId.id FROM UserFollow uf WHERE uf.followerId.id = :currentUserId AND uf.followeeId.id IN :targetUserIds")
+    Set<Long> findFolloweeIdsByFollowerIdAndInTargetUserIds(@Param("currentUserId") Long currentUserId, @Param("targetUserIds") List<Long> targetUserIds);
 
 }

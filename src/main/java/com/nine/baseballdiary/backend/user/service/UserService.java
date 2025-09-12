@@ -3,6 +3,7 @@ package com.nine.baseballdiary.backend.user.service;
 import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.reaction.RecordReactionRepository;
 import com.nine.baseballdiary.backend.record.RecordRepository;
+import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import com.nine.baseballdiary.backend.user.dto.*;
 import com.nine.baseballdiary.backend.user.entity.*;
 import com.nine.baseballdiary.backend.user.repository.FollowRequestRepository;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,7 +43,7 @@ public class UserService {
 
         // DTO로 변환하여 반환
         return users.stream()
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
+                .map(UserDto::from) // new UserDto(...) 대신 정적 팩토리 메서드 사용
                 .collect(Collectors.toList());
     }
 
@@ -49,43 +51,54 @@ public class UserService {
 
     // ✅ 팔로잉 목록 (수정 완료)
     @Transactional(readOnly = true)
-    public List<UserDto> getFollowing(Long userId, Long currentUserId) {
-        List<Long> followingIds = followRepo.findByFollowerId_Id(userId).stream()
-                .map(uf -> uf.getFolloweeId().getId())
+    public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
+        List<User> userList = followRepo.findByFollowerId_Id(profileUserId).stream()
+                .map(UserFollow::getFolloweeId)
                 .collect(Collectors.toList());
 
-        if (followingIds.isEmpty()) {
+        if (userList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // UserRepository의 DB 필터링 메서드 사용
-        List<User> users = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
-
-        return users.stream()
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .collect(Collectors.toList());
+        return convertToUserDtoWithFollowStatus(userList, currentUserId);
     }
+
 
     // ✅ 팔로워 목록 (수정 완료)
     @Transactional(readOnly = true)
-    public List<UserDto> getFollowers(Long userId, Long currentUserId) {
-        List<Long> followerIds = followRepo.findByFolloweeId_Id(userId).stream()
-                .map(uf -> uf.getFollowerId().getId())
+    public List<UserDto> getFollowers(Long profileUserId, Long currentUserId) {
+        List<User> userList = followRepo.findByFolloweeId_Id(profileUserId).stream()
+                .map(UserFollow::getFollowerId)
                 .collect(Collectors.toList());
 
-        if (followerIds.isEmpty()) {
+        if (userList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // UserRepository의 DB 필터링 메서드 사용
-        List<User> users = userRepo.findByIdInExcludingBlocked(followerIds, currentUserId);
-
-        return users.stream()
-                .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
-                .collect(Collectors.toList());
+        return convertToUserDtoWithFollowStatus(userList, currentUserId);
     }
 
-    // ... (requestFollow, acceptFollowRequest 등 나머지 메서드는 그대로 유지) ...
+
+    //유저 목록을 팔로우 상태가 포함된 userdto목록으로 변환하는 헬퍼 메서드
+    private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
+        List<Long> targetUserIds = userList.stream().map(User::getId).collect(Collectors.toList());
+        Set<Long> followingIdSet = followRepo.findFolloweeIdsByFollowerIdAndInTargetUserIds(currentUserId, targetUserIds);
+        Set<Long> requestedIdSet = reqRepo.findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(currentUserId, targetUserIds);
+
+        return userList.stream().map(user -> {
+            FollowStatus status;
+            if (user.getId().equals(currentUserId)) {
+                status = FollowStatus.ME;
+            } else if (followingIdSet.contains(user.getId())) {
+                status = FollowStatus.FOLLOWING;
+            } else if (requestedIdSet.contains(user.getId())) {
+                status = FollowStatus.REQUESTED;
+            } else {
+                status = FollowStatus.NOT_FOLLOWING;
+            }
+            return UserDto.from(user, status); // 수정된 UserDto의 정적 메서드 사용
+        }).collect(Collectors.toList());
+    }
 
     /**
      * 1) 팔로우 요청 (공개면 즉시, 비공개면 PENDING 생성)

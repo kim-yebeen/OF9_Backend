@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface FollowRequestRepository extends JpaRepository<FollowRequest, Long> {
     // 특정 대상에게 온 PENDING 요청 전체
@@ -26,5 +27,8 @@ public interface FollowRequestRepository extends JpaRepository<FollowRequest, Lo
     @Modifying
     @Query("DELETE FROM FollowRequest fr WHERE (fr.requester.id = :userId1 AND fr.target.id = :userId2) OR (fr.requester.id = :userId2 AND fr.target.id = :userId1)")
     void deleteByBothUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+
+    @Query("SELECT fr.target.id FROM FollowRequest fr WHERE fr.requester.id = :currentUserId AND fr.target.id IN :targetUserIds AND fr.status = 'PENDING'")
+    Set<Long> findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(@Param("currentUserId") Long currentUserId, @Param("targetUserIds") List<Long> targetUserIds);
 
 }
