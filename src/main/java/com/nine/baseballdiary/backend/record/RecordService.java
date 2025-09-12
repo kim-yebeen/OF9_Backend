@@ -361,7 +361,7 @@ public class RecordService {
 
         // 4. DTO로 변환하여 반환
         return mutualFriendsStream
-                .map(UserDto::from) // 
+                .map(UserDto::from) //
                 .collect(Collectors.toList());
     }
 

@@ -52,35 +52,50 @@ public class UserService {
     // ✅ 팔로잉 목록 (수정 완료)
     @Transactional(readOnly = true)
     public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
-        List<User> userList = followRepo.findByFollowerId_Id(profileUserId).stream()
-                .map(UserFollow::getFolloweeId)
+        // 1. 팔로잉하는 사람들의 ID 목록을 가져옵니다.
+        List<Long> followingIds = followRepo.findByFollowerId_Id(profileUserId).stream()
+                .map(follow -> follow.getFolloweeId().getId())
                 .collect(Collectors.toList());
 
-        if (userList.isEmpty()) {
+        if (followingIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return convertToUserDtoWithFollowStatus(userList, currentUserId);
+        // 2. ID 목록을 사용해 User 엔티티를 조회하면서,
+        //    현재 로그인한 사용자와 차단 관계인 사용자를 DB에서 미리 제외합니다.
+        List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
+
+        // 3. 필터링된 사용자 목록을 DTO로 변환합니다.
+        return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
     }
 
 
     // ✅ 팔로워 목록 (수정 완료)
     @Transactional(readOnly = true)
     public List<UserDto> getFollowers(Long profileUserId, Long currentUserId) {
-        List<User> userList = followRepo.findByFolloweeId_Id(profileUserId).stream()
-                .map(UserFollow::getFollowerId)
+        // 1. 팔로워들의 ID 목록을 가져옵니다.
+        List<Long> followerIds = followRepo.findByFolloweeId_Id(profileUserId).stream()
+                .map(follow -> follow.getFollowerId().getId())
                 .collect(Collectors.toList());
 
+        if (followerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. ID 목록을 사용해 User 엔티티를 조회하면서,
+        //    현재 로그인한 사용자와 차단 관계인 사용자를 DB에서 미리 제외합니다.
+        List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followerIds, currentUserId);
+
+        // 3. 필터링된 사용자 목록을 DTO로 변환합니다.
+        return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
+    }
+
+    //유저 목록을 팔로우 상태가 포함된 userdto목록으로 변환하는 헬퍼 메서드
+    private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
         if (userList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return convertToUserDtoWithFollowStatus(userList, currentUserId);
-    }
-
-
-    //유저 목록을 팔로우 상태가 포함된 userdto목록으로 변환하는 헬퍼 메서드
-    private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
         List<Long> targetUserIds = userList.stream().map(User::getId).collect(Collectors.toList());
         Set<Long> followingIdSet = followRepo.findFolloweeIdsByFollowerIdAndInTargetUserIds(currentUserId, targetUserIds);
         Set<Long> requestedIdSet = reqRepo.findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(currentUserId, targetUserIds);
@@ -96,7 +111,7 @@ public class UserService {
             } else {
                 status = FollowStatus.NOT_FOLLOWING;
             }
-            return UserDto.from(user, status); // 수정된 UserDto의 정적 메서드 사용
+            return UserDto.from(user, status);
         }).collect(Collectors.toList());
     }
 
