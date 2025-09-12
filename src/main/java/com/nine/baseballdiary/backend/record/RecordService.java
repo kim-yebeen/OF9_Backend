@@ -117,12 +117,7 @@ public class RecordService {
         // 2. 친구 ID 목록이 비어있지 않은 경우에만 DB를 조회하여 UserDto 목록으로 변환합니다.
         if (companionIds != null && !companionIds.isEmpty()) {
             companionDetails = userRepo.findAllById(companionIds).stream()
-                    .map(companionUser -> new UserDto(
-                            companionUser.getId(),
-                            companionUser.getNickname(),
-                            companionUser.getProfileImageUrl(),
-                            companionUser.getFavTeam()
-                    ))
+                    .map(UserDto::from) //
                     .collect(Collectors.toList());
         }
         String fmtDate = game.getDate().format(UPLOAD_FMT);
@@ -366,7 +361,7 @@ public class RecordService {
 
         // 4. DTO로 변환하여 반환
         return mutualFriendsStream
-                .map(user -> new UserDto(user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getFavTeam()))
+                .map(UserDto::from) // 
                 .collect(Collectors.toList());
     }
 
