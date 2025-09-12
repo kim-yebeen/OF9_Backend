@@ -35,16 +35,17 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<UserDto> searchUsers(Long currentUserId, String q) {
         // DB에서 닉네임으로 사용자 검색
-        List<User> users = userRepo.findByNicknameContainingIgnoreCase(q);
+        List<User> users = userRepo.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
+                q, currentUserId, org.springframework.data.domain.Pageable.unpaged()
+        ).getContent();
 
-        // 메모리에서 상호 차단된 사용자를 필터링
+        // DTO로 변환하여 반환
         return users.stream()
-                .filter(user -> !isBlockedEachOther(currentUserId, user.getId()))
                 .map(u -> new UserDto(u.getId(), u.getNickname(), u.getProfileImageUrl(), u.getFavTeam()))
                 .collect(Collectors.toList());
     }
 
-    // ❌ SearchService에서 잘못 복사해 온 searchUsers 메서드는 여기서 삭제되었습니다.
+
 
     // ✅ 팔로잉 목록 (수정 완료)
     @Transactional(readOnly = true)
