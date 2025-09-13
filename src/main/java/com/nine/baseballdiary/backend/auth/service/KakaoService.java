@@ -224,4 +224,8 @@ public class KakaoService {
         Random r = new Random();
         return list.get(r.nextInt(list.size())) + " " + (1000 + r.nextInt(9000));
     }
+
+    public Long getKakaoIdFromToken(String accessToken) {
+        return kakaoClient.getKakaoId(accessToken);
+    }
 }

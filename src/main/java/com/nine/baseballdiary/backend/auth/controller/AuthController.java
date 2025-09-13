@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.auth.controller;
 
+import com.nine.baseballdiary.backend.auth.dto.request.KakaoCheckRequestDto;
 import com.nine.baseballdiary.backend.auth.dto.request.KakaoLoginRequestDto;
 import com.nine.baseballdiary.backend.auth.dto.request.RefreshTokenRequest;
 import com.nine.baseballdiary.backend.auth.dto.response.AuthResponse;
@@ -7,6 +8,7 @@ import com.nine.baseballdiary.backend.auth.security.JwtProvider;
 import com.nine.baseballdiary.backend.auth.service.KakaoService;
 import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
@@ -25,6 +28,7 @@ public class AuthController {
 
     private final KakaoService kakaoService;
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
     @Value("${kakao.client-id}")
     private String kakaoClientId;
@@ -231,5 +235,20 @@ public class AuthController {
                 accessToken,
                 refreshToken
         );
+    }
+
+    @PostMapping("/kakao/check")
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> checkExistingUser(@RequestBody KakaoCheckRequestDto request) {
+        try {
+            Long kakaoId = kakaoService.getKakaoIdFromToken(request.getAccessToken());
+            boolean exists = userRepository.existsByKakaoId(kakaoId);
+
+            Map<String, Boolean> result = Map.of("exists", exists);
+            return ResponseEntity.ok(ApiResponse.success("사용자 확인이 완료되었습니다.", result));
+        } catch (Exception e) {
+            // 카카오 토큰이 유효하지 않거나 통신에 실패한 경우
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("CHECK_ERROR", "사용자 확인 중 오류가 발생했습니다."));
+        }
     }
 }
