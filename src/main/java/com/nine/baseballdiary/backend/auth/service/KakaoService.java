@@ -1,8 +1,10 @@
 package com.nine.baseballdiary.backend.auth.service;
 
+import com.nine.baseballdiary.backend.S3.S3Service;
 import com.nine.baseballdiary.backend.auth.client.KakaoClient;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -22,138 +24,88 @@ import java.util.Optional;
 import java.util.Random;
 
 @Service
+@RequiredArgsConstructor
 public class KakaoService {
     private final KakaoClient kakaoClient;
     private final UserRepository userRepository;
+    private final S3Service s3Service;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${kakao.client-id}")
     private String kakaoClientId;
 
     @Value("${kakao.redirect-uri}")
-    private String kakaoRedirectUri;
+    private String kakaoAppRedirectUri;
 
     @Value("${kakao.web.redirect-uri}")
     private String kakaoWebRedirectUri;
 
-    public KakaoService(KakaoClient kakaoClient, UserRepository userRepository) {
-        this.kakaoClient = kakaoClient;
-        this.userRepository = userRepository;
+
+    @Transactional
+    public User processKakaoLogin(String authCode, String favTeam, String platform) {
+        // 1. 플랫폼(app/web)에 맞는 redirect-uri 선택
+        String redirectUri = "web".equalsIgnoreCase(platform) ? kakaoWebRedirectUri : kakaoAppRedirectUri;
+
+        // 2. Authorization Code로 카카오 Access Token 획득
+        String kakaoAccessToken = getKakaoAccessToken(authCode, redirectUri);
+
+        // 3. 카카오 Access Token으로 사용자 정보 조회
+        Map<String, Object> kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);
+
+        // 4. 사용자 정보 기반으로 우리 서비스의 유저 조회 또는 생성
+        return getOrCreateUser(kakaoUserInfo, favTeam);
     }
 
-    // === 앱용 메서드들 (기존 유지) ===
-
-    // 기존 앱용 토큰 방식 (호환성 유지)
-    @Transactional
-    public User processLogin(String accessToken, String favTeam) {
-        Long kakaoId = kakaoClient.getKakaoId(accessToken);
-        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
-        if (existing.isPresent()) return existing.get();
-
-        User newUser = new User();
-        newUser.setKakaoId(kakaoId);
-        newUser.setNickname(generateRandomNickname());
-        newUser.setFavTeam(favTeam);
-        newUser.setIsPrivate(false);
-        newUser.setCreatedAt(LocalDateTime.now());
-        newUser.setUpdatedAt(LocalDateTime.now());
-        return userRepository.save(newUser);
-    }
-
-    // === 웹용 메서드들 (새로 추가) ===
-
-    // 웹용 Authorization Code 방식
-    @Transactional
-    public User processKakaoWebLogin(String authCode, String favTeam) {
-        // 1. Authorization Code로 액세스 토큰 획득 (웹용 redirect-uri 사용)
-        String accessToken = getKakaoAccessToken(authCode, kakaoWebRedirectUri);
-
-        // 2. 액세스 토큰으로 사용자 정보 조회
-        Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
-
-        // 3. 사용자 생성/조회
+    //카카오 유저 정보 바탕으로 유저 조회 및 생성
+    private User getOrCreateUser(Map<String, Object> kakaoUserInfo, String favTeam) {
         Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
-        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
+        Optional<User> existingUser = userRepository.findByKakaoId(kakaoId);
 
-        if (existing.isPresent()) {
-            return existing.get();
+        // 이미 가입된 유저이면 바로 반환
+        if (existingUser.isPresent()) {
+            return existingUser.get();
         }
 
-        // 4. 새 사용자 생성
-        Map<String, Object> properties = (Map<String, Object>) kakaoUserInfo.get("properties");
-        String kakaoNickname = properties != null ? (String) properties.get("nickname") : null;
+        // --- 신규 유저 생성 ---
+        Map<String, Object> kakaoAccount = (Map<String, Object>) kakaoUserInfo.get("kakao_account");
+        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
 
-        String nickname = (kakaoNickname != null && !kakaoNickname.isEmpty()) ?
-                kakaoNickname : generateRandomNickname();
+        String kakaoNickname = (String) profile.get("nickname");
+        String kakaoProfileUrl = (String) profile.get("profile_image_url");
 
-        // 닉네임 중복 체크
-        String finalNickname = nickname;
-        int counter = 1;
-        while (userRepository.existsByNickname(finalNickname)) {
-            finalNickname = nickname + counter;
-            counter++;
+        // 닉네임 중복 처리
+        String finalNickname = kakaoNickname;
+        if (finalNickname == null || finalNickname.isBlank() || userRepository.existsByNickname(finalNickname)) {
+            finalNickname = generateRandomNickname();
         }
 
-        User newUser = new User();
-        newUser.setKakaoId(kakaoId);
-        newUser.setNickname(finalNickname);
-        newUser.setFavTeam(favTeam);
-        newUser.setIsPrivate(false);
-        newUser.setCreatedAt(LocalDateTime.now());
-        newUser.setUpdatedAt(LocalDateTime.now());
+        // User 엔티티 생성
+        User newUser = User.builder()
+                .kakaoId(kakaoId)
+                .nickname(finalNickname)
+                .favTeam(favTeam)
+                .isPrivate(false)
+                .build();
 
-        if (properties != null && properties.get("profile_image") != null) {
-            newUser.setProfileImageUrl((String) properties.get("profile_image"));
+        // User를 먼저 한 번 저장하여 ID를 부여받습니다. (S3 경로에 userId를 사용하기 위함)
+        User savedUser = userRepository.save(newUser);
+
+        // ✅ 카카오 프로필 이미지를 우리 S3로 복사
+        if (kakaoProfileUrl != null) {
+            String ourS3Url = s3Service.uploadImageFromUrl(kakaoProfileUrl, savedUser.getId(), "profiles");
+            savedUser.setProfileImageUrl(ourS3Url);
+            return userRepository.save(savedUser); // 이미지 URL 업데이트 후 다시 저장
         }
 
-        return userRepository.save(newUser);
+        return savedUser;
     }
 
-    // === 기존 통합 메서드 (앱용 redirect-uri 사용) ===
-
-    // 통일된 Authorization Code 방식 (앱용 - 호환성을 위해 유지)
-    @Transactional
-    public User processKakaoLogin(String authCode, String favTeam) {
-        // 앱용 redirect-uri 사용
-        String accessToken = getKakaoAccessToken(authCode, kakaoRedirectUri);
-
+    //카카오 액세스 토큰으로 카카오 ID만 조회
+    public Long getKakaoIdFromToken(String accessToken) {
         Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
-        Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
-        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
-
-        if (existing.isPresent()) {
-            return existing.get();
-        }
-
-        Map<String, Object> properties = (Map<String, Object>) kakaoUserInfo.get("properties");
-        String kakaoNickname = properties != null ? (String) properties.get("nickname") : null;
-
-        String nickname = (kakaoNickname != null && !kakaoNickname.isEmpty()) ?
-                kakaoNickname : generateRandomNickname();
-
-        String finalNickname = nickname;
-        int counter = 1;
-        while (userRepository.existsByNickname(finalNickname)) {
-            finalNickname = nickname + counter;
-            counter++;
-        }
-
-        User newUser = new User();
-        newUser.setKakaoId(kakaoId);
-        newUser.setNickname(finalNickname);
-        newUser.setFavTeam(favTeam);
-        newUser.setIsPrivate(false);
-        newUser.setCreatedAt(LocalDateTime.now());
-        newUser.setUpdatedAt(LocalDateTime.now());
-
-        if (properties != null && properties.get("profile_image") != null) {
-            newUser.setProfileImageUrl((String) properties.get("profile_image"));
-        }
-
-        return userRepository.save(newUser);
+        return Long.valueOf(kakaoUserInfo.get("id").toString());
     }
 
-    // === 공통 private 메서드들 ===
 
     // Authorization Code로 액세스 토큰 획득 (redirect-uri를 파라미터로 받음)
     private String getKakaoAccessToken(String authCode, String redirectUri) {
@@ -190,27 +142,6 @@ public class KakaoService {
         return response.getBody();
     }
 
-    // 테스트용 사용자 생성
-    @Transactional
-    public User createTestUser(String favTeam) {
-        Long testKakaoId = System.currentTimeMillis();
-
-        Optional<User> existing = userRepository.findByKakaoId(testKakaoId);
-        if (existing.isPresent()) {
-            return existing.get();
-        }
-
-        User testUser = new User();
-        testUser.setKakaoId(testKakaoId);
-        testUser.setNickname(generateRandomNickname());
-        testUser.setFavTeam(favTeam);
-        testUser.setIsPrivate(false);
-        testUser.setCreatedAt(LocalDateTime.now());
-        testUser.setUpdatedAt(LocalDateTime.now());
-
-        return userRepository.save(testUser);
-    }
-
     private String generateRandomNickname() {
         List<String> list = List.of(
                 "부끄러운 프로직관러", "귀여운 승리요정", "조용한 홈런탐지기",
@@ -225,7 +156,5 @@ public class KakaoService {
         return list.get(r.nextInt(list.size())) + " " + (1000 + r.nextInt(9000));
     }
 
-    public Long getKakaoIdFromToken(String accessToken) {
-        return kakaoClient.getKakaoId(accessToken);
-    }
+
 }
