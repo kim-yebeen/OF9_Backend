@@ -82,7 +82,7 @@ public class AuthController {
         );
         response.sendRedirect(kakaoAuthUrl);
     }
-    @GetMapping("/kakao/web-redirect-for-test")
+    @GetMapping("/web/kakao/callback")
     public ResponseEntity<String> kakaoWebRedirectForTest(@RequestParam String code) {
         String html = """
             <!DOCTYPE html>
