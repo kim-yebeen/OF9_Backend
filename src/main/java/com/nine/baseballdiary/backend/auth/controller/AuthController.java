@@ -57,7 +57,7 @@ public class AuthController {
     @PostMapping("/kakao/login")
     public ResponseEntity<ApiResponse<AuthResponse>> kakaoLogin(@RequestBody KakaoLoginRequestDto request, @RequestParam String platform) {
         try {
-            User user = kakaoService.processKakaoLogin(request.getCode(), request.getFavTeam(), platform);
+            User user = kakaoService.processKakaoLogin(request.getToken(), request.getFavTeam(), platform);
 
             String accessToken = jwtProvider.createAccessToken(user.getId().toString());
             String refreshToken = jwtProvider.createRefreshToken(user.getId().toString());
@@ -65,7 +65,7 @@ public class AuthController {
             AuthResponse authResponse = new AuthResponse(accessToken, refreshToken);
             return ResponseEntity.ok(ApiResponse.success("로그인에 성공했습니다.", authResponse));
         } catch (Exception e) {
-            log.error("카카오 로그인 처리 중 오류 발생. Code: {}", request.getCode(), e);
+            log.error("카카오 로그인 처리 중 오류 발생. Code: {}", request.getToken(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("LOGIN_ERROR", "로그인 처리 중 오류가 발생했습니다."));
         }

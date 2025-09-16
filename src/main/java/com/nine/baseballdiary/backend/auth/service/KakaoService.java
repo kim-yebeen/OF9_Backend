@@ -42,13 +42,18 @@ public class KakaoService {
 
 
     @Transactional
-    public User processKakaoLogin(String authCode, String favTeam, String platform) {
-        // 1. 플랫폼(app/web)에 맞는 redirect-uri 선택
-        String redirectUri = "web".equalsIgnoreCase(platform) ? kakaoWebRedirectUri : kakaoAppRedirectUri;
+    public User processKakaoLogin(String token, String favTeam, String platform) {
+        String kakaoAccessToken;
 
-        // 2. Authorization Code로 카카오 Access Token 획득
-        String kakaoAccessToken = getKakaoAccessToken(authCode, redirectUri);
-
+        // ✅ [수정] platform 값에 따라 분기 처리
+        if ("app".equalsIgnoreCase(platform)) {
+            // 앱의 경우, 전달받은 token이 이미 카카오 Access Token 입니다.
+            kakaoAccessToken = token;
+        } else {
+            // 웹의 경우, 전달받은 token(authCode)을 실제 카카오 Access Token으로 교환해야 합니다.
+            String redirectUri = kakaoWebRedirectUri; // 웹용 redirect uri 사용
+            kakaoAccessToken = getKakaoAccessToken(token, redirectUri);
+        }
         // 3. 카카오 Access Token으로 사용자 정보 조회
         Map<String, Object> kakaoUserInfo = getKakaoUserInfo(kakaoAccessToken);
 

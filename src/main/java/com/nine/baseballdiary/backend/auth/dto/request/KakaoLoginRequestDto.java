@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 public class KakaoLoginRequestDto {
-    private String code;
+    private String token;
     private String favTeam;
 
 }
