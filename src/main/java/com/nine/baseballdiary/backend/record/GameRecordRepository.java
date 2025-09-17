@@ -8,7 +8,7 @@ import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.List;
 
-public interface RecordRepository extends JpaRepository<Record, Long> {
+public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
     // 기존 메서드들 (차단 로직 미적용 - 하위 호환성)
     @Query(value = """
@@ -38,7 +38,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             u.nickname ASC
         LIMIT :limit OFFSET :offset
         """, nativeQuery = true)
-    List<Record> findAllFeedRecordsByPopularity(
+    List<GameRecord> findAllFeedRecordsByPopularity(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") String followingIds,
             @Param("date") String date,
@@ -48,7 +48,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     );
 
     @Query("""
-        SELECT r FROM Record r 
+        SELECT r FROM GameRecord r 
         JOIN Game g ON r.gameId = g.gameId 
         JOIN User u ON r.userId = u.id 
         WHERE (
@@ -60,7 +60,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
         AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
         ORDER BY r.createdAt DESC
         """)
-    List<Record> findAllFeedRecordsByLatest(
+    List<GameRecord> findAllFeedRecordsByLatest(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
             @Param("date") LocalDate date,
@@ -101,7 +101,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             u.nickname ASC
         LIMIT :limit OFFSET :offset
         """, nativeQuery = true)
-    List<Record> findAllFeedRecordsByPopularityWithBlockFilter(
+    List<GameRecord> findAllFeedRecordsByPopularityWithBlockFilter(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") String followingIds,
             @Param("date") String date,
@@ -111,7 +111,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     );
 
     @Query("""
-        SELECT r FROM Record r 
+        SELECT r FROM GameRecord r 
         JOIN Game g ON r.gameId = g.gameId 
         JOIN User u ON r.userId = u.id 
         WHERE (
@@ -128,7 +128,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
         )
         ORDER BY r.createdAt DESC
         """)
-    List<Record> findAllFeedRecordsByLatestWithBlockFilter(
+    List<GameRecord> findAllFeedRecordsByLatestWithBlockFilter(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
             @Param("date") LocalDate date,
@@ -160,7 +160,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             u.nickname ASC
         LIMIT :limit OFFSET :offset
         """, nativeQuery = true)
-    List<Record> findFollowingFeedRecordsByPopularity(
+    List<GameRecord> findFollowingFeedRecordsByPopularity(
             @Param("userIds") String userIds,
             @Param("date") String date,
             @Param("team") String team,
@@ -170,14 +170,14 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     // 팔로잉 피드 - 최신순 (기존)
     @Query("""
-        SELECT r FROM Record r 
+        SELECT r FROM GameRecord r 
         JOIN Game g ON r.gameId = g.gameId 
         WHERE r.userId IN :userIds
         AND g.date = :date
         AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
         ORDER BY r.createdAt DESC
         """)
-    List<Record> findFollowingFeedRecordsByLatest(
+    List<GameRecord> findFollowingFeedRecordsByLatest(
             @Param("userIds") List<Long> userIds,
             @Param("date") LocalDate date,
             @Param("team") String team,
@@ -213,7 +213,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
             u.nickname ASC
         LIMIT :limit OFFSET :offset
         """, nativeQuery = true)
-    List<Record> findFollowingFeedRecordsByPopularityWithBlockFilter(
+    List<GameRecord> findFollowingFeedRecordsByPopularityWithBlockFilter(
             @Param("userIds") String userIds,
             @Param("currentUserId") Long currentUserId,
             @Param("date") String date,
@@ -223,7 +223,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     );
 
     @Query("""
-        SELECT r FROM Record r 
+        SELECT r FROM GameRecord r 
         JOIN Game g ON r.gameId = g.gameId 
         WHERE r.userId IN :userIds
         AND g.date = :date
@@ -235,7 +235,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
         )
         ORDER BY r.createdAt DESC
         """)
-    List<Record> findFollowingFeedRecordsByLatestWithBlockFilter(
+    List<GameRecord> findFollowingFeedRecordsByLatestWithBlockFilter(
             @Param("userIds") List<Long> userIds,
             @Param("currentUserId") Long currentUserId,
             @Param("date") LocalDate date,
@@ -246,7 +246,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     // 게시글 수 계산
     long countByUserId(Long userId);
 
-    List<Record> findByUserId(Long userId);
+    List<GameRecord> findByUserId(Long userId);
 
     // 검색 기능 (기존)
     @Query(value = """
@@ -294,7 +294,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     )
     """,
             nativeQuery = true)
-    Page<Record> searchRecordsWithAccess(
+    Page<GameRecord> searchRecordsWithAccess(
             @Param("query") String query,
             @Param("currentUserId") Long currentUserId,
             @Param("followingUserIds") String followingUserIds,
@@ -357,7 +357,7 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     )
     """,
             nativeQuery = true)
-    Page<Record> searchRecordsWithAccessAndBlockFilter(
+    Page<GameRecord> searchRecordsWithAccessAndBlockFilter(
             @Param("query") String query,
             @Param("currentUserId") Long currentUserId,
             @Param("followingUserIds") String followingUserIds,

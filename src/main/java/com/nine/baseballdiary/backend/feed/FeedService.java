@@ -1,8 +1,8 @@
 package com.nine.baseballdiary.backend.feed;
 
 import com.nine.baseballdiary.backend.reaction.TopReactionsResponse;
-import com.nine.baseballdiary.backend.record.Record;
-import com.nine.baseballdiary.backend.record.RecordRepository;
+import com.nine.baseballdiary.backend.record.GameRecord;
+import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.reaction.ReactionService;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class FeedService {
 
-    private final RecordRepository recordRepo;
+    private final GameRecordRepository recordRepo;
     private final UserFollowRepository userFollowRepo;
     private final ReactionService reactionService;
     private final GameRepository gameRepo;
@@ -41,7 +41,7 @@ public class FeedService {
 
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
 
-        List<Record> records;
+        List<GameRecord> records;
 
         if ("latest".equals(request.getSortBy())) {
             // 최신순 - JPQL 사용
@@ -86,7 +86,7 @@ public class FeedService {
             return List.of();
         }
 
-        List<Record> records;
+        List<GameRecord> records;
 
         if ("latest".equals(request.getSortBy())) {
             // 최신순 - JPQL 사용
@@ -131,7 +131,7 @@ public class FeedService {
         return (team != null && !team.trim().isEmpty()) ? team.trim() : null;
     }
 
-    private FeedResponse convertToFeedResponse(Record record) {
+    private FeedResponse convertToFeedResponse(GameRecord record) {
         User user = userRepo.findById(record.getUserId()).orElseThrow();
         Game game = gameRepo.findById(record.getGameId()).orElseThrow();
 

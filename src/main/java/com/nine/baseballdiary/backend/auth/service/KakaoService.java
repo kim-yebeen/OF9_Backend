@@ -66,7 +66,6 @@ public class KakaoService {
         Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
         Optional<User> existingUser = userRepository.findByKakaoId(kakaoId);
 
-        // 이미 가입된 유저이면 바로 반환
         if (existingUser.isPresent()) {
             return existingUser.get();
         }
@@ -74,36 +73,35 @@ public class KakaoService {
         // --- 신규 유저 생성 ---
         Map<String, Object> kakaoAccount = (Map<String, Object>) kakaoUserInfo.get("kakao_account");
         Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-
-        String kakaoNickname = (String) profile.get("nickname");
         String kakaoProfileUrl = (String) profile.get("profile_image_url");
 
-        // 닉네임 중복 처리
-        String finalNickname = kakaoNickname;
-        if (finalNickname == null || finalNickname.isBlank() || userRepository.existsByNickname(finalNickname)) {
-            finalNickname = generateRandomNickname();
-        }
+        // ✅ [수정] 항상 중복되지 않는 랜덤 닉네임을 생성합니다.
+        String finalNickname = generateUniqueRandomNickname();
 
-        // User 엔티티 생성
+        // ✅ [개선] S3 경로에 userId 대신 고유한 kakaoId를 사용하여 DB 저장을 한 번만 하도록 최적화합니다.
+        // S3Service에 uploadImageFromUrl의 두 번째 파라미터를 Long타입으로 변경해야 합니다.
+        String ourS3Url = s3Service.uploadImageFromUrl(kakaoProfileUrl, kakaoId, "profiles");
+
         User newUser = User.builder()
                 .kakaoId(kakaoId)
                 .nickname(finalNickname)
+                .profileImageUrl(ourS3Url) // S3 URL을 처음부터 저장
                 .favTeam(favTeam)
                 .isPrivate(false)
                 .build();
 
-        // User를 먼저 한 번 저장하여 ID를 부여받습니다. (S3 경로에 userId를 사용하기 위함)
-        User savedUser = userRepository.save(newUser);
-
-        // ✅ 카카오 프로필 이미지를 우리 S3로 복사
-        if (kakaoProfileUrl != null) {
-            String ourS3Url = s3Service.uploadImageFromUrl(kakaoProfileUrl, savedUser.getId(), "profiles");
-            savedUser.setProfileImageUrl(ourS3Url);
-            return userRepository.save(savedUser); // 이미지 URL 업데이트 후 다시 저장
-        }
-
-        return savedUser;
+        return userRepository.save(newUser);
     }
+
+    // ✅ [신규] 중복되지 않는 랜덤 닉네임을 생성하는 헬퍼 메서드
+    private String generateUniqueRandomNickname() {
+        String nickname;
+        do {
+            nickname = generateRandomNickname();
+        } while (userRepository.existsByNickname(nickname));
+        return nickname;
+    }
+
 
     //카카오 액세스 토큰으로 카카오 ID만 조회
     public Long getKakaoIdFromToken(String accessToken) {

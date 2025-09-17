@@ -2,6 +2,7 @@ package com.nine.baseballdiary.backend.user.repository;
 
 import com.nine.baseballdiary.backend.user.entity.UserBlock;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -36,5 +37,9 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
     // 나를 차단한 사용자의 ID 목록 조회 (새로 추가)
     @Query("SELECT ub.blocker.id FROM UserBlock ub WHERE ub.blocked.id = :userId")
     Set<Long> findBlockerIdsByBlockedId(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("DELETE FROM UserBlock ub WHERE ub.blocker.id = :userId OR ub.blocked.id = :userId")
+    void deleteAllByBlockerIdOrBlockedId(@Param("userId") Long userId);
 
 }

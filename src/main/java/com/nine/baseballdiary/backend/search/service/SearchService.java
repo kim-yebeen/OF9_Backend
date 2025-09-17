@@ -2,11 +2,10 @@ package com.nine.baseballdiary.backend.search.service;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
-import com.nine.baseballdiary.backend.record.Record;
-import com.nine.baseballdiary.backend.record.RecordRepository;
+import com.nine.baseballdiary.backend.record.GameRecord;
+import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.search.dto.*;
 import com.nine.baseballdiary.backend.user.entity.User;
-import com.nine.baseballdiary.backend.user.entity.FollowRequest;
 import com.nine.baseballdiary.backend.user.entity.FollowRequestStatus;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
@@ -21,7 +20,6 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,7 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SearchService {
 
-    private final RecordRepository recordRepository;
+    private final GameRecordRepository recordRepository;
     private final UserRepository userRepository;
     private final GameRepository gameRepository;
     private final UserFollowRepository userFollowRepository;
@@ -91,7 +89,7 @@ public class SearchService {
 
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<Record> recordPage = recordRepository.searchRecordsWithAccessAndBlockFilter(
+        Page<GameRecord> recordPage = recordRepository.searchRecordsWithAccessAndBlockFilter(
                 query.toLowerCase(), userId, followingIdsStr, pageable);
 
         // ✅ DTO의 정적 메서드를 사용하여 변환 (코드가 훨씬 깔끔해짐)
@@ -199,7 +197,7 @@ public class SearchService {
     }
 
     // Record를 SearchRecordDto로 변환
-    private SearchRecordDto convertToSearchRecordDto(Record record) {
+    private SearchRecordDto convertToSearchRecordDto(GameRecord record) {
         // 게임 정보 조회
         Game game = gameRepository.findById(record.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + record.getGameId()));

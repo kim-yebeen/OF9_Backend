@@ -2,7 +2,7 @@ package com.nine.baseballdiary.backend.search.dto;
 
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.user.entity.User;
-import com.nine.baseballdiary.backend.record.Record;
+import com.nine.baseballdiary.backend.record.GameRecord;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,7 +37,7 @@ public class SearchRecordDto {
     private List<String> mediaUrls;
     private String createdAt;
 
-    public static SearchRecordDto from(Record record, Game game, User author) {
+    public static SearchRecordDto from(GameRecord record, Game game, User author) {
         return SearchRecordDto.builder()
                 .recordId(record.getRecordId())
                 .authorId(author.getId())

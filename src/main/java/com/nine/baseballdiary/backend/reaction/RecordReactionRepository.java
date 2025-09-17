@@ -50,6 +50,10 @@ public interface RecordReactionRepository extends JpaRepository<RecordReaction, 
             ))
         """)
     void deleteByBothUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+
+    @Modifying
+    @Query("DELETE FROM RecordReaction rr WHERE rr.userId = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
 }
 
 

@@ -1,8 +1,10 @@
 package com.nine.baseballdiary.backend.user.service;
 
 import com.nine.baseballdiary.backend.Notifiation.NotificationService;
+import com.nine.baseballdiary.backend.S3.S3Service;
 import com.nine.baseballdiary.backend.reaction.RecordReactionRepository;
-import com.nine.baseballdiary.backend.record.RecordRepository;
+import com.nine.baseballdiary.backend.record.GameRecord;
+import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import com.nine.baseballdiary.backend.user.dto.*;
 import com.nine.baseballdiary.backend.user.entity.*;
@@ -26,11 +28,12 @@ import java.util.stream.Collectors;
 public class UserService {
     private final UserRepository userRepo;
     private final UserFollowRepository followRepo;
-    private final RecordRepository recordRepo;
+    private final GameRecordRepository recordRepo;
     private final FollowRequestRepository reqRepo;
     private final NotificationService notificationService;
     private final UserBlockRepository userBlockRepo;
     private final RecordReactionRepository recordReactionRepo;
+    private final S3Service s3Service;
 
     // ✅ 기존의 간단한 사용자 검색 메서드 (수정 완료)
     // 이 메서드는 UserDto를 반환하며, 페이징이 필요 없는 간단한 검색에 사용됩니다.
@@ -268,9 +271,30 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long userId) {
-        userRepo.deleteById(userId);
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+
+        // ✅ List<Record> -> List<GameRecord>로 타입 변경
+        List<GameRecord> userRecords = recordRepo.findByUserId(userId);
+
+        userRecords.forEach(record -> {
+            if (record.getMediaUrls() != null) {
+                record.getMediaUrls().forEach(s3Service::deleteFile);
+            }
+        });
+
+        s3Service.deleteFile(user.getProfileImageUrl());
+
+        recordReactionRepo.deleteAllByUserId(userId);
+        recordRepo.deleteAll(userRecords); // ✅ deleteAll(List<GameRecord>) 호출
+        reqRepo.deleteAllByRequesterIdOrTargetId(userId);
+        userBlockRepo.deleteAllByBlockerIdOrBlockedId(userId);
+        followRepo.deleteAllByFollowerIdOrFolloweeId(userId);
+
+        userRepo.delete(user);
     }
 
+    // ✅ [신규] 누락되었던 isNicknameAvailable 메서드를 다시 추가합니다.
     public boolean isNicknameAvailable(String nickname) {
         if (nickname == null || nickname.trim().isEmpty() || nickname.length() > 15) {
             return false;

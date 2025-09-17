@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 @Service
 @RequiredArgsConstructor
 public class RecordService {
-    private final RecordRepository recordRepo;
+    private final GameRecordRepository recordRepo;
     private final GameRepository   gameRepo;
     private final UserRepository   userRepo;
     private final UserFollowRepository userflRepo;
@@ -59,7 +59,7 @@ public class RecordService {
         String result = calculateResult(user.getFavTeam(), game);
 
         // 4) Record 엔티티 빌드 (모든 정보 포함)
-        Record record = Record.builder()
+        GameRecord record = GameRecord.builder()
                 .userId(userId)
                 .gameId(req.getGameId())
                 .stadium(req.getStadium())
@@ -75,7 +75,7 @@ public class RecordService {
                 .build();
 
         // 5) 저장
-        Record savedRecord = recordRepo.save(record);
+        GameRecord savedRecord = recordRepo.save(record);
 
         notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
 
@@ -87,7 +87,7 @@ public class RecordService {
     // 레코드 수정
     @Transactional
     public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
-        Record rec = recordRepo.findById(recordId)
+        GameRecord rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
@@ -105,7 +105,7 @@ public class RecordService {
     // 2) 피드에서 클릭 시 상세 조회
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long recordId) {
-        Record rec = recordRepo.findById(recordId)
+        GameRecord rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
         Game game = gameRepo.findById(rec.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
@@ -248,7 +248,7 @@ public class RecordService {
     //레코드 삭제
     @Transactional
     public void deleteRecord(Long currentUserId, Long recordId) {
-        Record record = recordRepo.findById(recordId)
+        GameRecord record = recordRepo.findById(recordId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 레코드"));
         if (!record.getUserId().equals(currentUserId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");

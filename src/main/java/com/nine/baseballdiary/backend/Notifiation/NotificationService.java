@@ -1,15 +1,12 @@
 package com.nine.baseballdiary.backend.Notifiation;
 
-import com.nine.baseballdiary.backend.record.Record;
-import com.nine.baseballdiary.backend.record.RecordRepository;
+import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -26,7 +23,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepo;
     private final UserRepository userRepo;
     private final UserFollowRepository userFollowRepo;
-    private final RecordRepository recordRepo;
+    private final GameRecordRepository recordRepo;
 
     // 공감 매핑 정보
     private static final Map<Integer, String> EMOTION_MAP = Map.of(

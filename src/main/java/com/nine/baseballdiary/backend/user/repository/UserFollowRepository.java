@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
 
 import java.util.List;
 import java.util.Set;
@@ -42,4 +43,7 @@ public interface UserFollowRepository extends JpaRepository<UserFollow, Long> {
     @Query("SELECT uf.followeeId.id FROM UserFollow uf WHERE uf.followerId.id = :currentUserId AND uf.followeeId.id IN :targetUserIds")
     Set<Long> findFolloweeIdsByFollowerIdAndInTargetUserIds(@Param("currentUserId") Long currentUserId, @Param("targetUserIds") List<Long> targetUserIds);
 
+    @Modifying
+    @Query("DELETE FROM UserFollow uf WHERE uf.followerId.id = :userId OR uf.followeeId.id = :userId")
+    void deleteAllByFollowerIdOrFolloweeId(@Param("userId") Long userId);
 }

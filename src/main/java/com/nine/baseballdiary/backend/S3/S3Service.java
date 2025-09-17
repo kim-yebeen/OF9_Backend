@@ -65,4 +65,20 @@ public class S3Service {
             return null; // 실패 시 null 반환 또는 예외 처리
         }
     }
+
+    public void deleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+        try {
+            // S3 URL에서 객체 키(파일 경로+이름)를 추출합니다.
+            URL url = new URL(fileUrl);
+            String objectKey = url.getPath().substring(1); // URL의 첫 '/'를 제거합니다.
+
+            amazonS3.deleteObject(bucket, objectKey);
+            log.info("S3 파일 삭제 성공: {}", objectKey);
+        } catch (Exception e) {
+            log.error("S3 파일 삭제 실패: {}", fileUrl, e);
+        }
+    }
 }
