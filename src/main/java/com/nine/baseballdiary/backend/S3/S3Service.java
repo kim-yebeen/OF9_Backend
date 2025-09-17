@@ -43,7 +43,7 @@ public class S3Service {
         return new PresignedUrlResponse(url.toString(), finalUrl);
     }
 
-    public String uploadImageFromUrl(String imageUrl, Long userId, String domain) {
+    public String uploadImageFromUrl(String imageUrl, Long kakaoId, String domain) {
         if (imageUrl == null || imageUrl.isBlank()) {
             return null;
         }
@@ -52,17 +52,17 @@ public class S3Service {
             URL url = new URL(imageUrl);
             try (InputStream inputStream = url.openStream()) {
                 ObjectMetadata metadata = new ObjectMetadata();
-                // metadata.setContentType("image/jpeg"); // 필요시 콘텐츠 타입 설정
 
                 String uniqueFileName = UUID.randomUUID().toString() + ".jpg";
-                objectKey = String.format("%s/user-%d/%s", domain, userId, uniqueFileName);
+                // ✅ S3 경로에 userId 대신 kakaoId를 사용합니다.
+                objectKey = String.format("%s/kakao-%d/%s", domain, kakaoId, uniqueFileName);
 
                 amazonS3.putObject(new PutObjectRequest(bucket, objectKey, inputStream, metadata));
             }
             return amazonS3.getUrl(bucket, objectKey).toString();
         } catch (IOException e) {
             log.error("URL로부터 S3에 이미지 업로드 실패: {}", imageUrl, e);
-            return null; // 실패 시 null 반환 또는 예외 처리
+            return null;
         }
     }
 

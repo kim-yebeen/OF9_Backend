@@ -75,17 +75,16 @@ public class KakaoService {
         Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
         String kakaoProfileUrl = (String) profile.get("profile_image_url");
 
-        // ✅ [수정] 항상 중복되지 않는 랜덤 닉네임을 생성합니다.
         String finalNickname = generateUniqueRandomNickname();
 
-        // ✅ [개선] S3 경로에 userId 대신 고유한 kakaoId를 사용하여 DB 저장을 한 번만 하도록 최적화합니다.
-        // S3Service에 uploadImageFromUrl의 두 번째 파라미터를 Long타입으로 변경해야 합니다.
+        // ✅ [개선] S3에 이미지를 먼저 업로드합니다. (kakaoId 사용)
         String ourS3Url = s3Service.uploadImageFromUrl(kakaoProfileUrl, kakaoId, "profiles");
 
+        // ✅ [개선] 모든 정보가 준비된 후 User 엔티티를 생성하고 DB에 한 번만 저장합니다.
         User newUser = User.builder()
                 .kakaoId(kakaoId)
                 .nickname(finalNickname)
-                .profileImageUrl(ourS3Url) // S3 URL을 처음부터 저장
+                .profileImageUrl(ourS3Url)
                 .favTeam(favTeam)
                 .isPrivate(false)
                 .build();
