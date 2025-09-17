@@ -32,7 +32,7 @@ public interface RecordReactionRepository extends JpaRepository<RecordReaction, 
         DELETE FROM RecordReaction rr 
         WHERE rr.userId = :reactorUserId 
         AND rr.recordId IN (
-            SELECT r.recordId FROM Record r WHERE r.userId = :recordOwnerId
+            SELECT r.recordId FROM GameRecord r WHERE r.userId = :recordOwnerId
         )
         """)
     void deleteByReactorAndRecordOwner(@Param("reactorUserId") Long reactorUserId,
@@ -43,10 +43,10 @@ public interface RecordReactionRepository extends JpaRepository<RecordReaction, 
     @Query("""
         DELETE FROM RecordReaction rr 
         WHERE (rr.userId = :userId1 AND rr.recordId IN (
-                SELECT r.recordId FROM Record r WHERE r.userId = :userId2
+                SELECT r.recordId FROM GameRecord r WHERE r.userId = :userId2
             ))
         OR (rr.userId = :userId2 AND rr.recordId IN (
-                SELECT r.recordId FROM Record r WHERE r.userId = :userId1
+                SELECT r.recordId FROM GameRecord r WHERE r.userId = :userId1
             ))
         """)
     void deleteByBothUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
