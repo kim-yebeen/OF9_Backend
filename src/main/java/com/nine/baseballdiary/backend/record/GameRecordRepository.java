@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
@@ -363,4 +364,19 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("followingUserIds") String followingUserIds,
             Pageable pageable
     );
+
+    // 특정 유저의 특정 월 직관 기록 조회
+    @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game g WHERE gr.userId = :userId AND g.date BETWEEN :startDate AND :endDate")
+    List<GameRecord> findByUserIdAndGameDateBetween(@Param("userId") Long userId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    // 특정 유저의 응원팀 직관 기록 수
+    @Query("SELECT count(gr) FROM GameRecord gr JOIN gr.game g WHERE gr.userId = :userId AND (g.homeTeam = :favTeam OR g.awayTeam = :favTeam)")
+    long countByUserIdAndFavTeam(@Param("userId") Long userId, @Param("favTeam") String favTeam);
+
+    // 특정 유저의 승/패/무 기록 수
+    long countByUserIdAndResult(Long userId, String result);
+
+    // 특정 유저가 방문한 모든 구장 이름 (중복 제거)
+    @Query("SELECT DISTINCT gr.stadium FROM GameRecord gr WHERE gr.userId = :userId")
+    Set<String> findDistinctStadiumsByUserId(@Param("userId") Long userId);
 }

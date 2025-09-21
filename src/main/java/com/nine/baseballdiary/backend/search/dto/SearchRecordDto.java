@@ -9,13 +9,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
 @Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class SearchRecordDto {
     private Long recordId;
     private Long authorId;
@@ -41,22 +40,22 @@ public class SearchRecordDto {
         return SearchRecordDto.builder()
                 .recordId(record.getRecordId())
                 .authorId(author.getId())
-                .authorNickname(author.getNickname())
-                .authorProfileImage(author.getProfileImageUrl())
-                .authorFavTeam(author.getFavTeam())
+                .authorNickname(author.getNickname() != null ? author.getNickname() : "알 수 없음")
+                .authorProfileImage(author.getProfileImageUrl()) // 프로필 이미지는 null일 수 있음
+                .authorFavTeam(author.getFavTeam() != null ? author.getFavTeam() : "")
                 .gameDate(game.getDate().format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 (E)요일", Locale.KOREAN)))
-                .gameTime(game.getTime().format(DateTimeFormatter.ofPattern("H:mm")))
+                .gameTime(game.getTime() != null ? game.getTime().format(DateTimeFormatter.ofPattern("H:mm")) : "")
                 .homeTeam(convertTeamName(game.getHomeTeam()))
                 .awayTeam(convertTeamName(game.getAwayTeam()))
-                .homeScore(game.getHomeScore())
-                .awayScore(game.getAwayScore())
+                .homeScore(game.getHomeScore() != null ? game.getHomeScore() : 0)
+                .awayScore(game.getAwayScore() != null ? game.getAwayScore() : 0)
                 .stadium(convertStadiumName(game.getStadium()))
                 .emotionCode(record.getEmotionCode())
                 .emotionLabel(convertEmotionLabel(record.getEmotionCode()))
-                .comment(record.getComment())
-                .longContent(record.getLongContent())
-                .result(record.getResult())
-                .mediaUrls(record.getMediaUrls())
+                .comment(record.getComment() != null ? record.getComment() : "")
+                .longContent(record.getLongContent() != null ? record.getLongContent() : "")
+                .result(record.getResult() != null ? record.getResult() : "")
+                .mediaUrls(record.getMediaUrls() != null ? record.getMediaUrls() : Collections.emptyList())
                 .createdAt(record.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
                 .build();
     }

@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.game.Game;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,6 +18,11 @@ public class GameRecord {
 
     @Column(nullable = false)
     private Long userId;             // 유저 ID
+
+    // ✅ [추가] Game 엔티티와의 연관 관계 매핑
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "game_id", insertable = false, updatable = false)
+    private Game game;
 
     @Column(nullable = false)
     private String gameId;           // 경기 ID

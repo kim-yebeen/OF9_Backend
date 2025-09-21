@@ -9,8 +9,6 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class SearchUserDto {
     private Long userId;
     private String nickname;
@@ -22,9 +20,9 @@ public class SearchUserDto {
     public static SearchUserDto of(User user, FollowStatus followStatus) {
         return SearchUserDto.builder()
                 .userId(user.getId())
-                .nickname(user.getNickname())
-                .profileImageUrl(user.getProfileImageUrl())
-                .favTeam(user.getFavTeam())
+                .nickname(user.getNickname() != null ? user.getNickname() : "알 수 없음")
+                .profileImageUrl(user.getProfileImageUrl()) // 프로필 이미지는 null일 수 있음
+                .favTeam(user.getFavTeam() != null ? user.getFavTeam() : "")
                 .isPrivate(user.getIsPrivate())
                 .followStatus(followStatus)
                 .build();
