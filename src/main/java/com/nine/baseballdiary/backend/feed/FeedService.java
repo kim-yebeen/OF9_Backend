@@ -133,7 +133,7 @@ public class FeedService {
 
     private FeedResponse convertToFeedResponse(GameRecord record) {
         User user = userRepo.findById(record.getUserId()).orElseThrow();
-        Game game = gameRepo.findById(record.getGameId()).orElseThrow();
+        Game game = gameRepo.findById(record.getGame().getGameId()).orElseThrow();
 
         // 상위 3개 공감 스티커 조회
         TopReactionsResponse topReactions = reactionService.getTopReactions(record.getRecordId());

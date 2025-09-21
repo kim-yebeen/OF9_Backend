@@ -61,7 +61,7 @@ public class RecordService {
         // 4) Record 엔티티 빌드 (모든 정보 포함)
         GameRecord record = GameRecord.builder()
                 .userId(userId)
-                .gameId(req.getGameId())
+                .game(game)
                 .stadium(req.getStadium())
                 .seatInfo(req.getSeatInfo())
                 .emotionCode(req.getEmotionCode())
@@ -107,9 +107,10 @@ public class RecordService {
     public RecordDetailResponse getRecordDetail(Long recordId) {
         GameRecord rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
-        Game game = gameRepo.findById(rec.getGameId())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임 ID: " + rec.getGameId()));
-
+        Game game = rec.getGame();
+        if (game == null) {
+            throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
+        }
         // 1. record에서 친구 ID 목록 (List<Long>)을 가져옵니다.
         List<Long> companionIds = rec.getCompanions();
         List<UserDto> companionDetails = List.of(); // 기본값은 빈 리스트
@@ -163,8 +164,7 @@ public class RecordService {
                 .filter(r->r.getMediaUrls()!=null && !r.getMediaUrls().isEmpty())
                 .map(r->{
                     // getById 대신 findById 사용
-                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
-                    // 기존 (mediaUrls.get(0)을 직접 넘김)
+                    Game g = r.getGame();
                     return new RecordFeedResponse(
                             r.getRecordId(),
                             g.getDate().format(FEED_FMT),
