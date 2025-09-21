@@ -215,5 +215,5 @@ public class SearchService {
         return FollowStatus.NOT_FOLLOWING;
     }
 
-    
+
 }

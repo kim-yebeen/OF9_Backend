@@ -31,7 +31,6 @@ public class ReportService {
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final UserFollowRepository userFollowRepository;
-
     public EmotionSummaryDto getEmotionSummary(Long userId, int year, int month) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
@@ -41,19 +40,21 @@ public class ReportService {
         Map<Integer, Long> emotionCounts = monthlyRecords.stream()
                 .collect(Collectors.groupingBy(GameRecord::getEmotionCode, Collectors.counting()));
 
+        // Top 3 감정 DTO 생성
         List<EmotionSummaryDto.EmotionCount> top3 = emotionCounts.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
                 .limit(3)
                 .map(entry -> new EmotionSummaryDto.EmotionCount(
                         convertEmotionToNoun(entry.getKey()),
-                        entry.getValue().intValue(),
+                        entry.getValue().intValue(), // ✅ Long -> int 타입 변환
                         entry.getKey()))
                 .collect(Collectors.toList());
 
+        // 전체 감정 기록 DTO 생성
         List<EmotionSummaryDto.EmotionRecord> all = emotionCounts.entrySet().stream()
                 .map(entry -> new EmotionSummaryDto.EmotionRecord(
                         convertEmotionLabel(entry.getKey()),
-                        entry.getValue().intValue(),
+                        entry.getValue().intValue(), // ✅ Long -> int 타입 변환
                         entry.getKey()))
                 .collect(Collectors.toList());
 

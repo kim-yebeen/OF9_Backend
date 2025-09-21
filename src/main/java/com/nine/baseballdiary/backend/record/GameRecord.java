@@ -21,11 +21,9 @@ public class GameRecord {
 
     // ✅ [추가] Game 엔티티와의 연관 관계 매핑
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "game_id", insertable = false, updatable = false)
+    @JoinColumn(name = "game_id")
     private Game game;
 
-    @Column(nullable = false)
-    private String gameId;           // 경기 ID
 
     private String seatInfo;         // 좌석 정보
     private String stadium;   // 티켓 이미지 URL
