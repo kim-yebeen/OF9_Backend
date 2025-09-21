@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 public class Badge {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private long id;
 
     @Column(nullable = false)
     private String category;
