@@ -4,7 +4,6 @@ import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -15,87 +14,59 @@ public class GameRecord {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long recordId;           // 레코드 ID
+    private Long recordId;
 
+    // --- User 관계 수정 ---
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    @JoinColumn(name = "user_id") // 실제 DB 컬럼의 주인
     private User user;
 
-    @Column(nullable = false)
-    private Long userId;             // 유저 ID
+    @Column(name = "user_id", insertable = false, updatable = false) // DB에 쓰기 작업은 하지 않음
+    private Long userId;
 
-    // ✅ [추가] Game 엔티티와의 연관 관계 매핑
+    // --- Game 관계 수정 ---
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "game_id", insertable = false, updatable = false)
+    @JoinColumn(name = "game_id") // 실제 DB 컬럼의 주인
     private Game game;
 
-    @Column(name = "game_id", nullable = false)
+    @Column(name = "game_id", insertable = false, updatable = false) // DB에 쓰기 작업은 하지 않음
     private String gameId;
 
-
-    private String seatInfo;         // 좌석 정보
-    private String stadium;   // 티켓 이미지 URL
-    private Integer emotionCode;     // 감정 코드
-    private String comment;          // 한줄평
+    // --- 나머지 필드는 기존과 동일 ---
+    private String seatInfo;
+    private String stadium;
+    private Integer emotionCode;
+    private String comment;
     @Column(columnDefinition = "TEXT")
-    private String longContent;      // 긴 본문 텍스트
+    private String longContent;
+    private String bestPlayer;
 
-    private String bestPlayer;       // 베스트 플레이어
-
-    // 함께 한 친구들
     @ElementCollection
-    @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"),
-            foreignKey = @ForeignKey(
-                    name = "fk_record_companions_record_id"
-            ))
+    @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "companion_id")
-    private List<Long> companions; // 함께 한 친구들
+    private List<Long> companions;
 
     @ElementCollection
-    @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"),
-            foreignKey = @ForeignKey(
-                    name = "fk_record_food_tags_record_id"
-            ))
+    @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "tag")
-    private List<String> foodTags;   // 음식 태그
-
-    /*@ElementCollection
-    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
-    @Column(name = "url")
-    private List<String> mediaUrls;  // 미디어 URL 리스트*/
-
-    /*@Column(name = "media_urls", columnDefinition = "TEXT[]")
-    private List<String> mediaUrls;*/
+    private List<String> foodTags;
 
     @ElementCollection
-    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"),
-            foreignKey = @ForeignKey(
-                    name = "fk_record_media_urls_record_id"
-            )
-    )
+    @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "url", columnDefinition = "TEXT")
     private List<String> mediaUrls;
 
-    private String result;           // 경기 결과 (WIN/LOSE/DRAW)
+    private String result;
 
-    private LocalDateTime createdAt;  // 생성일 수동 설정
-    private LocalDateTime updatedAt;  // 수정일 수동 설정
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    // Getters, Setters
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
-    // 생성 시, createdAt 자동 설정
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        this.updatedAt = this.createdAt;  // 처음 생성 시, createdAt과 동일하게 설정
+        this.updatedAt = this.createdAt;
     }
 
-    // 업데이트 시, updatedAt 자동 설정
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
