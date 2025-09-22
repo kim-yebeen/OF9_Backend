@@ -34,8 +34,6 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    // [복원] 원래 의도에 맞는 스케줄 활성화 (테스트용 cron은 주석 처리)
-    // @Scheduled(cron = "0 02 02 * * *", zone = "Asia/Seoul") // 테스트용
     //@Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
     public void dailyUpdate11() {
         logger.info("일일 업데이트 시작 (오전 11시) - " + LocalDate.now());
@@ -54,7 +52,7 @@ public class GameScheduleService {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 50 02 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 03 03 * * *", zone = "Asia/Seoul")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (오후 23시) - " + LocalDate.now());
         crawlSchedule(false);
@@ -66,7 +64,6 @@ public class GameScheduleService {
             logger.info("크롤링 시작 - fullCrawl: " + fullCrawl);
 
             WebDriverManager.chromedriver().setup();
-            // [유지] 안정적인 최신 ChromeOptions 설정 사용
             ChromeOptions options = new ChromeOptions();
             options.addArguments("--headless", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1920,1080");
             options.addArguments("--disable-web-security", "--disable-features=VizDisplayCompositor", "--disable-extensions", "--disable-plugins");
@@ -81,10 +78,21 @@ public class GameScheduleService {
             driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(300));
             driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(30));
 
-            // ... 페이지 로드 재시도 로직 (생략) ...
-            driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
+            boolean pageLoaded = false;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
+                    logger.info("페이지 로드 성공 (시도 " + attempt + "/3)");
+                    pageLoaded = true;
+                    break;
+                } catch (TimeoutException e) {
+                    logger.warning("페이지 로드 타임아웃 (시도 " + attempt + "/3): " + e.getMessage());
+                    if (attempt == 3) throw new RuntimeException("페이지 로드 3회 실패", e);
+                    Thread.sleep(5000);
+                }
+            }
+            if (!pageLoaded) throw new RuntimeException("페이지 로드 최종 실패");
 
-            // [수정] 저사양 서버에서도 충분히 기다리도록 대기 시간 180초로 설정
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(180));
 
             String year = driver.findElement(By.id("ddlYear")).getAttribute("value");
@@ -140,7 +148,6 @@ public class GameScheduleService {
                         String status = "SCHEDULED";
                         String rowText = row.getText();
 
-                        // [개선] 더 안정적인 경기 취소 로직
                         boolean isCanceledByCss = !row.findElements(By.cssSelector("td.cancel, span.cancel")).isEmpty();
 
                         if (isCanceledByCss || rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
@@ -152,14 +159,12 @@ public class GameScheduleService {
                                 String right = vsParts[1].trim();
                                 boolean hasScore = false;
 
-                                // [수정] 옛날 코드의 정확한 정규식 파싱 로직 복원
-                                // 원정팀 (왼쪽, "팀이름 점수" 형식)
                                 Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d*)");
                                 Matcher awayMatcher = awayPattern.matcher(left);
                                 if (awayMatcher.find()) {
                                     awayName = awayMatcher.group(1).trim();
                                     String scoreStr = awayMatcher.group(2);
-                                    if (!scoreStr.isEmpty()) {
+                                    if (scoreStr != null && !scoreStr.isEmpty()) {
                                         awayScore = Integer.parseInt(scoreStr);
                                         hasScore = true;
                                     }
@@ -167,7 +172,6 @@ public class GameScheduleService {
                                     awayName = left;
                                 }
 
-                                // 홈팀 (오른쪽, "점수 팀이름" 형식)
                                 Pattern homePattern = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
                                 Matcher homeMatcher = homePattern.matcher(right);
                                 if (homeMatcher.find()) {
@@ -181,7 +185,36 @@ public class GameScheduleService {
                             }
                         }
 
-                        // ... 이후 데이터 저장 로직 (생략, 기존 코드와 동일) ...
+                        String awayCode = getTeamCode(awayName);
+                        String homeCode = getTeamCode(homeName);
+                        if ("XX".equals(awayCode) || "XX".equals(homeCode)) continue;
+
+                        String matchKey = dbDateStr + homeCode + awayCode;
+                        int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
+                        doubleHeaderCounter.put(matchKey, gameNumber + 1);
+                        String gameId = matchKey + gameNumber;
+
+                        Game game = new Game();
+                        game.setGameId(gameId);
+                        game.setDate(gameDate);
+                        game.setTime(startTime);
+                        game.setStadium(stadium);
+                        game.setAwayTeam(awayName);
+                        game.setHomeTeam(homeName);
+                        game.setAwayScore(awayScore);
+                        game.setHomeScore(homeScore);
+                        game.setStatus(status);
+
+                        if (fullCrawl) {
+                            gameService.saveOrUpdateSchedule(game);
+                        } else {
+                            Game existingGame = gameService.findById(gameId).orElse(null);
+                            if (existingGame == null) {
+                                gameService.saveGame(game);
+                            } else if (shouldUpdateGame(existingGame, game)) {
+                                gameService.updateResult(game);
+                            }
+                        }
                     }
                     logger.info(monthVal + "월 크롤링 완료 - 처리된 게임 수: " + rows.size());
                 } catch (Exception e) {
@@ -193,12 +226,18 @@ public class GameScheduleService {
             logger.severe("크롤링 중 심각한 오류 발생: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            if (driver != null) driver.quit();
+            if (driver != null) {
+                try {
+                    driver.quit();
+                    logger.info("WebDriver 정상 종료");
+                } catch (Exception e) {
+                    logger.warning("WebDriver 종료 중 오류: " + e.getMessage());
+                }
+            }
         }
         logger.info("크롤링 작업 완료");
     }
 
-    // [개선] 게임 상태 결정 로직 명확화
     private String determineGameStatus(LocalDate gameDate, LocalDate today, boolean hasScore, String rowText, boolean hasHighlight) {
         if (rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
             return "CANCELED";
