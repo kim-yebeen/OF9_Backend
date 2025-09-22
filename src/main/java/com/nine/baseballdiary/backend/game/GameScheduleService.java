@@ -1,10 +1,7 @@
 package com.nine.baseballdiary.backend.game;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
-import org.openqa.selenium.By;
-import org.openqa.selenium.TimeoutException;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -38,42 +35,123 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    //매주 월요일 새벽 1시 전체 크롤링
-    @Scheduled(cron = "0 41 11 * * *") //@Scheduled(cron = "0 23 16 * ?")
-    public void weeklyInitialCrawl() {
+    // GitHub Actions 배포 후 크롤링 실행 (UTC 11:48)
+    @Scheduled(cron = "0 56 08 * * *")
+    public void dailyFullCrawl() {
+        logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
     }
-    //매일 아침 11시 해당 월 크롤링
-    //@Scheduled(cron = "0 0 18 * * *")
+
+    // 매일 오전 11시 해당 월 크롤링
+    @Scheduled(cron = "0 0 11 * * *")
     public void dailyUpdate11() {
+        logger.info("일일 업데이트 시작 (11시) - " + LocalDate.now());
         crawlSchedule(false);
     }
-    //매일 21시 해당 월 크롤링
-    //@Scheduled(cron = "0 0 21 * * *")
+
+    // 매일 21시 해당 월 크롤링
+    @Scheduled(cron = "0 0 21 * * *")
     public void dailyUpdate21() {
+        logger.info("일일 업데이트 시작 (21시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
-    //@Scheduled(cron = "0 0 22 * * *")
+    // 매일 22시 해당 월 크롤링
+    @Scheduled(cron = "0 0 22 * * *")
     public void dailyUpdate22() {
+        logger.info("일일 업데이트 시작 (22시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
-    //@Scheduled(cron = "0 0 23 * * *")
+    // 매일 23시 해당 월 크롤링
+    @Scheduled(cron = "0 0 23 * * *")
     public void dailyUpdate23() {
+        logger.info("일일 업데이트 시작 (23시) - " + LocalDate.now());
         crawlSchedule(false);
+    }
+
+    // 수동 실행용 메서드 (테스트나 즉시 실행용)
+    public void manualCrawl() {
+        logger.info("수동 크롤링 실행 - " + LocalDate.now());
+        crawlSchedule(true);
     }
 
     public void crawlSchedule(boolean fullCrawl) {
         WebDriver driver = null;
         try {
+            logger.info("크롤링 시작 - fullCrawl: " + fullCrawl);
+
             WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
-            options.addArguments("--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage", "--window-size=1920,1080");
+
+            // Docker 환경용 기본 옵션들
+            options.addArguments("--headless");
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+            options.addArguments("--disable-gpu");
+            options.addArguments("--window-size=1920,1080");
+
+            // 안정성 개선 옵션들
+            options.addArguments("--disable-web-security");
+            options.addArguments("--disable-features=VizDisplayCompositor");
+            options.addArguments("--disable-extensions");
+            options.addArguments("--disable-plugins");
+            options.addArguments("--disable-images");
+            options.addArguments("--disable-javascript");
+            options.addArguments("--disable-dev-tools");
+            options.addArguments("--disable-logging");
+            options.addArguments("--log-level=3");
+            options.addArguments("--silent");
+
+            // CDP 경고 해결용
+            options.addArguments("--remote-debugging-port=0");
+            options.addArguments("--disable-blink-features=AutomationControlled");
+
+            // 메모리 최적화
+            options.addArguments("--memory-pressure-off");
+            options.addArguments("--max_old_space_size=4096");
+
+            // User Agent 설정
+            options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+            // 페이지 로드 전략 - 빠른 로드
+            options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+
             driver = new ChromeDriver(options);
 
-            driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+            // 타임아웃 설정 강화
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(120)); // 2분으로 증가
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
+
+            logger.info("페이지 로드 시작: https://www.koreabaseball.com/Schedule/Schedule.aspx");
+
+            // 재시도 로직 추가
+            boolean pageLoaded = false;
+            for (int attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
+                    logger.info("페이지 로드 성공 (시도 " + attempt + "/3)");
+                    pageLoaded = true;
+                    break;
+                } catch (TimeoutException e) {
+                    logger.warning("페이지 로드 타임아웃 (시도 " + attempt + "/3): " + e.getMessage());
+                    if (attempt == 3) {
+                        throw new RuntimeException("페이지 로드 3회 실패", e);
+                    }
+                    // 5초 대기 후 재시도
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
+            if (!pageLoaded) {
+                throw new RuntimeException("페이지 로드 실패");
+            }
+
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 
             String year = driver.findElement(By.id("ddlYear")).getAttribute("value");
             String currentMonth = driver.findElement(By.id("ddlMonth")).getAttribute("value");
@@ -81,10 +159,13 @@ public class GameScheduleService {
             int endMonth   = fullCrawl ? 12 : Integer.parseInt(currentMonth);
 
             LocalDate today = LocalDate.now();
+            logger.info("크롤링 범위: " + startMonth + "월 ~ " + endMonth + "월");
 
             for (int m = startMonth; m <= endMonth; m++) {
                 String monthVal = String.format("%02d", m);
                 try {
+                    logger.info(monthVal + "월 크롤링 시작");
+
                     // 월 선택
                     new Select(driver.findElement(By.id("ddlMonth"))).selectByValue(monthVal);
 
@@ -96,7 +177,7 @@ public class GameScheduleService {
                         ));
                     } catch (TimeoutException | NoSuchElementException e) {
                         // 데이터가 없는 월은 스킵
-                        logger.info(monthVal + "월에 스케줄 데이터가 없어 건너뜁니다.");
+                        logger.info(monthVal + "월에 스케줄 데이터가 없어 건너뜀");
                         continue;
                     }
 
@@ -104,6 +185,7 @@ public class GameScheduleService {
                     String currentDayRaw = "";
                     Map<String, Integer> doubleHeaderCounter = new HashMap<>();
 
+                    int processedGames = 0;
                     for (WebElement row : rows) {
                         List<WebElement> days = row.findElements(By.cssSelector("td.day"));
                         if (!days.isEmpty()) {
@@ -133,14 +215,9 @@ public class GameScheduleService {
                         try {
                             List<WebElement> highlightLinks = row.findElements(By.cssSelector("a[href*='highlight'], a[href*='Highlight']"));
                             hasHighlight = !highlightLinks.isEmpty();
-                            if (hasHighlight) {
-                                logger.info("하이라이트 링크 발견: 경기 종료로 판단");
-                            }
                         } catch (Exception e) {
                             // 하이라이트 링크 확인 실패시 무시
                         }
-
-                        logger.info("원본 텍스트: " + playText + ", 하이라이트 존재: " + hasHighlight);
 
                         String awayName = "", homeName = "";
                         int awayScore = 0, homeScore = 0;
@@ -155,8 +232,6 @@ public class GameScheduleService {
                             if (vsParts.length == 2) {
                                 String left = vsParts[0].trim();
                                 String right = vsParts[1].trim();
-
-                                logger.info("분리된 텍스트 - 왼쪽: " + left + ", 오른쪽: " + right);
 
                                 boolean hasScore = false;
 
@@ -196,11 +271,8 @@ public class GameScheduleService {
                                     homeName = right;
                                 }
 
-                                // 상태 결정 로직 개선
+                                // 상태 결정
                                 status = determineGameStatus(gameDate, today, hasScore, awayScore, homeScore, rowText, hasHighlight);
-
-                                logger.info("파싱 결과 - 원정팀: " + awayName + ", 원정점수: " + awayScore +
-                                        ", 홈팀: " + homeName + ", 홈점수: " + homeScore + ", 상태: " + status);
                             }
                         }
 
@@ -210,9 +282,6 @@ public class GameScheduleService {
 
                         // 홈팀과 원정팀 코드를 올바른 순서로 배치 (홈팀이 뒤에 오도록)
                         String matchKey = dbDateStr + homeCode + awayCode;
-
-                        logger.info("생성된 매치키: " + matchKey + " (날짜: " + dbDateStr +
-                                ", 홈팀코드: " + homeCode + ", 원정팀코드: " + awayCode + ")");
 
                         int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
                         doubleHeaderCounter.put(matchKey, gameNumber + 1);
@@ -229,33 +298,49 @@ public class GameScheduleService {
                         game.setHomeScore(homeScore);
                         game.setStatus(status);
 
-                        logger.info("생성된 게임 객체: " + game);
-
-                        if (fullCrawl) {
-                            gameService.saveOrUpdateSchedule(game);
-                        } else if (gameService.existsById(gameId)) {
-                            // 기존 게임의 상태를 확인하여 업데이트 여부 결정
-                            Game existingGame = gameService.findById(gameId).orElse(null);
-                            if (existingGame != null && shouldUpdateGame(existingGame, game)) {
-                                gameService.updateResult(game);
+                        try {
+                            if (fullCrawl) {
+                                gameService.saveOrUpdateSchedule(game);
+                            } else if (gameService.existsById(gameId)) {
+                                // 기존 게임의 상태를 확인하여 업데이트 여부 결정
+                                Game existingGame = gameService.findById(gameId).orElse(null);
+                                if (existingGame != null && shouldUpdateGame(existingGame, game)) {
+                                    gameService.updateResult(game);
+                                }
+                            } else {
+                                gameService.saveGame(game);
                             }
-                        } else {
-                            gameService.saveGame(game);
+                            processedGames++;
+                        } catch (Exception e) {
+                            logger.warning("게임 저장 실패: " + gameId + ", 오류: " + e.getMessage());
                         }
                     }
-                    System.out.println(monthVal + "월 크롤링 완료");
+                    logger.info(monthVal + "월 크롤링 완료 - 처리된 게임 수: " + processedGames);
                 } catch (Exception e) {
-                    System.err.println(monthVal + "월 처리 오류: " + e.getMessage());
+                    logger.severe(monthVal + "월 처리 오류: " + e.getMessage());
                     e.printStackTrace();
                 }
             }
         } catch (Exception e) {
-            System.err.println("크롤링 중 오류: " + e.getMessage());
+            logger.severe("크롤링 중 오류: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            if (driver != null) driver.quit();
+            if (driver != null) {
+                try {
+                    driver.quit();
+                    logger.info("WebDriver 정상 종료");
+                } catch (Exception e) {
+                    logger.warning("WebDriver 종료 중 오류: " + e.getMessage());
+                    // 강제 종료 시도
+                    try {
+                        driver.close();
+                    } catch (Exception ex) {
+                        logger.warning("WebDriver 강제 종료도 실패");
+                    }
+                }
+            }
         }
-        System.out.println("크롤링 작업 완료");
+        logger.info("크롤링 작업 완료");
     }
 
     /**
@@ -271,7 +356,6 @@ public class GameScheduleService {
 
         // 하이라이트가 있으면 경기 완료로 처리
         if (hasHighlight && hasScore) {
-            logger.info("하이라이트 존재 + 점수 있음 -> FINISHED");
             return "FINISHED";
         }
 
