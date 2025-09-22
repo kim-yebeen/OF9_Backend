@@ -36,7 +36,7 @@ public class GameScheduleService {
     }
 
     // GitHub Actions 배포 후 크롤링 실행 (UTC 11:48)
-    @Scheduled(cron = "0 25 21 * * *")
+    @Scheduled(cron = "0 40 21 * * *")
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
@@ -115,14 +115,13 @@ public class GameScheduleService {
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
 
             // 페이지 로드 전략 - 빠른 로드
-            options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+            options.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
             driver = new ChromeDriver(options);
 
             // 타임아웃 설정 강화
-            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(120)); // 2분으로 증가
-            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
-
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(300)); // 5분으로 증가
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(30));    // 30초로 증가
             logger.info("페이지 로드 시작: https://www.koreabaseball.com/Schedule/Schedule.aspx");
 
             // 재시도 로직 추가
