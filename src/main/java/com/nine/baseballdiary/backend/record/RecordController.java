@@ -37,13 +37,13 @@ public class RecordController {
 
     // 직관 기록 등록
     @PostMapping
-    public ResponseEntity<ApiResponse<RecordUploadResponse>> upload(@RequestBody CreateRecordRequest req) {
+    public ResponseEntity<ApiResponse<RecordUploadResponse>> uploadRecord(
+            @RequestBody CreateRecordRequest req) {
         try {
             Long userId = getCurrentUserId();
             RecordUploadResponse response = service.uploadRecord(userId, req);
 
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success("직관 기록이 성공적으로 등록되었습니다", response));
+            return ResponseEntity.ok(ApiResponse.success("직관 기록이 성공적으로 등록되었습니다", response));
 
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -80,9 +80,28 @@ public class RecordController {
         }
     }
 
-    // 상세 정보 페이지에 표시될 모든 정보
+    // 상세 정보 페이지에 표시될 모든 정보 (로그인한 사용자 정보 포함)
     @GetMapping("/{recordId}/details")
     public ResponseEntity<ApiResponse<RecordDetailResponse>> getRecordDetail(@PathVariable Long recordId) {
+        try {
+            // ✅ [수정] 현재 로그인한 사용자 ID를 가져와 서비스에 전달합니다.
+            Long currentUserId = getCurrentUserId();
+            RecordDetailResponse response = service.getRecordDetailWithUser(recordId, currentUserId);
+
+            return ResponseEntity.ok(ApiResponse.success("직관 기록 상세 정보를 성공적으로 조회했습니다", response));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.error(e.getMessage(), "NOT_FOUND"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("직관 기록 조회 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
+        }
+    }
+
+    // 공개용 레코드 상세 조회 (로그인 없이 접근 가능)
+    @GetMapping("/{recordId}/public")
+    public ResponseEntity<ApiResponse<RecordDetailResponse>> getPublicRecordDetail(@PathVariable Long recordId) {
         try {
             RecordDetailResponse response = service.getRecordDetail(recordId);
 

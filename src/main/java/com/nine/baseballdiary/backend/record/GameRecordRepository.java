@@ -379,4 +379,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     // 특정 유저가 방문한 모든 구장 이름 (중복 제거)
     @Query("SELECT DISTINCT gr.stadium FROM GameRecord gr WHERE gr.userId = :userId")
     Set<String> findDistinctStadiumsByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game JOIN FETCH gr.user WHERE gr.user.id = :userId ORDER BY gr.createdAt DESC")
+    List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
 }

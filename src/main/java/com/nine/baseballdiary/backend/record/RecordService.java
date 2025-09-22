@@ -36,13 +36,12 @@ public class RecordService {
     private static final DateTimeFormatter FEED_FMT =
             DateTimeFormatter.ofPattern("yy/MM/dd EEE", Locale.ENGLISH);
 
-    // 업로드 후 상세에 “2025년 04월 29일 (금)요일” 처럼 보여줄 때
+    // 업로드 후 상세에 "2025년 04월 29일 (금)요일" 처럼 보여줄 때
     private static final DateTimeFormatter UPLOAD_FMT =
             DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 (E)요일", Locale.KOREAN);
 
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("H:mm");
-
 
     // 레코드 업로드 (모든 정보를 한번에 처리)
     @Transactional
@@ -102,7 +101,7 @@ public class RecordService {
         return getRecordDetail(recordId);
     }
 
-    // 2) 피드에서 클릭 시 상세 조회
+    // 피드에서 클릭 시 상세 조회 (단일 파라미터)
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long recordId) {
         GameRecord rec = recordRepo.findById(recordId)
@@ -111,6 +110,7 @@ public class RecordService {
         if (game == null) {
             throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
         }
+
         // 1. record에서 친구 ID 목록 (List<Long>)을 가져옵니다.
         List<Long> companionIds = rec.getCompanions();
         List<UserDto> companionDetails = List.of(); // 기본값은 빈 리스트
@@ -118,15 +118,17 @@ public class RecordService {
         // 2. 친구 ID 목록이 비어있지 않은 경우에만 DB를 조회하여 UserDto 목록으로 변환합니다.
         if (companionIds != null && !companionIds.isEmpty()) {
             companionDetails = userRepo.findAllById(companionIds).stream()
-                    .map(UserDto::from) //
+                    .map(UserDto::from)
                     .collect(Collectors.toList());
         }
+
         String fmtDate = game.getDate().format(UPLOAD_FMT);
         String fmtTime = game.getTime().format(TIME_FMT);
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
 
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
+        // currentUserId 없이 호출하는 getSummary 메서드 사용
         RecordReactionSummary summary = reactionService.getSummary(recordId);
         List<ReactionStatsResponse> reactions = summary.getStats();
         Integer totalReactionCount = summary.getTotalCount();
@@ -147,7 +149,7 @@ public class RecordService {
                 .comment(rec.getComment())                      // String
                 .longContent(rec.getLongContent())              // String
                 .bestPlayer(rec.getBestPlayer())                // String
-                .companions(companionDetails)                // List<String>
+                .companions(companionDetails)                   // List<UserDto>
                 .foodTags(rec.getFoodTags())                    // List<String>
                 .mediaUrls(rec.getMediaUrls())
                 .createdAt(createdAtStr)
@@ -156,89 +158,117 @@ public class RecordService {
                 .build();
     }
 
-    // 3) 마이페이지 피드 조회
-    // getUserRecordsFeed에서 getById 문제 수정
+    // 현재 사용자 정보를 포함한 상세 조회 (두 개 파라미터)
     @Transactional(readOnly = true)
-    public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
-        return recordRepo.findByUserId(userId).stream()
-                .filter(r->r.getMediaUrls()!=null && !r.getMediaUrls().isEmpty())
-                .map(r->{
-                    // getById 대신 findById 사용
-                    Game g = r.getGame();
-                    return new RecordFeedResponse(
-                            r.getRecordId(),
-                            g.getDate().format(FEED_FMT),
-                            (r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
-                                    ? List.of(r.getMediaUrls().get(0))
-                                    : List.of()
-                    );
+    public RecordDetailResponse getRecordDetailWithUser(Long recordId, Long currentUserId) {
+        GameRecord rec = recordRepo.findById(recordId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
+        Game game = rec.getGame();
+        if (game == null) {
+            throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
+        }
 
-                    /*return new RecordFeedResponse(
-                            r.getRecordId(),
-                            g.getDate().format(FEED_FMT),
-                            r.getMediaUrls() != null && !r.getMediaUrls().isEmpty()
-                                    ? r.getMediaUrls().get(0)
-                                    : null
-                    );*?
-                    /*return new RecordFeedResponse(
-                            r.getRecordId(),
-                            g.getDate().format(FEED_FMT),
-                            //r.getMediaUrls().get(0)
-                            // 첫 번째 이미지 URL만 반환 (없으면 null)
-                            r.getMediaUrls() != null && !r.getMediaUrls().isEmpty()
-                                    ? r.getMediaUrls().get(0)
-                                    : null
-                    );*/
-                }).toList();
+        // 1. record에서 친구 ID 목록 (List<Long>)을 가져옵니다.
+        List<Long> companionIds = rec.getCompanions();
+        List<UserDto> companionDetails = List.of(); // 기본값은 빈 리스트
+
+        // 2. 친구 ID 목록이 비어있지 않은 경우에만 DB를 조회하여 UserDto 목록으로 변환합니다.
+        if (companionIds != null && !companionIds.isEmpty()) {
+            companionDetails = userRepo.findAllById(companionIds).stream()
+                    .map(UserDto::from)
+                    .collect(Collectors.toList());
+        }
+
+        String fmtDate = game.getDate().format(UPLOAD_FMT);
+        String fmtTime = game.getTime().format(TIME_FMT);
+        String emoLabel = convertEmotionLabel(rec.getEmotionCode());
+
+        String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        // currentUserId를 포함한 getSummary 메서드 사용
+        RecordReactionSummary summary = reactionService.getSummary(recordId, currentUserId);
+        List<ReactionStatsResponse> reactions = summary.getStats();
+        Integer totalReactionCount = summary.getTotalCount();
+
+        return RecordDetailResponse.builder()
+                .recordId(rec.getRecordId())                    // Long
+                .gameDate(fmtDate)                              // String
+                .gameTime(fmtTime)                              // String
+                .emotionCode(rec.getEmotionCode())              // Integer
+                .emotionLabel(emoLabel)                         // String
+                .homeTeam(convertHomeTeam(game.getHomeTeam()))  // String
+                .awayTeam(convertAwayTeam(game.getAwayTeam()))  // String
+                .stadium(convertStadium(game.getStadium()))     // String
+                .seatInfo(rec.getSeatInfo())                    // String
+                .homeScore(game.getHomeScore())                 // Integer
+                .awayScore(game.getAwayScore())                 // Integer
+                .result(rec.getResult())                        // String
+                .comment(rec.getComment())                      // String
+                .longContent(rec.getLongContent())              // String
+                .bestPlayer(rec.getBestPlayer())                // String
+                .companions(companionDetails)                   // List<UserDto>
+                .foodTags(rec.getFoodTags())                    // List<String>
+                .mediaUrls(rec.getMediaUrls())
+                .createdAt(createdAtStr)
+                .reactions(reactions)
+                .totalReactionCount(totalReactionCount)
+                .build();
     }
 
+    // 마이페이지 피드 조회 - 수정 완료
+    @Transactional(readOnly = true)
+    public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
+        // ✅ [수정] N+1 문제를 해결하는 새로운 쿼리 메서드 호출
+        List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
 
-    // 4) 마이페이지 리스트 조회 - 수정
+        return records.stream()
+                .filter(r -> r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
+                .map(r -> new RecordFeedResponse(
+                        r.getRecordId(),
+                        r.getGame().getDate().format(FEED_FMT),
+                        List.of(r.getMediaUrls().get(0))
+                )).collect(Collectors.toList());
+    }
+
+    // 마이페이지 리스트 조회 - 수정 완료
     @Transactional(readOnly = true)
     public List<RecordListResponse> getUserRecordsList(Long userId) {
-        return recordRepo.findByUserId(userId).stream()
-                .map(r -> {
-                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
-                    User user = userRepo.findById(r.getUserId()).orElseThrow();
+        // ✅ [수정] N+1 문제를 해결하는 새로운 쿼리 메서드 호출
+        List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
 
-                    RecordReactionSummary summary =
-                            reactionService.getSummary(r.getRecordId());
-                    List<ReactionStatsResponse> reactions = summary.getStats();
-                    Integer totalReactionCount = summary.getTotalCount();
+        return records.stream()
+                .map(r -> {
+                    Game g = r.getGame();
+                    User user = r.getUser();
+                    // currentUserId를 포함한 getSummary 호출
+                    RecordReactionSummary summary = reactionService.getSummary(r.getRecordId(), userId);
 
                     return new RecordListResponse(
-                            user.getId(),
-                            user.getNickname(),
-                            user.getProfileImageUrl(),
-                            user.getFavTeam(),
+                            user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getFavTeam(),
                             r.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
                             g.getDate().format(UPLOAD_FMT),
-                            g.getTime().format(TIME_FMT),
-                            convertHomeTeam(g.getHomeTeam()),
-                            convertAwayTeam(g.getAwayTeam()),
-                            g.getHomeScore(),
-                            g.getAwayScore(),
-                            convertStadium(r.getStadium()),
-                            r.getEmotionCode(),
-                            convertEmotionLabel(r.getEmotionCode()),
-                            r.getLongContent(),
-                            r.getMediaUrls(),
-                            reactions,
-                            totalReactionCount,
-                            r.getRecordId()
+                            g.getTime() != null ? g.getTime().format(TIME_FMT) : "",
+                            convertHomeTeam(g.getHomeTeam()), convertAwayTeam(g.getAwayTeam()),
+                            g.getHomeScore(), g.getAwayScore(),
+                            convertStadium(r.getStadium()), // ✅ convertStadiumName -> convertStadium으로 수정
+                            r.getEmotionCode(), convertEmotionLabel(r.getEmotionCode()),
+                            r.getLongContent(), r.getMediaUrls(),
+                            summary.getStats(), summary.getTotalCount(), r.getRecordId()
                     );
                 })
                 .collect(Collectors.toList());
     }
 
-    // 5) 마이페이지 캘린더 조회
+    // 마이페이지 캘린더 조회 - 수정 완료
     @Transactional(readOnly = true)
     public List<RecordCalendarResponse> getUserRecordsCalendar(Long userId) {
-        return recordRepo.findByUserId(userId).stream()
+        List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
+
+        return records.stream()
                 .map(r -> {
-                    Game g = gameRepo.findById(r.getGameId()).orElseThrow();
+                    Game g = r.getGame();
                     return new RecordCalendarResponse(
-                            g.getDate().toString(), // 프론트에서 ISO 포맷 처리
+                            g.getDate().toString(),
                             r.getResult()
                     );
                 })
@@ -338,6 +368,7 @@ public class RecordService {
             default -> s;
         };
     }
+
     /**
      * 나와 맞팔(상호 팔로우)인 유저 중 닉네임으로 검색
      */
@@ -361,8 +392,7 @@ public class RecordService {
 
         // 4. DTO로 변환하여 반환
         return mutualFriendsStream
-                .map(UserDto::from) //
+                .map(UserDto::from)
                 .collect(Collectors.toList());
     }
-
 }

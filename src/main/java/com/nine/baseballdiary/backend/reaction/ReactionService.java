@@ -19,6 +19,7 @@ public class ReactionService {
     private final ReactionTypeRepository reactionTypeRepo;
     private final GameRecordRepository recordRepo;
     private final NotificationService notificationService;
+
     // 15가지 타입 목록 조회
     @Transactional(readOnly = true)
     public List<ReactionTypeResponse> getAllTypes() {
@@ -32,19 +33,35 @@ public class ReactionService {
                 .collect(Collectors.toList());
     }
 
-
     // 사용자 목록 조회 (getUsers 메서드)
     @Transactional(readOnly = true)
     public List<ReactionUserResponse> getUsers(Long recordId) {
         return reactionRepo.findUsersByRecordId(recordId);
     }
 
-    // getSummary() 메서드 추가
+    // getSummary() 메서드 - currentUserId 없이
     @Transactional(readOnly = true)
     public RecordReactionSummary getSummary(Long recordId) {
         List<ReactionStatsResponse> stats = getStats(recordId);
         Integer totalCount = getTotalCount(recordId);
+
         return new RecordReactionSummary(stats, totalCount);
+    }
+
+    // getSummary() 메서드 오버로드 - currentUserId 포함
+    @Transactional(readOnly = true)
+    public RecordReactionSummary getSummary(Long recordId, Long currentUserId) {
+        List<ReactionStatsResponse> stats = getStats(recordId);
+        Integer totalCount = getTotalCount(recordId);
+
+        // 내가 남긴 리액션 정보 조회
+        String myReaction = reactionRepo.findByRecordIdAndUserId(recordId, currentUserId)
+                .map(reaction -> reactionTypeRepo.findById(Long.valueOf(reaction.getReactionTypeId()))
+                        .map(ReactionType::getName)
+                        .orElse(null))
+                .orElse(null);
+
+        return new RecordReactionSummary(stats, totalCount, myReaction);
     }
 
     // getStats() 메서드 추가
@@ -81,7 +98,7 @@ public class ReactionService {
             if (!record.getUserId().equals(userId)) { // 자신의 기록이 아닌 경우에만
                 notificationService.createReactionNotification(
                         record.getUserId(), userId, recordId, request.getReactionTypeId());
-                }
+            }
         }
     }
 
