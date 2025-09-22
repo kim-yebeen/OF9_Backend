@@ -46,16 +46,16 @@ public class RecordService {
     // 레코드 업로드 (모든 정보를 한번에 처리)
     @Transactional
     public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
-        // 1) User 조회
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + req.getUserId()));
+        // ✅ User 조회 부분 제거 (이미 userId로 충분)
 
         // 2) Game 조회
         Game game = gameRepo.findById(req.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
 
-        // 3) 결과 계산
-        String result = calculateResult(user.getFavTeam(), game);
+        // 3) 결과 계산 - favTeam은 따로 조회 필요
+        User userForFavTeam = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + userId));
+        String result = calculateResult(userForFavTeam.getFavTeam(), game);
 
         // 4) Record 엔티티 빌드 (모든 정보 포함)
         GameRecord record = GameRecord.builder()
@@ -75,13 +75,13 @@ public class RecordService {
 
         // 5) 저장
         GameRecord savedRecord = recordRepo.save(record);
-
         notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
 
         // 6) 단순한 응답 반환 (recordId와 gameDate만)
         String dateStr = game.getDate().format(UPLOAD_FMT);
         return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);
     }
+
 
     // 레코드 수정
     @Transactional
@@ -280,11 +280,15 @@ public class RecordService {
     public void deleteRecord(Long currentUserId, Long recordId) {
         GameRecord record = recordRepo.findById(recordId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 레코드"));
+
         if (!record.getUserId().equals(currentUserId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
         }
+
         recordRepo.delete(record);
+        // ✅ recordCount는 자동으로 동적 계산되므로 별도 처리 불필요
     }
+
 
     // ——— Helpers ———
 

@@ -19,12 +19,13 @@ public class User {
 
     @Column(nullable=false, unique=true, length=50)
     private String nickname;
+    @Column(nullable=false)
+    @Builder.Default
+    private Integer recordCount = 0;
 
-    // ✅ null 허용을 명시적으로 설정
     @Column(nullable=true, length=500)
     private String profileImageUrl;
 
-    // ✅ 필수값으로 설정
     @Column(nullable=false, length=50)
     private String favTeam;
 
@@ -44,6 +45,16 @@ public class User {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    public void incrementRecordCount() {
+        this.recordCount++;
+    }
+
+    public void decrementRecordCount() {
+        if (this.recordCount > 0) {
+            this.recordCount--;
+        }
     }
 
     @PreUpdate
