@@ -33,35 +33,35 @@ public class GameScheduleService {
     }
 
     // 가끔 전체 데이터 동기화가 필요할 때 수동으로 실행하거나 주석 해제 후 사용
-    @Scheduled(cron = "0 45 1 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
+    //@Scheduled(cron = "0 45 1 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
     }
 
     // 매일 오전 11시 해당 월 크롤링 (일정 업데이트 확인)
-    @Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 02 02 * * *", zone = "Asia/Seoul")
     public void dailyUpdate11() {
         logger.info("일일 업데이트 시작 (오전 11시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 21시 해당 월 크롤링 (경기 결과 1차 확인)
-    @Scheduled(cron = "0 0 21 * * *", zone = "Asia/Seoul")
+    //@Scheduled(cron = "0 0 21 * * *", zone = "Asia/Seoul")
     public void dailyUpdate21() {
         logger.info("일일 업데이트 시작 (오후 21시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 22시 해당 월 크롤링 (늦게 끝나는 경기 결과 확인)
-    @Scheduled(cron = "0 0 22 * * *", zone = "Asia/Seoul")
+    //@Scheduled(cron = "0 0 22 * * *", zone = "Asia/Seoul")
     public void dailyUpdate22() {
         logger.info("일일 업데이트 시작 (오후 22시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 23시 해당 월 크롤링 (최종 결과 확인)
-    @Scheduled(cron = "0 0 23 * * *", zone = "Asia/Seoul")
+    //@Scheduled(cron = "0 0 23 * * *", zone = "Asia/Seoul")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (오후 23시) - " + LocalDate.now());
         crawlSchedule(false);
