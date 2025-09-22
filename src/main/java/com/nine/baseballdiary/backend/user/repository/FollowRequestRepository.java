@@ -35,4 +35,9 @@ public interface FollowRequestRepository extends JpaRepository<FollowRequest, Lo
     @Query("DELETE FROM FollowRequest fr WHERE fr.requester.id = :userId OR fr.target.id = :userId")
     void deleteAllByRequesterIdOrTargetId(@Param("userId") Long userId);
 
+    @Modifying
+    @Query("DELETE FROM FollowRequest fr WHERE fr.requester.id = :requesterId AND fr.target.id = :targetId AND fr.status = :status")
+    int deleteByRequester_IdAndTarget_IdAndStatus(@Param("requesterId") Long requesterId,
+                                                  @Param("targetId") Long targetId,
+                                                  @Param("status") FollowRequestStatus status);
 }

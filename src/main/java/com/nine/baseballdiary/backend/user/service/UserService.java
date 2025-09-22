@@ -223,14 +223,14 @@ public class UserService {
         req.setStatus(FollowRequestStatus.REJECTED);
     }
 
-    /**
-     * 언팔로우
-     */
     @Transactional
     public void unfollow(Long meId, Long targetId) {
+        // 1. 실제 팔로우 관계가 있다면 삭제를 시도합니다.
         followRepo.deleteByFollowerId_IdAndFolloweeId_Id(meId, targetId);
-    }
 
+        // 2. PENDING 상태의 팔로우 요청이 있다면 함께 삭제(취소)합니다.
+        reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId, FollowRequestStatus.PENDING);
+    }
     // 내 프로필 조회
     public UserProfileDto getMyProfile(Long userId) {
         User u = userRepo.findById(userId).orElseThrow();
