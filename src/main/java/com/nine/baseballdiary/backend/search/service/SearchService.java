@@ -95,7 +95,7 @@ public class SearchService {
         // ✅ DTO의 정적 메서드를 사용하여 변환 (코드가 훨씬 깔끔해짐)
         List<SearchRecordDto> records = recordPage.getContent().stream()
                 .map(record -> {
-                    Game game = gameRepository.findById(record.getGameId()).orElseThrow();
+                    Game game = gameRepository.findById(record.getGame().getGameId()).orElseThrow();
                     User author = userRepository.findById(record.getUserId()).orElseThrow();
                     return SearchRecordDto.from(record, game, author);
                 })
