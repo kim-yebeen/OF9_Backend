@@ -50,7 +50,7 @@ public class GameScheduleService {
     }
 
     // 매일 21시 해당 월 크롤링
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 10 0 * * *")
     public void dailyUpdate21() {
         logger.info("일일 업데이트 시작 (21시) - " + LocalDate.now());
         crawlSchedule(false);
