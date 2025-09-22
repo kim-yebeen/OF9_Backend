@@ -33,7 +33,7 @@ public class GameScheduleService {
     }
 
     // 가끔 전체 데이터 동기화가 필요할 때 수동으로 실행하거나 주석 해제 후 사용
-    @Scheduled(cron = "0 45 0 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
+    @Scheduled(cron = "0 58 0 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
@@ -84,7 +84,7 @@ public class GameScheduleService {
             // 서버 환경을 위한 안정적인 최적화 옵션
             options.addArguments("--headless", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1920,1080");
             options.addArguments("--disable-web-security", "--disable-features=VizDisplayCompositor", "--disable-extensions", "--disable-plugins");
-            options.addArguments("--disable-images", "--disable-javascript", "--disable-dev-tools", "--disable-logging", "--log-level=3", "--silent");
+            options.addArguments("--disable-images", "--disable-dev-tools", "--disable-logging", "--log-level=3", "--silent");
             options.addArguments("--remote-debugging-port=0", "--disable-blink-features=AutomationControlled");
             options.addArguments("--memory-pressure-off", "--max_old_space_size=512", "--aggressive-cache-discard");
             options.addArguments("--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows");
