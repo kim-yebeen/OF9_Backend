@@ -43,21 +43,18 @@ public class RecordService {
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("H:mm");
 
-    // 레코드 업로드 (모든 정보를 한번에 처리)
-    @Transactional
     public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
-        // ✅ User 조회 부분 제거 (이미 userId로 충분)
-
-        // 2) Game 조회
+        // Game 조회
         Game game = gameRepo.findById(req.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
 
-        // 3) 결과 계산 - favTeam은 따로 조회 필요
-        User userForFavTeam = userRepo.findById(userId)
+        // User 조회 (favTeam을 위해)
+        User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + userId));
-        String result = calculateResult(userForFavTeam.getFavTeam(), game);
 
-        // 4) Record 엔티티 빌드 (모든 정보 포함)
+        String result = calculateResult(user.getFavTeam(), game);
+
+        // Record 엔티티 빌드
         GameRecord record = GameRecord.builder()
                 .userId(userId)
                 .game(game)
@@ -73,15 +70,15 @@ public class RecordService {
                 .result(result)
                 .build();
 
-        // 5) 저장
         GameRecord savedRecord = recordRepo.save(record);
+
+        // recordCount 업데이트 제거 - 동적 계산으로 처리
+
         notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
 
-        // 6) 단순한 응답 반환 (recordId와 gameDate만)
         String dateStr = game.getDate().format(UPLOAD_FMT);
         return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);
     }
-
 
     // 레코드 수정
     @Transactional
@@ -233,14 +230,17 @@ public class RecordService {
     // 마이페이지 리스트 조회 - 수정 완료
     @Transactional(readOnly = true)
     public List<RecordListResponse> getUserRecordsList(Long userId) {
-        // ✅ [수정] N+1 문제를 해결하는 새로운 쿼리 메서드 호출
         List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
+
+        // User 정보를 별도로 조회
+        User user = userRepo.findById(userId).orElseThrow(
+                () -> new IllegalArgumentException("존재하지 않는 사용자: " + userId)
+        );
 
         return records.stream()
                 .map(r -> {
                     Game g = r.getGame();
-                    User user = r.getUser();
-                    // currentUserId를 포함한 getSummary 호출
+                    // r.getUser() 대신 조회한 user 객체 사용
                     RecordReactionSummary summary = reactionService.getSummary(r.getRecordId(), userId);
 
                     return new RecordListResponse(
@@ -250,7 +250,7 @@ public class RecordService {
                             g.getTime() != null ? g.getTime().format(TIME_FMT) : "",
                             convertHomeTeam(g.getHomeTeam()), convertAwayTeam(g.getAwayTeam()),
                             g.getHomeScore(), g.getAwayScore(),
-                            convertStadium(r.getStadium()), // ✅ convertStadiumName -> convertStadium으로 수정
+                            convertStadium(r.getStadium()),
                             r.getEmotionCode(), convertEmotionLabel(r.getEmotionCode()),
                             r.getLongContent(), r.getMediaUrls(),
                             summary.getStats(), summary.getTotalCount(), r.getRecordId()
@@ -258,7 +258,6 @@ public class RecordService {
                 })
                 .collect(Collectors.toList());
     }
-
     // 마이페이지 캘린더 조회 - 수정 완료
     @Transactional(readOnly = true)
     public List<RecordCalendarResponse> getUserRecordsCalendar(Long userId) {
@@ -286,9 +285,9 @@ public class RecordService {
         }
 
         recordRepo.delete(record);
-        // ✅ recordCount는 자동으로 동적 계산되므로 별도 처리 불필요
-    }
 
+        // recordCount 업데이트 제거 - 동적 계산으로 처리
+    }
 
     // ——— Helpers ———
 

@@ -1,7 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
 import com.nine.baseballdiary.backend.game.Game;
-import com.nine.baseballdiary.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -16,23 +15,16 @@ public class GameRecord {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long recordId;
 
-    // --- User 관계 수정 ---
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id") // 실제 DB 컬럼의 주인
-    private User user;
-
-    @Column(name = "user_id", insertable = false, updatable = false) // DB에 쓰기 작업은 하지 않음
+    // User 관계는 userId 필드만 사용
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    // --- Game 관계 수정 ---
+    // Game 관계는 ManyToOne으로 유지
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "game_id") // 실제 DB 컬럼의 주인
+    @JoinColumn(name = "game_id")
     private Game game;
 
-    @Column(name = "game_id", insertable = false, updatable = false) // DB에 쓰기 작업은 하지 않음
-    private String gameId;
-
-    // --- 나머지 필드는 기존과 동일 ---
+    // 나머지 필드들
     private String seatInfo;
     private String stadium;
     private Integer emotionCode;

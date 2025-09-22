@@ -19,9 +19,7 @@ public class User {
 
     @Column(nullable=false, unique=true, length=50)
     private String nickname;
-    @Column(nullable=false)
-    @Builder.Default
-    private Integer recordCount = 0;
+
 
     @Column(nullable=true, length=500)
     private String profileImageUrl;
@@ -47,15 +45,7 @@ public class User {
         this.updatedAt = now;
     }
 
-    public void incrementRecordCount() {
-        this.recordCount++;
-    }
 
-    public void decrementRecordCount() {
-        if (this.recordCount > 0) {
-            this.recordCount--;
-        }
-    }
 
     @PreUpdate
     protected void onUpdate() {

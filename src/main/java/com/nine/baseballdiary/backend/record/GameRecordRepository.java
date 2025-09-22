@@ -49,18 +49,18 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     );
 
     @Query("""
-        SELECT r FROM GameRecord r 
-        JOIN Game g ON r.gameId = g.gameId 
-        JOIN User u ON r.userId = u.id 
-        WHERE (
-            u.isPrivate = false OR 
-            r.userId = :currentUserId OR 
-            r.userId IN :followingIds
-        )
-        AND g.date = :date
-        AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-        ORDER BY r.createdAt DESC
-        """)
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    JOIN User u ON r.userId = u.id 
+    WHERE (
+        u.isPrivate = false OR 
+        r.userId = :currentUserId OR 
+        r.userId IN :followingIds
+    )
+    AND g.date = :date
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    ORDER BY r.createdAt DESC
+    """)
     List<GameRecord> findAllFeedRecordsByLatest(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
@@ -112,23 +112,23 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     );
 
     @Query("""
-        SELECT r FROM GameRecord r 
-        JOIN Game g ON r.gameId = g.gameId 
-        JOIN User u ON r.userId = u.id 
-        WHERE (
-            u.isPrivate = false OR 
-            r.userId = :currentUserId OR 
-            r.userId IN :followingIds
-        )
-        AND g.date = :date
-        AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-        AND NOT EXISTS (
-            SELECT 1 FROM UserBlock ub 
-            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
-               OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
-        )
-        ORDER BY r.createdAt DESC
-        """)
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    JOIN User u ON r.userId = u.id 
+    WHERE (
+        u.isPrivate = false OR 
+        r.userId = :currentUserId OR 
+        r.userId IN :followingIds
+    )
+    AND g.date = :date
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub 
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
+           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
+    )
+    ORDER BY r.createdAt DESC
+    """)
     List<GameRecord> findAllFeedRecordsByLatestWithBlockFilter(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
@@ -136,7 +136,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("team") String team,
             Pageable pageable
     );
-
     // 팔로잉 피드 - 인기순 (기존)
     @Query(value = """
         SELECT r.* FROM record r 
@@ -171,13 +170,13 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
     // 팔로잉 피드 - 최신순 (기존)
     @Query("""
-        SELECT r FROM GameRecord r 
-        JOIN Game g ON r.gameId = g.gameId 
-        WHERE r.userId IN :userIds
-        AND g.date = :date
-        AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-        ORDER BY r.createdAt DESC
-        """)
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    WHERE r.userId IN :userIds
+    AND g.date = :date
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    ORDER BY r.createdAt DESC
+    """)
     List<GameRecord> findFollowingFeedRecordsByLatest(
             @Param("userIds") List<Long> userIds,
             @Param("date") LocalDate date,
@@ -224,18 +223,18 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     );
 
     @Query("""
-        SELECT r FROM GameRecord r 
-        JOIN Game g ON r.gameId = g.gameId 
-        WHERE r.userId IN :userIds
-        AND g.date = :date
-        AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-        AND NOT EXISTS (
-            SELECT 1 FROM UserBlock ub 
-            WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
-               OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
-        )
-        ORDER BY r.createdAt DESC
-        """)
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    WHERE r.userId IN :userIds
+    AND g.date = :date
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub 
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
+           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
+    )
+    ORDER BY r.createdAt DESC
+    """)
     List<GameRecord> findFollowingFeedRecordsByLatestWithBlockFilter(
             @Param("userIds") List<Long> userIds,
             @Param("currentUserId") Long currentUserId,
@@ -243,7 +242,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("team") String team,
             Pageable pageable
     );
-
     // 게시글 수 계산
     long countByUserId(Long userId);
 
@@ -380,6 +378,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     @Query("SELECT DISTINCT gr.stadium FROM GameRecord gr WHERE gr.userId = :userId")
     Set<String> findDistinctStadiumsByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game JOIN FETCH gr.user WHERE gr.user.id = :userId ORDER BY gr.createdAt DESC")
+    @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game WHERE gr.userId = :userId ORDER BY gr.createdAt DESC")
     List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
+
 }
