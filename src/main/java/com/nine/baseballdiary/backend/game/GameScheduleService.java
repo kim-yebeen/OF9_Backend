@@ -36,7 +36,7 @@ public class GameScheduleService {
     }
 
     // GitHub Actions 배포 후 크롤링 실행 (UTC 11:48)
-    @Scheduled(cron = "0 50 21 * * *")
+    @Scheduled(cron = "0 40 23 * * *")
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
@@ -109,7 +109,11 @@ public class GameScheduleService {
 
             // 메모리 최적화
             options.addArguments("--memory-pressure-off");
-            options.addArguments("--max_old_space_size=4096");
+            options.addArguments("--max_old_space_size=512");  // 512MB로 제한
+            options.addArguments("--aggressive-cache-discard");
+            options.addArguments("--disable-background-timer-throttling");
+            options.addArguments("--disable-renderer-backgrounding");
+            options.addArguments("--disable-backgrounding-occluded-windows");
 
             // User Agent 설정
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
