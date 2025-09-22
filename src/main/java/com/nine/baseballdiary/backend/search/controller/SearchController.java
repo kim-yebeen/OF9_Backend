@@ -33,7 +33,7 @@ public class SearchController {
             @RequestParam String query,
             @RequestParam(defaultValue = "0") int recordPage,
             @RequestParam(defaultValue = "0") int userPage,
-            @RequestParam(defaultValue = "2") int recordSize,
+            @RequestParam(defaultValue = "15") int recordSize,
             @RequestParam(defaultValue = "10") int userSize) {
 
         // 검색어 유효성 검사
