@@ -36,7 +36,7 @@ public class GameScheduleService {
     }
 
     // GitHub Actions 배포 후 크롤링 실행 (UTC 11:48)
-    @Scheduled(cron = "0 40 21 * * *")
+    @Scheduled(cron = "0 50 21 * * *")
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
