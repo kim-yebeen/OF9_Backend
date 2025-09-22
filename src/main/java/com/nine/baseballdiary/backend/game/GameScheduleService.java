@@ -33,7 +33,7 @@ public class GameScheduleService {
     }
 
     // 가끔 전체 데이터 동기화가 필요할 때 수동으로 실행하거나 주석 해제 후 사용
-    @Scheduled(cron = "0 58 0 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
+    @Scheduled(cron = "0 08 1 * * * ", zone = "Asia/Seoul") // 예: 매주 월요일 새벽 1시
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
