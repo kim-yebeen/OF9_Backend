@@ -36,35 +36,35 @@ public class GameScheduleService {
     }
 
     // GitHub Actions 배포 후 크롤링 실행 (UTC 11:48)
-    @Scheduled(cron = "0 05 21 * * *")
+    @Scheduled(cron = "0 25 21 * * *")
     public void dailyFullCrawl() {
         logger.info("전체 크롤링 시작 - " + LocalDate.now());
         crawlSchedule(true);
     }
 
     // 매일 오전 11시 해당 월 크롤링
-    @Scheduled(cron = "0 0 11 * * *")
+    //@Scheduled(cron = "0 0 11 * * *")
     public void dailyUpdate11() {
         logger.info("일일 업데이트 시작 (11시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 21시 해당 월 크롤링
-    @Scheduled(cron = "0 0 21 * * *")
+    //@Scheduled(cron = "0 0 21 * * *")
     public void dailyUpdate21() {
         logger.info("일일 업데이트 시작 (21시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 22시 해당 월 크롤링
-    @Scheduled(cron = "0 0 22 * * *")
+    //@Scheduled(cron = "0 0 22 * * *")
     public void dailyUpdate22() {
         logger.info("일일 업데이트 시작 (22시) - " + LocalDate.now());
         crawlSchedule(false);
     }
 
     // 매일 23시 해당 월 크롤링
-    @Scheduled(cron = "0 0 23 * * *")
+    //@Scheduled(cron = "0 0 23 * * *")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (23시) - " + LocalDate.now());
         crawlSchedule(false);
