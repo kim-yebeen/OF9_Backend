@@ -52,7 +52,7 @@ public class GameScheduleService {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 10 17 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 25 17 * * *", zone = "Asia/Seoul")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (오후 23시) - " + LocalDate.now());
         crawlSchedule(false);
@@ -101,7 +101,7 @@ public class GameScheduleService {
             options.addArguments("--disable-ipc-flooding-protection");
 
             // 추가 메모리 절약 옵션
-            options.addArguments("--single-process"); // 단일 프로세스 모드
+           // options.addArguments("--single-process"); // 단일 프로세스 모드
             options.addArguments("--no-zygote"); // zygote 프로세스 비활성화
             options.addArguments("--disable-gpu-sandbox");
 
