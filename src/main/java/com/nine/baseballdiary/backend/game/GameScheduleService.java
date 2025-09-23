@@ -52,7 +52,7 @@ public class GameScheduleService {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 03 03 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 10 17 * * *", zone = "Asia/Seoul")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (오후 23시) - " + LocalDate.now());
         crawlSchedule(false);
@@ -65,12 +65,46 @@ public class GameScheduleService {
 
             WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
-            options.addArguments("--headless", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--window-size=1920,1080");
-            options.addArguments("--disable-web-security", "--disable-features=VizDisplayCompositor", "--disable-extensions", "--disable-plugins");
-            options.addArguments("--disable-images", "--disable-dev-tools", "--disable-logging", "--log-level=3", "--silent");
-            options.addArguments("--remote-debugging-port=0", "--disable-blink-features=AutomationControlled");
-            options.addArguments("--memory-pressure-off", "--max_old_space_size=512", "--aggressive-cache-discard");
-            options.addArguments("--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows");
+
+            // 메모리 최적화를 위한 설정 추가
+            options.addArguments("--headless");
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+            options.addArguments("--disable-gpu");
+            options.addArguments("--window-size=1280,720"); // 해상도 줄임
+            options.addArguments("--disable-web-security");
+            options.addArguments("--disable-features=VizDisplayCompositor");
+            options.addArguments("--disable-extensions");
+            options.addArguments("--disable-plugins");
+            options.addArguments("--disable-images");
+            options.addArguments("--disable-dev-tools");
+            options.addArguments("--disable-logging");
+            options.addArguments("--log-level=3");
+            options.addArguments("--silent");
+            options.addArguments("--remote-debugging-port=0");
+            options.addArguments("--disable-blink-features=AutomationControlled");
+
+            // 메모리 사용량 제한 (JavaScript 유지하면서 최적화)
+            options.addArguments("--memory-pressure-off");
+            options.addArguments("--max_old_space_size=384"); // JavaScript 유지를 위해 약간 증가
+            options.addArguments("--aggressive-cache-discard");
+            options.addArguments("--disable-background-timer-throttling");
+            options.addArguments("--disable-renderer-backgrounding");
+            options.addArguments("--disable-backgrounding-occluded-windows");
+
+            // JavaScript 관련 최적화 (비활성화하지 않고 최적화)
+            options.addArguments("--disable-plugins-discovery");
+            options.addArguments("--disable-background-networking");
+            options.addArguments("--disable-client-side-phishing-detection");
+            options.addArguments("--disable-component-extensions-with-background-pages");
+            options.addArguments("--disable-default-apps");
+            options.addArguments("--disable-ipc-flooding-protection");
+
+            // 추가 메모리 절약 옵션
+            options.addArguments("--single-process"); // 단일 프로세스 모드
+            options.addArguments("--no-zygote"); // zygote 프로세스 비활성화
+            options.addArguments("--disable-gpu-sandbox");
+
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             options.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
@@ -124,99 +158,153 @@ public class GameScheduleService {
                     Map<String, Integer> doubleHeaderCounter = new HashMap<>();
 
                     for (WebElement row : rows) {
-                        List<WebElement> days = row.findElements(By.cssSelector("td.day"));
-                        if (!days.isEmpty()) {
-                            currentDayRaw = days.get(0).getText().split("\\(")[0].trim();
-                        }
-                        if (currentDayRaw.isBlank() || !currentDayRaw.matches(".*\\d+.*")) continue;
+                        try {
+                            List<WebElement> days = row.findElements(By.cssSelector("td.day"));
+                            if (!days.isEmpty()) {
+                                currentDayRaw = days.get(0).getText().split("\\(")[0].trim();
+                            }
+                            if (currentDayRaw.isBlank() || !currentDayRaw.matches(".*\\d+.*")) continue;
 
-                        String[] dateParts = currentDayRaw.split("\\.");
-                        String dbDateStr = year + String.format("%02d", Integer.parseInt(dateParts[0])) + String.format("%02d", Integer.parseInt(dateParts[1]));
-                        LocalDate gameDate = LocalDate.parse(dbDateStr, DB_DATE);
+                            String[] dateParts = currentDayRaw.split("\\.");
+                            String dbDateStr = year + String.format("%02d", Integer.parseInt(dateParts[0])) + String.format("%02d", Integer.parseInt(dateParts[1]));
+                            LocalDate gameDate = LocalDate.parse(dbDateStr, DB_DATE);
 
-                        String timeText = row.findElement(By.cssSelector("td.time")).getText().trim();
-                        LocalTime startTime = timeText.isBlank() ? null : LocalTime.parse(timeText, TIME_FMT);
+                            String timeText = row.findElement(By.cssSelector("td.time")).getText().trim();
+                            LocalTime startTime = timeText.isBlank() ? null : LocalTime.parse(timeText, TIME_FMT);
 
-                        List<WebElement> tds = row.findElements(By.tagName("td"));
-                        String stadium = tds.size() >= 8 ? tds.get(tds.size() - 2).getText().trim() : "";
-                        WebElement playCell = row.findElement(By.cssSelector("td.play"));
-                        String playText = playCell.getText().trim();
-                        boolean hasHighlight = !row.findElements(By.cssSelector("a[href*='highlight'], a[href*='Highlight']")).isEmpty();
+                            List<WebElement> tds = row.findElements(By.tagName("td"));
+                            String stadium = tds.size() >= 8 ? tds.get(tds.size() - 2).getText().trim() : "";
+                            WebElement playCell = row.findElement(By.cssSelector("td.play"));
+                            String playText = playCell.getText().trim();
+                            boolean hasHighlight = !row.findElements(By.cssSelector("a[href*='highlight'], a[href*='Highlight']")).isEmpty();
 
-                        String awayName = "", homeName = "";
-                        int awayScore = 0, homeScore = 0;
-                        String status = "SCHEDULED";
-                        String rowText = row.getText();
+                            String awayName = "", homeName = "";
+                            int awayScore = 0, homeScore = 0;
+                            String status = "SCHEDULED";
+                            String rowText = row.getText();
 
-                        boolean isCanceledByCss = !row.findElements(By.cssSelector("td.cancel, span.cancel")).isEmpty();
+                            // 취소 상태 체크 개선
+                            boolean isCanceledByCss = !row.findElements(By.cssSelector("td.cancel, span.cancel, .cancel")).isEmpty();
+                            boolean isCanceledByText = rowText.contains("우천취소") ||
+                                    rowText.contains("경기취소") ||
+                                    rowText.contains("기타") ||
+                                    rowText.contains("취소") ||
+                                    rowText.contains("연기") ||
+                                    playText.contains("취소") ||
+                                    playText.contains("연기");
 
-                        if (isCanceledByCss || rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
-                            status = "CANCELED";
-                        } else {
-                            String[] vsParts = playText.split("\\s*vs\\s*");
-                            if (vsParts.length == 2) {
-                                String left = vsParts[0].trim();
-                                String right = vsParts[1].trim();
-                                boolean hasScore = false;
+                            logger.info("경기 정보 파싱: " + playText + " | 전체 텍스트: " + rowText);
 
-                                Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d*)");
-                                Matcher awayMatcher = awayPattern.matcher(left);
-                                if (awayMatcher.find()) {
-                                    awayName = awayMatcher.group(1).trim();
-                                    String scoreStr = awayMatcher.group(2);
-                                    if (scoreStr != null && !scoreStr.isEmpty()) {
-                                        awayScore = Integer.parseInt(scoreStr);
-                                        hasScore = true;
+                            if (isCanceledByCss || isCanceledByText) {
+                                status = "CANCELED";
+                                logger.info("취소된 경기 감지: " + playText);
+                            } else {
+                                // 점수 파싱 로직 개선
+                                String[] vsParts = playText.split("\\s*vs\\s*");
+                                if (vsParts.length == 2) {
+                                    String left = vsParts[0].trim();
+                                    String right = vsParts[1].trim();
+                                    boolean hasScore = false;
+
+                                    logger.info("파싱 중 - Left: " + left + " | Right: " + right);
+
+                                    // Away 팀과 점수 파싱 (왼쪽)
+                                    // 패턴: "팀명 점수" 또는 "팀명"
+                                    Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)?");
+                                    Matcher awayMatcher = awayPattern.matcher(left);
+                                    if (awayMatcher.find()) {
+                                        awayName = awayMatcher.group(1).trim();
+                                        String scoreStr = awayMatcher.group(2);
+                                        if (scoreStr != null && !scoreStr.isEmpty()) {
+                                            awayScore = Integer.parseInt(scoreStr);
+                                            hasScore = true;
+                                        }
+                                    } else {
+                                        awayName = left.replaceAll("\\d", "").trim();
                                     }
-                                } else {
-                                    awayName = left;
+
+                                    // Home 팀과 점수 파싱 (오른쪽) - 패턴 개선
+                                    // 패턴1: "점수 팀명" (일반적인 경우)
+                                    // 패턴2: "팀명 점수" (다른 형태)
+                                    // 패턴3: "팀명" (점수 없는 경우)
+                                    Pattern homePattern1 = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
+                                    Pattern homePattern2 = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)");
+
+                                    Matcher homeMatcher1 = homePattern1.matcher(right);
+                                    Matcher homeMatcher2 = homePattern2.matcher(right);
+
+                                    if (homeMatcher1.find()) {
+                                        // 점수가 앞에 있는 경우: "7 삼성"
+                                        homeScore = Integer.parseInt(homeMatcher1.group(1));
+                                        homeName = homeMatcher1.group(2).trim();
+                                        hasScore = true;
+                                        logger.info("Home 팀 파싱 (패턴1): " + homeName + " 점수: " + homeScore);
+                                    } else if (homeMatcher2.find()) {
+                                        // 점수가 뒤에 있는 경우: "삼성 7"
+                                        homeName = homeMatcher2.group(1).trim();
+                                        homeScore = Integer.parseInt(homeMatcher2.group(2));
+                                        hasScore = true;
+                                        logger.info("Home 팀 파싱 (패턴2): " + homeName + " 점수: " + homeScore);
+                                    } else {
+                                        // 점수가 없는 경우
+                                        homeName = right.replaceAll("\\d", "").trim();
+                                        logger.info("Home 팀 파싱 (점수없음): " + homeName);
+                                    }
+
+                                    status = determineGameStatus(gameDate, today, hasScore, rowText, hasHighlight);
+
+                                    logger.info("최종 파싱 결과 - Away: " + awayName + "(" + awayScore + ") vs Home: " + homeName + "(" + homeScore + ") | Status: " + status);
                                 }
+                            }
 
-                                Pattern homePattern = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
-                                Matcher homeMatcher = homePattern.matcher(right);
-                                if (homeMatcher.find()) {
-                                    homeScore = Integer.parseInt(homeMatcher.group(1));
-                                    homeName = homeMatcher.group(2).trim();
-                                    hasScore = true;
-                                } else {
-                                    homeName = right.replaceAll("\\d", "").trim();
+                            String awayCode = getTeamCode(awayName);
+                            String homeCode = getTeamCode(homeName);
+                            if ("XX".equals(awayCode) || "XX".equals(homeCode)) {
+                                logger.warning("알 수 없는 팀 코드: " + awayName + " -> " + awayCode + ", " + homeName + " -> " + homeCode);
+                                continue;
+                            }
+
+                            String matchKey = dbDateStr + homeCode + awayCode;
+                            int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
+                            doubleHeaderCounter.put(matchKey, gameNumber + 1);
+                            String gameId = matchKey + gameNumber;
+
+                            Game game = new Game();
+                            game.setGameId(gameId);
+                            game.setDate(gameDate);
+                            game.setTime(startTime);
+                            game.setStadium(stadium);
+                            game.setAwayTeam(awayName);
+                            game.setHomeTeam(homeName);
+                            game.setAwayScore(awayScore);
+                            game.setHomeScore(homeScore);
+                            game.setStatus(status);
+
+                            if (fullCrawl) {
+                                gameService.saveOrUpdateSchedule(game);
+                            } else {
+                                Game existingGame = gameService.findById(gameId).orElse(null);
+                                if (existingGame == null) {
+                                    gameService.saveGame(game);
+                                } else if (shouldUpdateGame(existingGame, game)) {
+                                    logger.info("게임 업데이트: " + gameId + " | 기존: " + existingGame.getHomeScore() + "-" + existingGame.getAwayScore() +
+                                            " | 새로운: " + game.getHomeScore() + "-" + game.getAwayScore());
+                                    gameService.updateResult(game);
                                 }
-                                status = determineGameStatus(gameDate, today, hasScore, rowText, hasHighlight);
                             }
-                        }
-
-                        String awayCode = getTeamCode(awayName);
-                        String homeCode = getTeamCode(homeName);
-                        if ("XX".equals(awayCode) || "XX".equals(homeCode)) continue;
-
-                        String matchKey = dbDateStr + homeCode + awayCode;
-                        int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
-                        doubleHeaderCounter.put(matchKey, gameNumber + 1);
-                        String gameId = matchKey + gameNumber;
-
-                        Game game = new Game();
-                        game.setGameId(gameId);
-                        game.setDate(gameDate);
-                        game.setTime(startTime);
-                        game.setStadium(stadium);
-                        game.setAwayTeam(awayName);
-                        game.setHomeTeam(homeName);
-                        game.setAwayScore(awayScore);
-                        game.setHomeScore(homeScore);
-                        game.setStatus(status);
-
-                        if (fullCrawl) {
-                            gameService.saveOrUpdateSchedule(game);
-                        } else {
-                            Game existingGame = gameService.findById(gameId).orElse(null);
-                            if (existingGame == null) {
-                                gameService.saveGame(game);
-                            } else if (shouldUpdateGame(existingGame, game)) {
-                                gameService.updateResult(game);
-                            }
+                        } catch (Exception rowException) {
+                            logger.warning("행 처리 중 오류: " + rowException.getMessage());
+                            continue; // 개별 행 오류는 건너뛰고 계속 진행
                         }
                     }
                     logger.info(monthVal + "월 크롤링 완료 - 처리된 게임 수: " + rows.size());
+
+                    // 메모리 정리 및 안정화
+                    rows.clear(); // 리스트 정리
+                    doubleHeaderCounter.clear(); // 맵 정리
+                    System.gc();
+                    Thread.sleep(1000); // 1초 대기로 메모리 안정화
+
                 } catch (Exception e) {
                     logger.severe(monthVal + "월 처리 중 오류: " + e.getMessage());
                     e.printStackTrace();
@@ -234,36 +322,57 @@ public class GameScheduleService {
                     logger.warning("WebDriver 종료 중 오류: " + e.getMessage());
                 }
             }
+            // 최종 메모리 정리
+            System.gc();
         }
         logger.info("크롤링 작업 완료");
     }
 
     private String determineGameStatus(LocalDate gameDate, LocalDate today, boolean hasScore, String rowText, boolean hasHighlight) {
-        if (rowText.contains("우천취소") || rowText.contains("경기취소") || rowText.contains("기타")) {
+        // 취소 관련 텍스트 체크
+        if (rowText.contains("우천취소") ||
+                rowText.contains("경기취소") ||
+                rowText.contains("기타") ||
+                rowText.contains("취소") ||
+                rowText.contains("연기")) {
             return "CANCELED";
         }
+
+        // 하이라이트가 있고 점수가 있으면 종료
         if (hasHighlight && hasScore) {
             return "FINISHED";
         }
+
+        // 과거 경기인 경우
         if (gameDate.isBefore(today)) {
             return hasScore ? "FINISHED" : "CANCELED";
         }
+
+        // 오늘 경기이고 점수가 있으면 진행중
         if (gameDate.equals(today) && hasScore) {
             return "IN_PROGRESS";
         }
+
         return "SCHEDULED";
     }
 
     private boolean shouldUpdateGame(Game existingGame, Game newGame) {
+        // 종료된 경기는 오늘이 아니면 업데이트하지 않음
         if ("FINISHED".equals(existingGame.getStatus()) && !newGame.getDate().equals(LocalDate.now())) {
             return false;
         }
+
+        // 점수나 상태가 변경된 경우 업데이트
         return existingGame.getAwayScore() != newGame.getAwayScore() ||
                 existingGame.getHomeScore() != newGame.getHomeScore() ||
                 !existingGame.getStatus().equals(newGame.getStatus());
     }
 
     private static String getTeamCode(String name) {
+        if (name == null || name.isEmpty()) {
+            return "XX";
+        }
+
         String cleanName = name.replaceAll("\\d+", "").trim();
         return switch (cleanName) {
             case "두산" -> "OB";
