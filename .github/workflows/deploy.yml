@@ -37,25 +37,42 @@ jobs:
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
 
-      - name: Copy files to EC2
+      - name: Setup SSH Proxy for Bastion
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-          HOST: ${{ secrets.EC2_HOST }}
-          USER: ${{ secrets.EC2_USER }}
+          BASTION_HOST: ${{ secrets.EC2_HOST }}
+          BASTION_USER: ${{ secrets.EC2_USER }}
+          BASTION_PORT: ${{ secrets.EC2_PORT }}
+          WAS_HOST: ${{ secrets.WAS_HOST }}
+          WAS_USER: ${{ secrets.WAS_USER }}
         run: |
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3 -i private_key.pem baseball-diary.tar.gz ${USER}@${HOST}:~/
-          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -o ConnectionAttempts=3 -i private_key.pem docker-compose.yml ${USER}@${HOST}:~/
+          mkdir -p ~/.ssh/
+          echo "$PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          cat <<EOT >> ~/.ssh/config
+          Host bastion
+            HostName ${BASTION_HOST}
+            User ${BASTION_USER}
+            Port ${BASTION_PORT}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
 
-      - name: Deploy on EC2
-        env:
-          PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-          HOST: ${{ secrets.EC2_HOST }}
-          USER: ${{ secrets.EC2_USER }}
-          # DB 환경변수 모두 제거! JWT도 파일에서 읽을 예정
+          Host was_server
+            HostName ${WAS_HOST}
+            User ${WAS_USER}
+            ProxyJump bastion
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+          EOT
+
+      - name: Copy files to EC2 WAS Server via Bastion
         run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i private_key.pem ${USER}@${HOST} "
+          scp baseball-diary.tar.gz was_server:~/
+          scp docker-compose.yml was_server:~/
+
+      - name: Deploy on EC2 WAS Server via Bastion
+        run: |
+          ssh was_server "
             set -e
           
             echo '=== 기존 컨테이너 정리 ==='
@@ -146,4 +163,3 @@ jobs:
             echo '=== tar 파일 정리 ==='
             rm -f ~/baseball-diary.tar.gz
           "
-          rm -f private_key.pem

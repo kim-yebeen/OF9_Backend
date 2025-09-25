@@ -167,8 +167,8 @@ CREATE TABLE IF NOT EXISTS user_block (
 
 -- 뱃지 종류를 정의하는 테이블
 CREATE TABLE IF NOT EXISTS badge (
-                                     id SERIAL PRIMARY KEY,
-                                     category VARCHAR(50) NOT NULL,         -- 뱃지 카테고리 (예: STADIUM, WINS)
+    id SERIAL PRIMARY KEY,
+    category VARCHAR(50) NOT NULL,         -- 뱃지 카테고리 (예: STADIUM, WINS)
     name VARCHAR(100) NOT NULL UNIQUE,      -- 뱃지 이름 (예: 잠실 정복, 승리요정 입문)
     description TEXT,                       -- 뱃지 설명
     image_url TEXT,                         -- 뱃지 이미지 URL
@@ -177,8 +177,8 @@ CREATE TABLE IF NOT EXISTS badge (
 
 -- 사용자가 획득한 뱃지를 기록하는 테이블
 CREATE TABLE IF NOT EXISTS user_badge (
-                                          id SERIAL PRIMARY KEY,
-                                          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     badge_id INT NOT NULL REFERENCES badge(id) ON DELETE CASCADE,
     achieved_at TIMESTAMP NOT NULL DEFAULT now(),
     UNIQUE(user_id, badge_id)

@@ -52,7 +52,7 @@ public class GameScheduleService {
         crawlSchedule(false);
     }
 
-    @Scheduled(cron = "0 25 17 * * *", zone = "Asia/Seoul")
+    //@Scheduled(cron = "0 25 17 * * *", zone = "Asia/Seoul")
     public void dailyUpdate23() {
         logger.info("일일 업데이트 시작 (오후 23시) - " + LocalDate.now());
         crawlSchedule(false);
