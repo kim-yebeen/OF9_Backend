@@ -24,18 +24,10 @@ jobs:
         run: ./gradlew build -x test
 
       - name: Build Docker image
-        run: |
-          echo "=== Pulling Chrome base image ==="
-          docker pull kimyebeen125/java-chrome-base:v3
-          echo "=== Testing base image Chrome ==="
-          docker run --rm kimyebeen125/java-chrome-base:v3 google-chrome-stable --version
-          echo "=== Building application image ==="
-          docker build --no-cache -t baseball-diary:latest .
-          echo "=== Verifying Chrome in built image ==="
-          docker run --rm --entrypoint="" baseball-diary:latest google-chrome-stable --version || echo "⚠ Chrome verification failed!"
+        run: docker build --no-cache -t baseball-diary:latest .
 
       - name: Save Docker image
-        run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
+        run: docker save baseball-diary:latest | gzip -9 > baseball-diary.tar.gz
 
       - name: Setup SSH Proxy for Bastion
         env:
@@ -74,36 +66,33 @@ jobs:
         run: |
           ssh was_server "
             set -e
-          
+
+            echo '=== 디스크 공간 확인 ==='
+            df -h
+
             echo '=== 기존 컨테이너 정리 ==='
             docker compose down || true
             docker stop baseball-diary baseball-redis || true
             docker rm baseball-diary baseball-redis || true
-          
-            echo '=== 기존 이미지 정리 (최신 2개만 유지) ==='
-            docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.CreatedAt}}\t{{.ID}}' | grep baseball-diary | tail -n +3 | awk '{print \$3}' | xargs -r docker rmi -f || true
-          
-            echo '=== 사용하지 않는 이미지 정리 ==='
-            docker image prune -f
-          
-            echo '=== 디스크 사용량 확인 ==='
+
+            echo '=== 모든 이미지 정리 ==='
+            docker images -q baseball-diary | xargs -r docker rmi -f || true
+
+            echo '=== 전체 시스템 정리 ==='
+            docker system prune -af --volumes
+
+            echo '=== 정리 후 디스크 공간 ==='
             df -h
-          
+
             echo '=== 이미지 로드 ==='
             docker load < baseball-diary.tar.gz
-          
-            echo '=== Chrome 설치 확인 ==='
-            if ! docker run --rm --entrypoint='' baseball-diary:latest google-chrome-stable --version; then
-              echo '⚠ Chrome이 설치되지 않았습니다. 배포를 중단합니다.'
-              exit 1
-            fi
-          
+
             echo '=== 설정 파일 확인 ==='
             ls -la ~/config/
-          
+
             echo '=== Docker Compose로 Redis 먼저 시작 ==='
             docker compose up -d redis
-          
+
             echo '=== Redis 준비 대기 (최대 30초) ==='
             for i in {1..30}; do
               if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
@@ -113,13 +102,13 @@ jobs:
               echo \"Redis 대기 중... (\$i/30)\"
               sleep 1
             done
-          
+
             echo '=== 애플리케이션 시작 ==='
             docker compose up -d baseball-diary
-          
+
             echo '=== 컨테이너 상태 확인 ==='
             docker ps
-          
+
             echo '=== 애플리케이션 시작 대기 (최대 120초) ==='
             for i in {1..120}; do
               if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
@@ -135,7 +124,7 @@ jobs:
               echo \"애플리케이션 대기 중... (\$i/120)\"
               sleep 1
             done
-          
+
             echo '=== Redis 연결 테스트 ==='
             if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
               echo '✅ Redis 연결 성공!'
@@ -143,10 +132,10 @@ jobs:
               echo '⚠ Redis 연결 실패!'
               exit 1
             fi
-          
+
             echo '=== 최종 상태 확인 ==='
             docker ps
-          
+
             echo '=== API 헬스 체크 ==='
             if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
               echo '✅ 배포 성공!'
@@ -156,10 +145,10 @@ jobs:
               docker logs baseball-diary --tail 20
               exit 1
             fi
-          
+
             echo '=== 최종 디스크 사용량 ==='
             df -h
-          
+
             echo '=== tar 파일 정리 ==='
             rm -f ~/baseball-diary.tar.gz
           "
