@@ -22,8 +22,8 @@ public class Game {
     @Column(name = "time")
     private LocalTime time;
 
-    @Column(name = "playtime")
-    private LocalTime playtime;
+    //@Column(name = "playtime")
+    //private LocalTime playtime;
 
     @Column(name = "stadium", length = 50)
     private String stadium;
