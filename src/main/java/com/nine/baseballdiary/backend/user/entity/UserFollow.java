@@ -1,29 +1,44 @@
 package com.nine.baseballdiary.backend.user.entity;
 
-import com.nine.baseballdiary.backend.user.entity.User;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-
-import static jakarta.persistence.GenerationType.IDENTITY;
-
+import lombok.*;
+import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
 @Entity
-@Table(name="user_follow", uniqueConstraints=@UniqueConstraint(columnNames={"follower_id","followee_id"}))
-@NoArgsConstructor @AllArgsConstructor
+@Table(name = "user_follow")
+@IdClass(UserFollow.UserFollowId.class)
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserFollow {
-    @Id @GeneratedValue(strategy=IDENTITY)
-    private Long id;
+
+    @Id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "follower_id", nullable = false)
-    private User followerId;
+    private User follower;  // followerId → follower
 
+    @Id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "followee_id", nullable = false)
-    private User followeeId;
+    private User followee;  // followeeId → followee
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UserFollowId implements Serializable {
+        private Long follower;
+        private Long followee;
+    }
 }
