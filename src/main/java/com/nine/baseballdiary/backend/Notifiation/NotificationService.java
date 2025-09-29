@@ -92,9 +92,9 @@ public class NotificationService {
     public void createNewRecordNotification(Long recordOwnerId, Long recordId) {
         User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
 
-        List<Long> followerIds = userFollowRepo.findByFolloweeId_Id(recordOwnerId)
+        List<Long> followerIds = userFollowRepo.findByFollowee_Id(recordOwnerId)
                 .stream()
-                .map(follow -> follow.getFollowerId().getId())
+                .map(uf -> uf.getFollower().getId())
                 .collect(Collectors.toList());
 
         List<Notification> notifications = followerIds.stream()

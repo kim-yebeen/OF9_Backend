@@ -378,13 +378,13 @@ public class RecordService {
     @Transactional(readOnly = true)
     public List<UserDto> getMutualFriends(Long userId, String query) {
         // 1. 내가 팔로우하는 사람들의 ID 목록
-        List<Long> followingIds =userflRepo.findByFollowerId_Id(userId).stream()
-                .map(follow -> follow.getFolloweeId().getId())
+        List<Long> followingIds = userflRepo.findByFollower_Id(userId).stream()
+                .map(uf -> uf.getFollowee().getId())
                 .collect(Collectors.toList());
 
         // 2. 나를 팔로우하는 사람들 중에서, 내가 팔로우하는 사람(1번 목록)만 필터링 -> 맞팔 관계
-        Stream<User> mutualFriendsStream = userflRepo.findByFolloweeId_Id(userId).stream()
-                .map(follow -> follow.getFollowerId()) // 나를 팔로우하는 User 엔티티
+        Stream<User> mutualFriendsStream = userflRepo.findByFollowee_Id(userId).stream()
+                .map(uf -> uf.getFollower())
                 .filter(follower -> followingIds.contains(follower.getId())); // 그 중에서 내가 팔로우하는 사람
 
         // 3. 검색어(query)가 있으면 닉네임으로 추가 필터링

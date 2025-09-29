@@ -78,8 +78,8 @@ public class SearchService {
     // ✅ 게시글 검색 (차단된 사용자 필터링 추가)
     @Transactional(readOnly = true)
     public SearchRecordResponse searchRecords(Long userId, String query, int page, int size) {
-        Set<Long> followingUserIds = userFollowRepository.findByFollowerId_Id(userId).stream()
-                .map(follow -> follow.getFolloweeId().getId())
+        Set<Long> followingUserIds = userFollowRepository.findByFollower_Id(userId).stream()
+                .map(uf -> uf.getFollowee().getId())
                 .collect(Collectors.toSet());
 
         // ✅ 'followingIdsStr' 선언 부분을 추가하여 오류 해결
@@ -200,7 +200,7 @@ public class SearchService {
     // 팔로우 상태 확인
     private FollowStatus getFollowStatus(Long currentUserId, Long targetUserId) {
         // 이미 팔로우 중인지 확인
-        boolean isFollowing = userFollowRepository.existsByFollowerId_IdAndFolloweeId_Id(currentUserId, targetUserId);
+        boolean isFollowing = userFollowRepository.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
         if (isFollowing) {
             return FollowStatus.FOLLOWING;
         }

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -35,63 +36,50 @@ public class UserService {
     private final RecordReactionRepository recordReactionRepo;
     private final S3Service s3Service;
 
-    // ✅ 기존의 간단한 사용자 검색 메서드 (수정 완료)
-    // 이 메서드는 UserDto를 반환하며, 페이징이 필요 없는 간단한 검색에 사용됩니다.
     @Transactional(readOnly = true)
     public List<UserDto> searchUsers(Long currentUserId, String q) {
-        // DB에서 닉네임으로 사용자 검색
         List<User> users = userRepo.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
                 q, currentUserId, org.springframework.data.domain.Pageable.unpaged()
         ).getContent();
 
-        // DTO로 변환하여 반환
         return users.stream()
-                .map(UserDto::from) // new UserDto(...) 대신 정적 팩토리 메서드 사용
+                .map(UserDto::from)
                 .collect(Collectors.toList());
     }
-
 
 
     // ✅ 팔로잉 목록 (수정 완료)
     @Transactional(readOnly = true)
     public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
-        // 1. 팔로잉하는 사람들의 ID 목록을 가져옵니다.
-        List<Long> followingIds = followRepo.findByFollowerId_Id(profileUserId).stream()
-                .map(follow -> follow.getFolloweeId().getId())
+        // 복합키 구조에 맞게 수정
+        List<Long> followingIds = followRepo.findByFollower_Id(profileUserId).stream()
+                .map(follow -> follow.getFollowee().getId())
                 .collect(Collectors.toList());
 
         if (followingIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 2. ID 목록을 사용해 User 엔티티를 조회하면서,
-        //    현재 로그인한 사용자와 차단 관계인 사용자를 DB에서 미리 제외합니다.
         List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
-
-        // 3. 필터링된 사용자 목록을 DTO로 변환합니다.
         return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
     }
 
 
-    // ✅ 팔로워 목록 (수정 완료)
     @Transactional(readOnly = true)
     public List<UserDto> getFollowers(Long profileUserId, Long currentUserId) {
-        // 1. 팔로워들의 ID 목록을 가져옵니다.
-        List<Long> followerIds = followRepo.findByFolloweeId_Id(profileUserId).stream()
-                .map(follow -> follow.getFollowerId().getId())
+        // 복합키 구조에 맞게 수정
+        List<Long> followerIds = followRepo.findByFollowee_Id(profileUserId).stream()
+                .map(follow -> follow.getFollower().getId())
                 .collect(Collectors.toList());
 
         if (followerIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 2. ID 목록을 사용해 User 엔티티를 조회하면서,
-        //    현재 로그인한 사용자와 차단 관계인 사용자를 DB에서 미리 제외합니다.
         List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followerIds, currentUserId);
-
-        // 3. 필터링된 사용자 목록을 DTO로 변환합니다.
         return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
     }
+
 
     //유저 목록을 팔로우 상태가 포함된 userdto목록으로 변환하는 헬퍼 메서드
     private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
@@ -117,14 +105,11 @@ public class UserService {
             return UserDto.from(user, status);
         }).collect(Collectors.toList());
     }
-
     /**
      * 1) 팔로우 요청 (공개면 즉시, 비공개면 PENDING 생성)
      */
-    // ✅ 팔로우 요청 (차단된 사용자는 팔로우 불가)
     @Transactional
     public FollowResponse requestFollow(Long meId, Long targetId) {
-        // 차단 여부 확인
         if (isBlockedEachOther(meId, targetId)) {
             throw new IllegalArgumentException("차단된 사용자와는 팔로우할 수 없습니다");
         }
@@ -132,13 +117,12 @@ public class UserService {
         User me = userRepo.findById(meId).orElseThrow();
         User target = userRepo.findById(targetId).orElseThrow();
 
-        // 이미 팔로우 중이면 아무 동작 없이 false 반환
-        if (followRepo.existsByFollowerId_IdAndFolloweeId_Id(meId, targetId)) {
+        // 복합키 구조에 맞게 수정
+        if (followRepo.existsByFollower_IdAndFollowee_Id(meId, targetId)) {
             return new FollowResponse(false, false, null);
         }
 
         if (Boolean.TRUE.equals(target.getIsPrivate())) {
-            // 비공개 계정: PENDING 요청 생성
             FollowRequest req = FollowRequest.builder()
                     .requester(me)
                     .target(target)
@@ -148,13 +132,17 @@ public class UserService {
             notificationService.createFollowRequestNotification(targetId, meId);
             return new FollowResponse(true, true, req.getId());
         } else {
-            // 공개 계정: 즉시 팔로우
-            followRepo.save(new UserFollow(null, me, target));
+            // 복합키 구조에서는 생성자 대신 세터 사용
+            UserFollow userFollow = new UserFollow();
+            userFollow.setFollower(me);
+            userFollow.setFollowee(target);
+            userFollow.setCreatedAt(LocalDateTime.now());
+            followRepo.save(userFollow);
+
             notificationService.createFollowNotification(targetId, meId);
             return new FollowResponse(true, false, null);
         }
     }
-
     // 2) 내 계정으로 온 PENDING 요청 리스트 조회
     //    (import org.springframework.transaction.annotation.Transactional;)
     @Transactional(readOnly = true)
@@ -178,7 +166,6 @@ public class UserService {
         FollowRequest req = reqRepo.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 요청입니다."));
 
-        // 본인이 받은 요청이 아니면 403
         if (!req.getTarget().getId().equals(me)) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
@@ -186,7 +173,6 @@ public class UserService {
             );
         }
 
-        // 이미 처리된 요청이면 400
         if (req.getStatus() != FollowRequestStatus.PENDING) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -194,7 +180,13 @@ public class UserService {
             );
         }
 
-        followRepo.save(new UserFollow(null, req.getRequester(), req.getTarget()));
+        // 복합키 구조에서는 생성자 대신 세터 사용
+        UserFollow userFollow = new UserFollow();
+        userFollow.setFollower(req.getRequester());
+        userFollow.setFollowee(req.getTarget());
+        userFollow.setCreatedAt(LocalDateTime.now());
+        followRepo.save(userFollow);
+
         req.setStatus(FollowRequestStatus.ACCEPTED);
     }
 
@@ -223,19 +215,20 @@ public class UserService {
         req.setStatus(FollowRequestStatus.REJECTED);
     }
 
+
     @Transactional
     public void unfollow(Long meId, Long targetId) {
-        // 1. 실제 팔로우 관계가 있다면 삭제를 시도합니다.
-        followRepo.deleteByFollowerId_IdAndFolloweeId_Id(meId, targetId);
-
-        // 2. PENDING 상태의 팔로우 요청이 있다면 함께 삭제(취소)합니다.
+        // 복합키 구조에 맞게 수정
+        followRepo.deleteByFollower_IdAndFollowee_Id(meId, targetId);
         reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId, FollowRequestStatus.PENDING);
     }
+
     // 내 프로필 조회
     public UserProfileDto getMyProfile(Long userId) {
         User u = userRepo.findById(userId).orElseThrow();
-        long followerCnt = followRepo.countByFolloweeId_Id(userId);
-        long followingCnt = followRepo.countByFollowerId_Id(userId);
+        // 복합키 구조에 맞게 수정
+        long followerCnt = followRepo.countByFollowee_Id(userId);
+        long followingCnt = followRepo.countByFollower_Id(userId);
         long recordCnt = recordRepo.countByUserId(userId);
         return new UserProfileDto(
                 u.getId(), u.getNickname(), u.getProfileImageUrl(),
@@ -243,6 +236,7 @@ public class UserService {
                 followerCnt, followingCnt, recordCnt
         );
     }
+
 
     // 내 정보 수정
     @Transactional
@@ -311,9 +305,9 @@ public class UserService {
 
         userBlockRepo.save(UserBlock.builder().blocker(blocker).blocked(target).build());
 
-        // 차단 시 관련 데이터 정리
-        followRepo.deleteByFollowerId_IdAndFolloweeId_Id(blockerId, targetId);
-        followRepo.deleteByFollowerId_IdAndFolloweeId_Id(targetId, blockerId);
+        // 복합키 구조에 맞게 수정
+        followRepo.deleteByFollower_IdAndFollowee_Id(blockerId, targetId);
+        followRepo.deleteByFollower_IdAndFollowee_Id(targetId, blockerId);
         reqRepo.deleteByBothUsers(blockerId, targetId);
         recordReactionRepo.deleteByBothUsers(blockerId, targetId);
     }
