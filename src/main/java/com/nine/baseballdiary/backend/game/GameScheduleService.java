@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.game;
 
+import jakarta.annotation.PostConstruct;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -28,6 +29,12 @@ public class GameScheduleService {
     public void dailyUpdate() {
         logger.info("일일 업데이트 시작 - " + LocalDate.now());
         crawlSchedule(false);
+    }
+
+    @PostConstruct  // 이거 추가
+    public void init() {
+        logger.info("애플리케이션 시작 시 크롤링 실행");
+        crawlSchedule(true);  // true = 전체 크롤링 (3~10월)
     }
 
     public void crawlSchedule(boolean fullCrawl) {
