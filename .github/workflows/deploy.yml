@@ -1,4 +1,4 @@
-naname: Docker Deploy to EC2
+name: Docker Deploy to EC2
 
 on:
   push:
