@@ -33,7 +33,7 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    
+
     @PostConstruct
     public void init() {
         logger.info("애플리케이션 시작 - 30초 후 크롤링 시작 예정");

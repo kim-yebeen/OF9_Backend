@@ -111,7 +111,7 @@ jobs:
 
       - name: Build and Deploy on EC2 WAS Server
         run: |
-          ssh was_server << 'ENDSSH'
+          ssh was_server "
             set -e
 
             echo '=== 기존 컨테이너 정리 ==='
@@ -131,7 +131,6 @@ jobs:
             sudo rm -rf /tmp/* 2>/dev/null || true
 
             echo '=== Docker 이미지 빌드 ==='
-            # JAR 파일을 사용하여 경량 Dockerfile로 빌드
             docker build --no-cache -t baseball-diary:latest .
 
             echo '=== 배포 파일 정리 ==='
@@ -166,7 +165,7 @@ jobs:
                 docker stats --no-stream
                 exit 0
               fi
-              if [ $i -eq 60 ]; then
+              if [ \$i -eq 60 ]; then
                 echo '60초 경과 - 로그 확인'
                 docker logs --tail 50 baseball-diary
               fi
@@ -177,4 +176,4 @@ jobs:
             docker logs --tail 100 baseball-diary
             docker ps -a
             exit 1
-  ENDSSH
+          "
