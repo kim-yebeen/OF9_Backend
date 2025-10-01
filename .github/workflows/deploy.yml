@@ -1,4 +1,4 @@
-name: Docker Deploy to EC2 (JAR Transfer)
+naname: Docker Deploy to EC2
 
 on:
   push:
@@ -17,35 +17,17 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew clean build -x test --no-daemon --parallel
+        run: ./gradlew build -x test
 
-      - name: Prepare deployment files
-        run: |
-          echo "=== JAR 파일 찾기 ==="
-          find build/libs -name "*.jar" -type f
-          
-          echo "=== 배포 패키지 생성 ==="
-          mkdir -p deploy
-          cp build/libs/backend-0.0.1-SNAPSHOT.jar deploy/app.jar
-          cp Dockerfile deploy/
-          cp docker-compose.yml deploy/
-          
-          echo "=== 파일 확인 ==="
-          ls -lh deploy/
+      - name: Build Docker image
+        run: docker build -t baseball-diary:latest .
+
+      - name: Save Docker image
+        run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
 
       - name: Setup SSH Proxy for Bastion
         env:
@@ -66,11 +48,6 @@ jobs:
             Port ${BASTION_PORT}
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
-            ServerAliveInterval 30
-            ServerAliveCountMax 5
-            TCPKeepAlive yes
-            Compression yes
-            ConnectionAttempts 3
 
           Host was_server
             HostName ${WAS_HOST}
@@ -78,102 +55,18 @@ jobs:
             ProxyJump bastion
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
-            ServerAliveInterval 30
-            ServerAliveCountMax 5
-            TCPKeepAlive yes
-            Compression yes
-            ConnectionAttempts 3
           EOT
-
-      - name: Test SSH Connection
-        run: |
-          echo "=== Bastion 연결 테스트 ==="
-          ssh -v bastion "echo 'Bastion OK' && hostname" || echo "Bastion 연결 실패"
-          
-          echo "=== WAS 서버 연결 테스트 ==="
-          ssh -v was_server "echo 'WAS Server OK' && hostname" || echo "WAS 연결 실패"
 
       - name: Copy files to EC2 WAS Server via Bastion
         run: |
-          echo "=== 배포 파일 전송 시작 ==="
-          
-          # 파일별로 개별 전송 (타임아웃 대응)
-          for file in deploy/*; do
-            echo "Transferring: $file"
-            scp -v -o ConnectTimeout=120 -o ServerAliveInterval=15 "$file" was_server:~/ || {
-              echo "전송 실패: $file"
-              exit 1
-            }
-          done
-          
-          echo "=== 전송 완료 확인 ==="
-          ssh was_server "ls -lh ~/ | grep -E 'app.jar|Dockerfile|docker-compose'"
+          scp baseball-diary.tar.gz was_server:~/
+          scp docker-compose.yml was_server:~/
 
-      - name: Build and Deploy on EC2 WAS Server
+      - name: Deploy on EC2 WAS Server via Bastion
         run: |
           ssh was_server "
-            set -e
-
-            echo '=== 기존 컨테이너 정리 ==='
-            docker compose down || true
-
-            echo '=== 기존 이미지 삭제 ==='
-            docker rmi baseball-diary:latest -f || true
-
-            echo '=== Docker 시스템 정리 ==='
-            docker system prune -af --volumes
-
-            echo '=== 디스크 공간 확인 ==='
-            df -h
-
-            echo '=== 로그 및 임시 파일 정리 ==='
-            sudo journalctl --vacuum-time=1d 2>/dev/null || true
-            sudo rm -rf /tmp/* 2>/dev/null || true
-
-            echo '=== Docker 이미지 빌드 ==='
-            docker build --no-cache -t baseball-diary:latest .
-
-            echo '=== 배포 파일 정리 ==='
-            rm -f ~/app.jar ~/Dockerfile
-
-            echo '=== 디스크 공간 최종 확인 ==='
-            df -h
-
-            echo '=== Redis 시작 ==='
-            docker compose up -d redis
-          
-            echo '=== Redis 준비 대기 ==='
-            for i in {1..30}; do
-              if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
-                echo 'Redis 준비 완료'
-                break
-              fi
-              sleep 1
-            done
-
-            echo '=== 애플리케이션 시작 ==='
-            docker compose up -d baseball-diary
-
-            echo '=== 컨테이너 상태 확인 ==='
-            docker ps -a
-
-            echo '=== 애플리케이션 준비 대기 (최대 120초) ==='
-            for i in {1..120}; do
-              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
-                echo '배포 성공!'
-                docker ps
-                docker stats --no-stream
-                exit 0
-              fi
-              if [ \$i -eq 60 ]; then
-                echo '60초 경과 - 로그 확인'
-                docker logs --tail 50 baseball-diary
-              fi
-              sleep 1
-            done
-
-            echo '배포 실패 - 상세 로그 출력'
-            docker logs --tail 100 baseball-diary
-            docker ps -a
-            exit 1
+            docker load < baseball-diary.tar.gz
+            docker-compose down
+            docker-compose up -d
+            rm baseball-diary.tar.gz
           "
