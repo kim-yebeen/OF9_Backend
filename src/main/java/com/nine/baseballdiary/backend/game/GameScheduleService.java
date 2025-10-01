@@ -28,22 +28,26 @@ public class GameScheduleService {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("H:mm");
     private static final Logger logger = Logger.getLogger(GameScheduleService.class.getName());
 
+
     public GameScheduleService(GameService gameService) {
         this.gameService = gameService;
     }
 
+    
     @PostConstruct
     public void init() {
-        logger.info("애플리케이션 시작 시 크롤링 실행");
+        logger.info("애플리케이션 시작 - 30초 후 크롤링 시작 예정");
         new Thread(() -> {
             try {
-                Thread.sleep(10000); // 10초 대기 후 실행 (서버 안정화)
+                Thread.sleep(30000); // 30초 대기
+                logger.info("크롤링 시작");
                 crawlSchedule(true);
             } catch (InterruptedException e) {
-                logger.warning("초기 크롤링 대기 중 인터럽트: " + e.getMessage());
+                logger.warning("크롤링 대기 중 인터럽트: " + e.getMessage());
             }
         }).start();
     }
+
 
     @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
     public void dailyUpdate() {
