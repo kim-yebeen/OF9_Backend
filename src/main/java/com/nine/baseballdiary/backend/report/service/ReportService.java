@@ -6,6 +6,7 @@ import com.nine.baseballdiary.backend.badge.UserBadgeRepository;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.report.dto.*;
+import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +33,8 @@ public class ReportService {
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final UserFollowRepository userFollowRepository;
+    private final PlayerDataService playerDataService;
+
     public EmotionSummaryDto getEmotionSummary(Long userId, int year, int month) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
@@ -117,6 +121,151 @@ public class ReportService {
                 .myBadgeCount(myBadgeIds.size())
                 .categories(categories)
                 .build();
+    }
+
+    public SeasonDdayDto getSeasonDday() {
+        LocalDate today = LocalDate.now();
+        int currentYear = today.getYear();
+
+        // 2025 시즌: 3월 23일 ~ 11월 15일
+        LocalDate seasonStart = LocalDate.of(currentYear, 3, 23);
+        LocalDate seasonEnd = LocalDate.of(currentYear, 11, 15);
+
+        // 다음 시즌 시작일
+        LocalDate nextSeasonStart = LocalDate.of(currentYear + 1, 3, 23);
+
+        if (today.isBefore(seasonStart)) {
+            // 시즌 시작 전
+            int daysUntilStart = (int) ChronoUnit.DAYS.between(today, seasonStart);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear)
+                    .daysRemaining(daysUntilStart)
+                    .seasonEndDate(seasonStart.toString())
+                    .status("BEFORE_START")
+                    .message(currentYear + " 시즌 시작까지")
+                    .build();
+        } else if (today.isAfter(seasonEnd)) {
+            // 시즌 종료 후
+            int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextSeasonStart);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear + 1)
+                    .daysRemaining(daysUntilNextStart)
+                    .seasonEndDate(nextSeasonStart.toString())
+                    .status("ENDED")
+                    .message((currentYear + 1) + " 시즌 시작까지")
+                    .build();
+        } else {
+            // 시즌 진행 중
+            int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, seasonEnd);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear)
+                    .daysRemaining(daysUntilEnd)
+                    .seasonEndDate(seasonEnd.toString())
+                    .status("IN_PROGRESS")
+                    .message(currentYear + " 시즌 종료까지")
+                    .build();
+        }
+    }
+
+    public List<MvpPlayerDto> getMvpPlayers(Long userId) {
+        List<GameRecord> records = gameRecordRepository.findByUserId(userId);
+
+        // bestPlayer 카운트
+        Map<String, Long> playerCounts = records.stream()
+                .filter(r -> r.getBestPlayer() != null && !r.getBestPlayer().isBlank())
+                .collect(Collectors.groupingBy(GameRecord::getBestPlayer, Collectors.counting()));
+
+        // 상위 5명 추출
+        return playerCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> {
+                    String playerName = entry.getKey();
+                    int count = entry.getValue().intValue();
+
+                    // 선수 정보에서 팀 찾기
+                    String teamCode = findTeamByPlayerName(playerName);
+                    String teamName = convertTeamCodeToName(teamCode);
+
+                    return MvpPlayerDto.builder()
+                            .playerName(playerName)
+                            .team(teamName)
+                            .teamCode(teamCode)
+                            .count(count)
+                            .playerImageUrl(null)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<CompanionStatsDto> getCompanionStats(Long userId) {
+        List<GameRecord> records = gameRecordRepository.findByUserId(userId);
+
+        // companion별 등장 횟수 카운트
+        Map<Long, Long> companionCounts = records.stream()
+                .filter(r -> r.getCompanions() != null && !r.getCompanions().isEmpty())
+                .flatMap(r -> r.getCompanions().stream())
+                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+
+        // 상위 5명 추출
+        return companionCounts.entrySet().stream()
+                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> {
+                    Long companionId = entry.getKey();
+                    int count = entry.getValue().intValue();
+
+                    User companion = userRepository.findById(companionId).orElse(null);
+                    if (companion == null) return null;
+
+                    // 해당 친구와 함께한 경기의 승률 계산
+                    List<GameRecord> companionRecords = records.stream()
+                            .filter(r -> r.getCompanions() != null && r.getCompanions().contains(companionId))
+                            .toList();
+
+                    long wins = companionRecords.stream()
+                            .filter(r -> "WIN".equals(r.getResult()))
+                            .count();
+                    long total = companionRecords.stream()
+                            .filter(r -> "WIN".equals(r.getResult()) || "LOSE".equals(r.getResult()))
+                            .count();
+
+                    double winRate = total == 0 ? 0.0 : (double) wins / total * 100.0;
+
+                    return CompanionStatsDto.builder()
+                            .userId(companion.getId())
+                            .nickname(companion.getNickname())
+                            .profileImageUrl(companion.getProfileImageUrl())
+                            .companionCount(count)
+                            .winRate(Math.round(winRate * 10) / 10.0)
+                            .build();
+                })
+                .filter(dto -> dto != null)
+                .collect(Collectors.toList());
+    }
+
+    private String findTeamByPlayerName(String playerName) {
+        return playerDataService.getAllPlayers().stream()
+                .filter(p -> p.getName().equals(playerName))
+                .findFirst()
+                .map(PlayerInfoDto::getTeam)
+                .orElse("XX");
+    }
+
+    private String convertTeamCodeToName(String code) {
+        return switch(code) {
+            case "KIA" -> "KIA타이거즈";
+            case "NC" -> "NC다이노스";
+            case "삼성" -> "삼성라이온즈";
+            case "LG" -> "LG트윈스";
+            case "두산" -> "두산베어스";
+            case "KT" -> "KT WIZ";
+            case "SSG" -> "SSG랜더스";
+            case "롯데" -> "롯데자이언츠";
+            case "한화" -> "한화이글스";
+            case "키움" -> "키움히어로즈";
+            default -> code;
+        };
     }
 
     private String convertEmotionToNoun(int code) {

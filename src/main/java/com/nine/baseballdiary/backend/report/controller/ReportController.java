@@ -2,6 +2,7 @@ package com.nine.baseballdiary.backend.report.controller;
 
 import com.nine.baseballdiary.backend.common.response.ApiResponse;
 import com.nine.baseballdiary.backend.report.dto.*;
+import com.nine.baseballdiary.backend.report.service.PlayerDataService;
 import com.nine.baseballdiary.backend.report.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,5 +52,35 @@ public class ReportController {
     public ResponseEntity<ApiResponse<BadgeResponseDto>> getBadgeStatus() {
         BadgeResponseDto badges = reportService.getBadgeStatus(getCurrentUserId());
         return ResponseEntity.ok(ApiResponse.success("뱃지 현황을 조회했습니다.", badges));
+    }
+
+    @GetMapping("/season-dday")
+    public ResponseEntity<ApiResponse<SeasonDdayDto>> getSeasonDday() {
+        SeasonDdayDto dday = reportService.getSeasonDday();
+        return ResponseEntity.ok(ApiResponse.success("시즌 D-day를 조회했습니다.", dday));
+    }
+
+    @GetMapping("/mvp-players")
+    public ResponseEntity<ApiResponse<List<MvpPlayerDto>>> getMvpPlayers() {
+        Long userId = getCurrentUserId();
+        List<MvpPlayerDto> mvps = reportService.getMvpPlayers(userId);
+        return ResponseEntity.ok(ApiResponse.success("MVP 선수를 조회했습니다.", mvps));
+    }
+
+    @GetMapping("/companions")
+    public ResponseEntity<ApiResponse<List<CompanionStatsDto>>> getCompanionStats() {
+        Long userId = getCurrentUserId();
+        List<CompanionStatsDto> stats = reportService.getCompanionStats(userId);
+        return ResponseEntity.ok(ApiResponse.success("직관 메이트를 조회했습니다.", stats));
+    }
+
+    @GetMapping("/players")
+    public ResponseEntity<ApiResponse<List<PlayerInfoDto>>> getPlayersByTeam(
+            @RequestParam(required = false) String team) {
+        PlayerDataService playerService = new PlayerDataService();
+        List<PlayerInfoDto> players = team != null
+                ? playerService.getPlayersByTeam(team)
+                : playerService.getAllPlayers();
+        return ResponseEntity.ok(ApiResponse.success("선수 목록을 조회했습니다.", players));
     }
 }

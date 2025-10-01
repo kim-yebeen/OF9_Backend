@@ -44,6 +44,9 @@ public class RecordService {
             DateTimeFormatter.ofPattern("H:mm");
 
     public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
+        if (req.getCompanions() != null && !req.getCompanions().isEmpty()) {
+            validateMutualFriends(userId, req.getCompanions());
+        }
         // Game 조회
         Game game = gameRepo.findById(req.getGameId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
@@ -80,6 +83,17 @@ public class RecordService {
         return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);
     }
 
+    private void validateMutualFriends(Long userId, List<Long> companionIds) {
+        List<Long> mutualFriendIds = getMutualFriends(userId, null).stream()
+                .map(UserDto::getId)
+                .collect(Collectors.toList());
+
+        for (Long companionId : companionIds) {
+            if (!mutualFriendIds.contains(companionId)) {
+                throw new IllegalArgumentException("맞팔 친구만 태그할 수 있습니다: " + companionId);
+            }
+        }
+    }
     // 레코드 수정
     @Transactional
     public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
