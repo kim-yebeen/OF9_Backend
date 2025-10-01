@@ -20,11 +20,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew build -x test
-
       - name: Build Docker image
-        run: docker build -t baseball-diary:latest .
+        run: docker build --no-cache -t baseball-diary:latest .
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
