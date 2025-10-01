@@ -1,4 +1,4 @@
-name: Docker Deploy to EC2
+name: Docker Deploy to EC2 (Remote Build)
 
 on:
   push:
@@ -10,51 +10,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # Gradle 캐싱으로 빌드 시간 단축
-      - name: Cache Gradle packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build with Gradle
-        run: ./gradlew build -x test --no-daemon --parallel
-
-      # Docker 이미지 빌드 캐싱
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build Docker image
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new \
-            --load \
-            -t baseball-diary:latest .
-
-      # 캐시 관리
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-      - name: Save Docker image
-        run: docker save baseball-diary:latest | gzip -9 > baseball-diary.tar.gz
 
       - name: Setup SSH Proxy for Bastion
         env:
@@ -75,6 +30,9 @@ jobs:
             Port ${BASTION_PORT}
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
+            ServerAliveInterval 60
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
 
           Host was_server
             HostName ${WAS_HOST}
@@ -82,49 +40,61 @@ jobs:
             ProxyJump bastion
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
+            ServerAliveInterval 60
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
+            Compression yes
           EOT
 
-      - name: Copy files to EC2 WAS Server via Bastion
+      - name: Copy source code to EC2
         run: |
-          scp baseball-diary.tar.gz was_server:~/
-          scp docker-compose.yml was_server:~/
+          echo "=== 소스 코드 압축 ==="
+          tar -czf source.tar.gz --exclude='.git' --exclude='build' --exclude='.gradle' .
+          
+          echo "=== 파일 크기 확인 ==="
+          ls -lh source.tar.gz
+          
+          echo "=== WAS 서버로 전송 ==="
+          scp -C source.tar.gz was_server:~/
+          
+          echo "=== 전송 완료 ==="
 
-      - name: Deploy on EC2 WAS Server via Bastion
+      - name: Build and Deploy on EC2 WAS Server
         run: |
           ssh was_server "
             set -e
 
+            echo '=== 소스 코드 압축 해제 ==='
+            rm -rf ~/app
+            mkdir -p ~/app
+            tar -xzf source.tar.gz -C ~/app/
+            cd ~/app
+          
+            echo '=== 소스 파일 삭제 ==='
+            rm ~/source.tar.gz
+
             echo '=== 기존 컨테이너 정리 ==='
             docker compose down || true
 
-            echo '=== 기존 이미지 완전 삭제 ==='
+            echo '=== 기존 이미지 삭제 ==='
             docker rmi baseball-diary:latest -f || true
 
-            echo '=== 불필요한 Docker 리소스 정리 ==='
+            echo '=== Docker 시스템 정리 ==='
             docker system prune -af --volumes
 
-            echo '=== 디스크 공간 확인 (정리 전) ==='
+            echo '=== 디스크 공간 확인 ==='
             df -h
 
-            echo '=== 로그 파일 정리 ==='
-            sudo journalctl --vacuum-time=1d
+            echo '=== 로그 및 임시 파일 정리 ==='
+            sudo journalctl --vacuum-time=1d 2>/dev/null || true
             sudo find /var/log -type f -name '*.log' -mtime +7 -delete 2>/dev/null || true
-          
-            echo '=== 임시 파일 정리 ==='
             sudo rm -rf /tmp/* 2>/dev/null || true
-          
-            echo '=== apt 캐시 정리 ==='
-            sudo apt-get clean 2>/dev/null || true
-            sudo rm -rf /var/lib/apt/lists/* 2>/dev/null || true
 
-            echo '=== 디스크 공간 확인 (정리 후) ==='
-            df -h
+            echo '=== Docker 이미지 빌드 (EC2에서 직접) ==='
+            docker build -t baseball-diary:latest .
 
-            echo '=== 이미지 로드 ==='
-            docker load < baseball-diary.tar.gz
-
-            echo '=== tar 파일 즉시 삭제 ==='
-            rm -f baseball-diary.tar.gz
+            echo '=== 빌드 산출물 정리 ==='
+            rm -rf ~/app
 
             echo '=== 디스크 공간 최종 확인 ==='
             df -h
@@ -132,7 +102,7 @@ jobs:
             echo '=== Redis 시작 ==='
             docker compose up -d redis
           
-            echo '=== Redis 준비 대기 (최대 30초) ==='
+            echo '=== Redis 준비 대기 ==='
             for i in {1..30}; do
               if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
                 echo 'Redis 준비 완료'
@@ -144,7 +114,7 @@ jobs:
             echo '=== 애플리케이션 시작 ==='
             docker compose up -d baseball-diary
 
-            echo '=== 애플리케이션 준비 대기 (최대 120초) ==='
+            echo '=== 애플리케이션 준비 대기 ==='
             for i in {1..120}; do
               if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
                 echo '배포 성공!'
