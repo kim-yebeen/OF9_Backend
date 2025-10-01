@@ -57,8 +57,14 @@ jobs:
             --exclude='node_modules' \
             --exclude='.idea' \
             --exclude='*.log' \
-            --warning=no-file-changed \
-            .
+            . || true
+          
+          # tar 종료 코드 확인 (1은 경고, 2는 에러)
+          TAR_EXIT=$?
+          if [ $TAR_EXIT -eq 2 ]; then
+            echo "tar 압축 실패"
+            exit 1
+          fi
           
           echo "=== 파일 크기 확인 ==="
           ls -lh source.tar.gz
