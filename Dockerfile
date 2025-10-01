@@ -3,17 +3,22 @@ WORKDIR /app
 COPY . .
 RUN gradle build -x test --no-daemon
 
-FROM eclipse-temurin:17-jre-alpine
+FROM selenium/standalone-chrome:120.0
+
+USER root
+
+RUN apt-get update && apt-get install -y \
+    openjdk-17-jre-headless \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-
-RUN apk add --no-cache curl tzdata
-
-ENV TZ=Asia/Seoul
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
-EXPOSE 8080
+ENV TZ=Asia/Seoul
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC"
 
-ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseG1GC"
+EXPOSE 8080
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

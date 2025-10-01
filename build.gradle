@@ -52,8 +52,8 @@ dependencies {
 	implementation 'com.google.code.gson:gson:2.10.1'
 	// Hibernate 6 버전 의존성 추가 (Hibernate 6는 jakarta.persistence 사용)
 	implementation 'org.hibernate.orm:hibernate-core:6.2.7.Final'
-	//implementation 'org.seleniumhq.selenium:selenium-java:4.19.1'
-	//implementation 'io.github.bonigarcia:webdrivermanager:5.7.0'
+	implementation 'org.seleniumhq.selenium:selenium-java:4.19.1'
+	implementation 'io.github.bonigarcia:webdrivermanager:5.7.0'
 	implementation 'org.jsoup:jsoup:1.17.2'
 	// JJWT (버전 0.11.5 예시)
 	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
