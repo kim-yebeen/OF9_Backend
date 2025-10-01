@@ -49,13 +49,22 @@ jobs:
       - name: Copy source code to EC2
         run: |
           echo "=== 소스 코드 압축 ==="
-          tar -czf source.tar.gz --exclude='.git' --exclude='build' --exclude='.gradle' .
+          tar -czf source.tar.gz \
+            --exclude='.git' \
+            --exclude='build' \
+            --exclude='.gradle' \
+            --exclude='*.tar.gz' \
+            --exclude='node_modules' \
+            --exclude='.idea' \
+            --exclude='*.log' \
+            --warning=no-file-changed \
+            .
           
           echo "=== 파일 크기 확인 ==="
           ls -lh source.tar.gz
           
           echo "=== WAS 서버로 전송 ==="
-          scp -C source.tar.gz was_server:~/
+          scp -o ConnectTimeout=300 -o ServerAliveInterval=30 -C source.tar.gz was_server:~/
           
           echo "=== 전송 완료 ==="
 
