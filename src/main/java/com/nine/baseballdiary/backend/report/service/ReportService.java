@@ -201,13 +201,11 @@ public class ReportService {
     public List<CompanionStatsDto> getCompanionStats(Long userId) {
         List<GameRecord> records = gameRecordRepository.findByUserId(userId);
 
-        // companion별 등장 횟수 카운트
         Map<Long, Long> companionCounts = records.stream()
                 .filter(r -> r.getCompanions() != null && !r.getCompanions().isEmpty())
                 .flatMap(r -> r.getCompanions().stream())
                 .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
 
-        // 상위 5명 추출
         return companionCounts.entrySet().stream()
                 .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
                 .limit(5)
@@ -218,26 +216,15 @@ public class ReportService {
                     User companion = userRepository.findById(companionId).orElse(null);
                     if (companion == null) return null;
 
-                    // 해당 친구와 함께한 경기의 승률 계산
-                    List<GameRecord> companionRecords = records.stream()
-                            .filter(r -> r.getCompanions() != null && r.getCompanions().contains(companionId))
-                            .toList();
-
-                    long wins = companionRecords.stream()
-                            .filter(r -> "WIN".equals(r.getResult()))
-                            .count();
-                    long total = companionRecords.stream()
-                            .filter(r -> "WIN".equals(r.getResult()) || "LOSE".equals(r.getResult()))
-                            .count();
-
-                    double winRate = total == 0 ? 0.0 : (double) wins / total * 100.0;
+                    // 캐시된 승률 조회 (있으면 캐시에서, 없으면 계산 후 캐시에 저장)
+                    WinRateSummaryDto winRateData = getWinRateSummary(companionId);
 
                     return CompanionStatsDto.builder()
                             .userId(companion.getId())
                             .nickname(companion.getNickname())
                             .profileImageUrl(companion.getProfileImageUrl())
                             .companionCount(count)
-                            .winRate(Math.round(winRate * 10) / 10.0)
+                            .winRate(winRateData.getTotalWinRate())
                             .build();
                 })
                 .filter(dto -> dto != null)

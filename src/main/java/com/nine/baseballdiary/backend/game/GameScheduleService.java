@@ -1,6 +1,5 @@
 package com.nine.baseballdiary.backend.game;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
 import jakarta.annotation.PostConstruct;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -36,7 +35,14 @@ public class GameScheduleService {
     @PostConstruct
     public void init() {
         logger.info("애플리케이션 시작 시 크롤링 실행");
-        new Thread(() -> crawlSchedule(true)).start();  // 별도 스레드로 실행
+        new Thread(() -> {
+            try {
+                Thread.sleep(10000); // 10초 대기 후 실행 (서버 안정화)
+                crawlSchedule(true);
+            } catch (InterruptedException e) {
+                logger.warning("초기 크롤링 대기 중 인터럽트: " + e.getMessage());
+            }
+        }).start();
     }
 
     @Scheduled(cron = "0 0 3 * * *", zone = "Asia/Seoul")
@@ -50,18 +56,38 @@ public class GameScheduleService {
         try {
             logger.info("크롤링 시작 - fullCrawl: " + fullCrawl);
 
-            WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
 
+            // 메모리 최적화 옵션
             options.addArguments("--headless");
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--disable-gpu");
-            options.addArguments("--window-size=1280,720");
+            options.addArguments("--disable-software-rasterizer");
             options.addArguments("--disable-extensions");
-            options.addArguments("--disable-images");
+            options.addArguments("--disable-background-networking");
+            options.addArguments("--disable-default-apps");
+            options.addArguments("--disable-sync");
+            options.addArguments("--disable-translate");
+            options.addArguments("--hide-scrollbars");
+            options.addArguments("--metrics-recording-only");
+            options.addArguments("--mute-audio");
+            options.addArguments("--no-first-run");
+            options.addArguments("--safebrowsing-disable-auto-update");
+            options.addArguments("--disable-images"); // 이미지 로드 안함
+            options.addArguments("--blink-settings=imagesEnabled=false");
+            options.addArguments("--window-size=1280,720");
+            options.addArguments("--single-process"); // 메모리 절약
+            options.addArguments("--disable-logging");
+            options.addArguments("--log-level=3");
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36");
             options.setPageLoadStrategy(PageLoadStrategy.EAGER);
+
+            // 추가 메모리 최적화
+            Map<String, Object> prefs = new HashMap<>();
+            prefs.put("profile.managed_default_content_settings.images", 2);
+            prefs.put("profile.default_content_setting_values.notifications", 2);
+            options.setExperimentalOption("prefs", prefs);
 
             driver = new ChromeDriver(options);
             driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(60));
@@ -109,12 +135,21 @@ public class GameScheduleService {
                             if (currentDayRaw.isBlank() || !currentDayRaw.matches(".*\\d+.*")) continue;
 
                             String[] dateParts = currentDayRaw.split("\\.");
+                            if (dateParts.length < 2) continue;
+
                             String dbDateStr = year + String.format("%02d", Integer.parseInt(dateParts[0]))
                                     + String.format("%02d", Integer.parseInt(dateParts[1]));
                             LocalDate gameDate = LocalDate.parse(dbDateStr, DB_DATE);
 
                             String timeText = row.findElement(By.cssSelector("td.time")).getText().trim();
-                            LocalTime startTime = timeText.isBlank() ? null : LocalTime.parse(timeText, TIME_FMT);
+                            LocalTime startTime = null;
+                            if (!timeText.isBlank()) {
+                                try {
+                                    startTime = LocalTime.parse(timeText, TIME_FMT);
+                                } catch (Exception e) {
+                                    logger.warning("시간 파싱 실패: " + timeText);
+                                }
+                            }
 
                             List<WebElement> tds = row.findElements(By.tagName("td"));
                             String stadium = tds.size() >= 8 ? tds.get(tds.size() - 2).getText().trim() : "";
@@ -207,10 +242,14 @@ public class GameScheduleService {
                         }
                     }
                     logger.info(monthVal + "월 크롤링 완료");
+
+                    // 메모리 정리
+                    System.gc();
                     Thread.sleep(2000);
 
                 } catch (Exception e) {
                     logger.severe(monthVal + "월 처리 중 오류: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         } catch (Exception e) {
@@ -224,6 +263,8 @@ public class GameScheduleService {
                     logger.warning("WebDriver 종료 중 오류: " + e.getMessage());
                 }
             }
+            // 최종 메모리 정리
+            System.gc();
         }
         logger.info("크롤링 작업 완료");
     }

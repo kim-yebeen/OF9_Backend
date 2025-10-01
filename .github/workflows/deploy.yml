@@ -17,14 +17,41 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # Gradle 캐싱으로 빌드 시간 단축
+      - name: Cache Gradle packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build -x test
+        run: ./gradlew build -x test --no-daemon --parallel
+
+      # Docker 이미지 빌드 캐싱
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
       - name: Build Docker image
-        run: docker build --no-cache -t baseball-diary:latest .
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --load \
+            -t baseball-diary:latest .
+
+      # 캐시 관리
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip -9 > baseball-diary.tar.gz
@@ -73,10 +100,24 @@ jobs:
             echo '=== 기존 이미지 완전 삭제 ==='
             docker rmi baseball-diary:latest -f || true
 
-            echo '=== 전체 시스템 정리 ==='
+            echo '=== 불필요한 Docker 리소스 정리 ==='
             docker system prune -af --volumes
 
-            echo '=== 디스크 공간 확인 ==='
+            echo '=== 디스크 공간 확인 (정리 전) ==='
+            df -h
+
+            echo '=== 로그 파일 정리 ==='
+            sudo journalctl --vacuum-time=1d
+            sudo find /var/log -type f -name '*.log' -mtime +7 -delete 2>/dev/null || true
+          
+            echo '=== 임시 파일 정리 ==='
+            sudo rm -rf /tmp/* 2>/dev/null || true
+          
+            echo '=== apt 캐시 정리 ==='
+            sudo apt-get clean 2>/dev/null || true
+            sudo rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+
+            echo '=== 디스크 공간 확인 (정리 후) ==='
             df -h
 
             echo '=== 이미지 로드 ==='
@@ -85,19 +126,40 @@ jobs:
             echo '=== tar 파일 즉시 삭제 ==='
             rm -f baseball-diary.tar.gz
 
+            echo '=== 디스크 공간 최종 확인 ==='
+            df -h
+
             echo '=== Redis 시작 ==='
             docker compose up -d redis
-            sleep 5
-
-            echo '=== 애플리케이션 시작 ==='
-            docker compose up -d baseball-diary
-
-            echo '=== 애플리케이션 준비 대기 ==='
-            for i in {1..120}; do
-              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
-                echo '배포 성공'
+          
+            echo '=== Redis 준비 대기 (최대 30초) ==='
+            for i in {1..30}; do
+              if docker exec baseball-redis redis-cli ping > /dev/null 2>&1; then
+                echo 'Redis 준비 완료'
                 break
               fi
               sleep 1
             done
+
+            echo '=== 애플리케이션 시작 ==='
+            docker compose up -d baseball-diary
+
+            echo '=== 애플리케이션 준비 대기 (최대 120초) ==='
+            for i in {1..120}; do
+              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                echo '배포 성공!'
+                docker ps
+                docker stats --no-stream
+                exit 0
+              fi
+              if [ \$i -eq 60 ]; then
+                echo '60초 경과 - 로그 확인'
+                docker logs --tail 50 baseball-diary
+              fi
+              sleep 1
+            done
+
+            echo '배포 실패 - 로그 출력'
+            docker logs --tail 100 baseball-diary
+            exit 1
           "
