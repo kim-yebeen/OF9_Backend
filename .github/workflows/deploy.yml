@@ -66,29 +66,32 @@ jobs:
         run: |
           ssh was_server "
             set -e
-          
+
             echo '=== 기존 컨테이너 정리 ==='
             docker compose down || true
-          
-            echo '=== 오래된 이미지만 삭제 (최신 2개 유지) ==='
-            docker images --format '{{.ID}} {{.CreatedAt}}' baseball-diary | sort -k2 -r | tail -n +3 | awk '{print \$1}' | xargs -r docker rmi -f || true
-          
+
+            echo '=== 기존 이미지 완전 삭제 ==='
+            docker rmi baseball-diary:latest -f || true
+
             echo '=== 전체 시스템 정리 ==='
-            docker system prune -f
-          
+            docker system prune -af --volumes
+
             echo '=== 디스크 공간 확인 ==='
             df -h
-          
+
             echo '=== 이미지 로드 ==='
             docker load < baseball-diary.tar.gz
-          
+
+            echo '=== tar 파일 즉시 삭제 ==='
+            rm -f baseball-diary.tar.gz
+
             echo '=== Redis 시작 ==='
             docker compose up -d redis
             sleep 5
-          
+
             echo '=== 애플리케이션 시작 ==='
             docker compose up -d baseball-diary
-          
+
             echo '=== 애플리케이션 준비 대기 ==='
             for i in {1..120}; do
               if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
@@ -97,7 +100,4 @@ jobs:
               fi
               sleep 1
             done
-          
-            echo '=== tar 파일 정리 ==='
-            rm -f ~/baseball-diary.tar.gz
           "
