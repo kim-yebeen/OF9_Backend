@@ -11,29 +11,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
       - name: Build Docker image
         run: docker build --no-cache -t baseball-diary:latest .
 
       - name: Save Docker image
         run: docker save baseball-diary:latest | gzip > baseball-diary.tar.gz
 
-      - name: Setup SSH Proxy for Bastion
+      - name: Setup SSH
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           BASTION_HOST: ${{ secrets.EC2_HOST }}
-          BASTION_USER: ${{ secrets.EC2_USER }}
-          BASTION_PORT: ${{ secrets.EC2_PORT }}
           WAS_HOST: ${{ secrets.WAS_HOST }}
-          WAS_USER: ${{ secrets.WAS_USER }}
         run: |
           mkdir -p ~/.ssh/
           echo "$PRIVATE_KEY" > ~/.ssh/id_rsa
@@ -41,25 +29,26 @@ jobs:
           cat <<EOT >> ~/.ssh/config
           Host bastion
             HostName ${BASTION_HOST}
-            User ${BASTION_USER}
-            Port ${BASTION_PORT}
+            User ubuntu
+            Port 2222
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
 
           Host was_server
             HostName ${WAS_HOST}
-            User ${WAS_USER}
+            User ubuntu
+            Port 22
             ProxyJump bastion
             IdentityFile ~/.ssh/id_rsa
             StrictHostKeyChecking no
           EOT
 
-      - name: Copy files to EC2 WAS Server via Bastion
+      - name: Copy files to WAS Server
         run: |
           scp baseball-diary.tar.gz was_server:~/
           scp docker-compose.yml was_server:~/
 
-      - name: Deploy on EC2 WAS Server via Bastion
+      - name: Deploy on WAS Server
         run: |
           ssh was_server "
             docker load < baseball-diary.tar.gz
