@@ -30,10 +30,12 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest # '유저이름/이미지명:태그' 형식
 
   deploy-on-ec2:
-    needs: build-and-push # build-and-push 작업이 성공해야 실행됩니다.
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Setup SSH
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Setup SSH 
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           BASTION_HOST: ${{ secrets.EC2_HOST }}

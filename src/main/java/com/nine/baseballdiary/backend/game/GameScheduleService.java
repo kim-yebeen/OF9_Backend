@@ -73,7 +73,7 @@ public class GameScheduleService {
 
             // Dockerfile에 설치된 브라우저를 명시적으로 지정해줍니다.
             options.setBinary("/usr/bin/google-chrome");
-            
+
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             options.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
