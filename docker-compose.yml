@@ -12,7 +12,7 @@ services:
       retries: 5
 
   baseball-diary:
-    image: baseball-diary:latest
+    image: ${DOCKER_IMAGE:-${DOCKERHUB_USERNAME}/baseball-diary:latest}
     container_name: baseball-diary
     ports:
       - "8080:8080"
