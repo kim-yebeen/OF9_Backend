@@ -67,8 +67,8 @@ jobs:
       - name: Deploy on WAS Server
         run: |
           ssh was_server "
-            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
-            docker compose down
-            docker compose up -d
+            /usr/bin/docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            /usr/bin/docker pull ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
+            /usr/bin/docker compose down
+            /usr/bin/docker compose up -d
           "
