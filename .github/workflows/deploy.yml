@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Setup SSH 
+      - name: Setup SSH
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
           BASTION_HOST: ${{ secrets.EC2_HOST }}
@@ -69,6 +69,6 @@ jobs:
           ssh was_server "
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
-            docker-compose down
-            docker-compose up -d
+            docker compose down
+            docker compose up -d
           "
