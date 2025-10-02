@@ -5,15 +5,16 @@ RUN gradle build -x test --no-daemon
 
 FROM eclipse-temurin:17-jre-alpine
 
+# chromium과 chromedriver를 설치합니다. (좋은 방법!)
 RUN apk add --no-cache \
     chromium \
     chromium-chromedriver \
     curl \
     && rm -rf /var/cache/apk/*
 
+# Selenium이 찾을 수 있도록 심볼릭 링크를 설정합니다.
 RUN ln -s /usr/bin/chromium-browser /usr/bin/google-chrome \
     && ln -s /usr/bin/chromedriver /usr/local/bin/chromedriver
-
 WORKDIR /app
 
 COPY --from=builder /app/build/libs/*.jar app.jar

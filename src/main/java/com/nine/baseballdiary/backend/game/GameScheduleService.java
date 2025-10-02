@@ -63,39 +63,17 @@ public class GameScheduleService {
         try {
             logger.info("크롤링 시작 - fullCrawl: " + fullCrawl);
 
-            WebDriverManager.chromedriver().setup();
+            //WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
 
             options.addArguments("--headless");
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--disable-gpu");
-            options.addArguments("--window-size=1280,720");
-            options.addArguments("--disable-web-security");
-            options.addArguments("--disable-features=VizDisplayCompositor");
-            options.addArguments("--disable-extensions");
-            options.addArguments("--disable-plugins");
-            options.addArguments("--disable-images");
-            options.addArguments("--disable-dev-tools");
-            options.addArguments("--disable-logging");
-            options.addArguments("--log-level=3");
-            options.addArguments("--silent");
-            options.addArguments("--remote-debugging-port=0");
-            options.addArguments("--disable-blink-features=AutomationControlled");
-            options.addArguments("--memory-pressure-off");
-            options.addArguments("--max_old_space_size=384");
-            options.addArguments("--aggressive-cache-discard");
-            options.addArguments("--disable-background-timer-throttling");
-            options.addArguments("--disable-renderer-backgrounding");
-            options.addArguments("--disable-backgrounding-occluded-windows");
-            options.addArguments("--disable-plugins-discovery");
-            options.addArguments("--disable-background-networking");
-            options.addArguments("--disable-client-side-phishing-detection");
-            options.addArguments("--disable-component-extensions-with-background-pages");
-            options.addArguments("--disable-default-apps");
-            options.addArguments("--disable-ipc-flooding-protection");
-            options.addArguments("--no-zygote");
-            options.addArguments("--disable-gpu-sandbox");
+
+            // Dockerfile에 설치된 브라우저를 명시적으로 지정해줍니다.
+            options.setBinary("/usr/bin/google-chrome");
+            
             options.addArguments("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
             options.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
