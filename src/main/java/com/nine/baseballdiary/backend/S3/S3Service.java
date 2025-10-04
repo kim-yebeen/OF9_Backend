@@ -37,7 +37,7 @@ public class S3Service {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(objectKey)
-                .acl(ObjectCannedACL.PUBLIC_READ)
+               // .acl(ObjectCannedACL.PUBLIC_READ)
                 .build();
 
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
@@ -67,7 +67,7 @@ public class S3Service {
                 PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                         .bucket(bucket)
                         .key(objectKey)
-                        .acl(ObjectCannedACL.PUBLIC_READ)
+                        //.acl(ObjectCannedACL.PUBLIC_READ)
                         .contentType("image/jpeg")
                         .build();
 
