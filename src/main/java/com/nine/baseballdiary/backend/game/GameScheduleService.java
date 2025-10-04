@@ -7,6 +7,8 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -34,10 +36,11 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    //@Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
+
+    @Scheduled(cron = "0 38 9 * * *", zone = "Asia/Seoul")
     public void dailyUpdate11() {
         logger.info("일일 업데이트 시작 (오전 11시) - " + LocalDate.now());
-        crawlSchedule(false);
+        crawlSchedule(true);
     }
 
     //@Scheduled(cron = "0 0 21 * * *", zone = "Asia/Seoul")

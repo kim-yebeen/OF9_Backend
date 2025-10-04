@@ -1,5 +1,3 @@
-# deploy.yml
-
 name: Docker Deploy to EC2
 
 on:
@@ -27,14 +25,12 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest # '유저이름/이미지명:태그' 형식
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
 
   deploy-on-ec2:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
       - name: Setup SSH
         env:
           PRIVATE_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
@@ -61,15 +57,11 @@ jobs:
             StrictHostKeyChecking no
           EOT
 
-      - name: Copy docker-compose.yml to WAS Server
-        run: scp docker-compose.yml was_server:~/
-
       - name: Deploy on WAS Server
         run: |
           ssh was_server "
-            export DOCKER_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            docker pull \$DOCKER_IMAGE
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/baseball-diary:latest
             docker compose down
             docker compose up -d
           "
