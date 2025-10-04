@@ -38,7 +38,7 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    @Scheduled(cron = "0 53 13 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 3 14 * * *", zone = "Asia/Seoul")
     public void dailyUpdate11() {
         logger.info("일일 업데이트 시작 (오전 11시) - " + LocalDate.now());
         crawlSchedule(true);
