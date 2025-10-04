@@ -37,6 +37,8 @@ public class S3Service {
                 .withMethod(HttpMethod.PUT)
                 .withExpiration(expiration);
 
+        request.addRequestParameter("x-amz-acl", "public-read");
+        
         URL url = amazonS3.generatePresignedUrl(request);
         String finalUrl = amazonS3.getUrl(bucket, objectKey).toString();
 
