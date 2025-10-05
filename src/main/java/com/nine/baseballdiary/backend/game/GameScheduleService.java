@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -39,7 +40,7 @@ public class GameScheduleService {
     }
 
     // @Scheduled 어노테이션은 그대로 사용하시면 됩니다.
-    // 예: @Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 55 10 * * *", zone = "Asia/Seoul")
     public void crawlSchedule(boolean fullCrawl) {
         logger.info("API 기반 크롤링 시작 - fullCrawl: " + fullCrawl);
         String url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList";
