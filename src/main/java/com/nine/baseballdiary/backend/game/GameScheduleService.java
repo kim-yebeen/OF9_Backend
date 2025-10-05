@@ -38,9 +38,15 @@ public class GameScheduleService {
         this.restTemplate = restTemplate;
         this.objectMapper = new ObjectMapper();
     }
+    @Scheduled(cron = "0 13 11 * * *", zone = "Asia/Seoul")
+    public void performDailyCrawl() {
+        logger.info("정기 스케줄러 실행: 전체 크롤링을 시작합니다.");
+        // 2. 이 안에서 기존 메소드를 원하는 파라미터(true)로 호출합니다.
+        crawlSchedule(true);
+    }
 
     // @Scheduled 어노테이션은 그대로 사용하시면 됩니다.
-    @Scheduled(cron = "0 55 10 * * *", zone = "Asia/Seoul")
+    //@Scheduled(cron = "0 55 10 * * *", zone = "Asia/Seoul")
     public void crawlSchedule(boolean fullCrawl) {
         logger.info("API 기반 크롤링 시작 - fullCrawl: " + fullCrawl);
         String url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList";
