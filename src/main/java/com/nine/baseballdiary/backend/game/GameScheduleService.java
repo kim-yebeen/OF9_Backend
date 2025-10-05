@@ -1,6 +1,7 @@
 package com.nine.baseballdiary.backend.game;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
+import jakarta.annotation.PostConstruct;
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -11,7 +12,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
+import org.springframework.beans.factory.annotation.Value;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -33,8 +34,21 @@ public class GameScheduleService {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("H:mm");
     private static final Logger logger = Logger.getLogger(GameScheduleService.class.getName());
 
+    @Value("${initial.crawl.enabled:false}")
+    private boolean isInitialCrawlEnabled;
+
     public GameScheduleService(GameService gameService) {
         this.gameService = gameService;
+    }
+
+    @PostConstruct
+    public void init() {
+        // application.properties 파일에 initial.crawl.enabled=true 로 되어 있을 때만 실행
+        if (isInitialCrawlEnabled) {
+            logger.info("### @PostConstruct: 초기 크롤링을 시작합니다. ###");
+            // 별도의 스레드에서 크롤링 실행 (웹 요청을 막지 않기 위함)
+            new Thread(() -> crawlSchedule(true)).start();
+        }
     }
 
 
