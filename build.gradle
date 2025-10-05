@@ -25,14 +25,14 @@ repositories {
 
 dependencies {
 	// --- 핵심 스프링 부트 스타터 ---
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa' // Hibernate, JPA API 포함
-	implementation 'org.springframework.boot:spring-boot-starter-web' // Jackson 포함
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
-	implementation 'org.springframework.boot:spring-boot-starter-webflux' // WebClient 사용
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 	// --- 데이터베이스 ---
 	runtimeOnly 'org.postgresql:postgresql'
@@ -51,8 +51,12 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 
+	// --- Selenium (다시 추가) ---
+	implementation 'org.seleniumhq.selenium:selenium-java:4.19.1'
+	implementation 'io.github.bonigarcia:webdrivermanager:5.7.0'
+
 	// --- 기타 라이브러리 ---
-	implementation 'org.jsoup:jsoup:1.17.2' // 최신 버전 하나만 남김
+	implementation 'org.jsoup:jsoup:1.17.2'
 	implementation 'com.google.code.gson:gson:2.10.1'
 
 	// --- 개발 및 테스트 ---

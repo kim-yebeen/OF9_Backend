@@ -1,16 +1,19 @@
 package com.nine.baseballdiary.backend.game;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import com.nine.baseballdiary.backend.game.Game;
+import com.nine.baseballdiary.backend.game.GameService;
+import org.openqa.selenium.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -18,9 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,177 +28,161 @@ import java.util.regex.Pattern;
 public class GameScheduleService {
 
     private final GameService gameService;
-    private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper;
-
     private static final DateTimeFormatter DB_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("H:mm");
-    private static final Logger logger = LoggerFactory.getLogger(GameScheduleService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(GameScheduleService.class);
 
-    public GameScheduleService(GameService gameService, RestTemplate restTemplate) {
+    public GameScheduleService(GameService gameService) {
         this.gameService = gameService;
-        this.restTemplate = restTemplate;
-        this.objectMapper = new ObjectMapper();
     }
-    @Scheduled(cron = "0 08 12 * * *", zone = "Asia/Seoul")
+
+    @Scheduled(cron = "0 30 12 * * *", zone = "Asia/Seoul") // 테스트를 위해 현재 시간보다 2~3분 뒤로 설정
     public void performDailyCrawl() {
-        logger.info("정기 스케줄러 실행: 전체 크롤링을 시작합니다.");
-        // 2. 이 안에서 기존 메소드를 원하는 파라미터(true)로 호출합니다.
+        logger.info("정기 스케줄러 실행 (Selenium): 전체 크롤링을 시작합니다.");
         crawlSchedule(true);
     }
 
-    // @Scheduled 어노테이션은 그대로 사용하시면 됩니다.
-    //@Scheduled(cron = "0 55 10 * * *", zone = "Asia/Seoul")
     public void crawlSchedule(boolean fullCrawl) {
-        logger.info("API 기반 크롤링 시작 - fullCrawl: " + fullCrawl);
-        String url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList";
+        WebDriver driver = null;
+        try {
+            logger.info("Selenium 기반 크롤링 시작 - fullCrawl: " + fullCrawl);
 
-        HttpHeaders headers = new HttpHeaders();
-        // 폼 데이터 형식으로 Content-Type 설정
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-        headers.set("X-Requested-With", "XMLHttpRequest");
+            ChromeOptions options = new ChromeOptions();
+            options.addArguments("--headless", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu");
+            // EC2 환경에 설치된 Chrome 경로를 지정해야 할 수 있습니다.
+            // options.setBinary("/usr/bin/google-chrome");
+            options.setPageLoadStrategy(PageLoadStrategy.EAGER);
 
-        int currentYear = LocalDate.now().getYear();
-        int startMonth = fullCrawl ? 3 : LocalDate.now().getMonthValue();
-        int endMonth = fullCrawl ? 11 : LocalDate.now().getMonthValue();
+            driver = new ChromeDriver(options);
+            driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(90));
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
 
-        List<Game> allGames = new ArrayList<>();
+            driver.get("https://www.koreabaseball.com/Schedule/Schedule.aspx");
+            logger.info("페이지 로드 성공");
 
-        for (int m = startMonth; m <= endMonth; m++) {
-            String month = String.format("%02d", m);
-            logger.info(currentYear + "년 " + month + "월 데이터 요청...");
+            String year = driver.findElement(By.id("ddlYear")).getAttribute("value");
+            int startMonth = fullCrawl ? 3 : LocalDate.now().getMonthValue();
+            int endMonth = fullCrawl ? 11 : LocalDate.now().getMonthValue();
 
-            try {
-                // KBO API가 요구하는 폼 데이터 생성
-                MultiValueMap<String, String> requestBody = new LinkedMultiValueMap<>();
-                requestBody.add("leId", "1");
-                requestBody.add("srIdList", "0,,9,6");
-                requestBody.add("seasonId", String.valueOf(currentYear));
-                requestBody.add("gameMonth", month);
-                requestBody.add("teamId", "");
+            List<Game> allGamesToSave = new ArrayList<>();
 
-                HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(requestBody, headers);
-                String responseJson = restTemplate.postForObject(url, request, String.class);
+            for (int m = startMonth; m <= endMonth; m++) {
+                String monthVal = String.format("%02d", m);
+                logger.info(monthVal + "월 크롤링 시작");
 
-                Map<String, Object> decodedResponse = objectMapper.readValue(responseJson, new TypeReference<>() {});
-                List<Map<String, List<Map<String, String>>>> rowsData = (List<Map<String, List<Map<String, String>>>>) decodedResponse.get("rows");
+                try {
+                    WebElement scheduleTable = driver.findElement(By.id("tblScheduleList"));
+                    new Select(driver.findElement(By.id("ddlMonth"))).selectByValue(monthVal);
 
-                if (rowsData == null || rowsData.isEmpty()) {
-                    logger.info(month + "월에 스케줄 데이터가 없습니다.");
-                    continue;
-                }
+                    // 안정적인 대기 로직
+                    wait.until(ExpectedConditions.stalenessOf(scheduleTable));
+                    wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("tblScheduleList")));
 
-                allGames.addAll(parseGameData(rowsData, String.valueOf(currentYear)));
-                Thread.sleep(200); // 서버 부하 방지를 위한 최소한의 대기
-
-            } catch (Exception e) {
-                logger.error(month + "월 처리 중 오류 발생: " + e.getMessage());
-                e.printStackTrace();
-            }
-        }
-
-        if (!allGames.isEmpty()) {
-            gameService.saveAllGames(allGames);
-            logger.info("총 " + allGames.size() + "개의 게임 정보를 DB에 저장 완료!");
-        }
-        logger.info("API 기반 크롤링 작업 완료");
-    }
-
-    private List<Game> parseGameData(List<Map<String, List<Map<String, String>>>> rowsData, String year) {
-        List<Game> monthlyGames = new ArrayList<>();
-        String currentDayRaw = "";
-        Map<String, Integer> doubleHeaderCounter = new HashMap<>();
-
-        for (Map<String, List<Map<String, String>>> rowMap : rowsData) {
-            try {
-                List<Map<String, String>> row = rowMap.get("row");
-                if (row.isEmpty()) continue;
-
-                int timeIdx, playIdx, relayIdx, highlightIdx, stadiumIdx, remarksIdx;
-
-                if ("day".equals(row.get(0).get("Class"))) {
-                    currentDayRaw = row.get(0).get("Text").split("\\(")[0].trim();
-                    timeIdx = 1; playIdx = 2; relayIdx = 3; highlightIdx = 4; stadiumIdx = 7; remarksIdx = 8;
-                } else {
-                    timeIdx = 0; playIdx = 1; relayIdx = 2; highlightIdx = 3; stadiumIdx = 6; remarksIdx = 7;
-                }
-
-                if (currentDayRaw.isBlank()) continue;
-
-                String timeText = row.get(timeIdx).get("Text").replaceAll("<[^>]*>", "").trim();
-                String playData = row.get(playIdx).get("Text"); // HTML 포함
-                String playText = playData.replaceAll("<[^>]*>", " ").replaceAll("\\s+", " ").trim();
-                String stadium = row.get(stadiumIdx).get("Text").trim();
-                String remarks = row.get(remarksIdx).get("Text").trim();
-                String relayText = row.get(relayIdx).get("Text");
-
-                String awayName = "", homeName = "";
-                int awayScore = 0, homeScore = 0;
-                String status = "SCHEDULED"; // 기본값
-
-                // 1. 경기 상태 판단
-                if (remarks.contains("취소")) {
-                    status = "CANCELED";
-                } else if (relayText.contains("btnReview") || relayText.contains("btnHighlight")) {
-                    status = "FINISHED";
-                }
-
-                // 2. 팀 이름 파싱 (모든 상태 공통)
-                String[] vsParts = playText.split("vs");
-                if (vsParts.length == 2) {
-                    Pattern teamNamePattern = Pattern.compile("([가-힣A-Z]+)");
-                    Matcher awayMatcher = teamNamePattern.matcher(vsParts[0]);
-                    if (awayMatcher.find()) awayName = awayMatcher.group(1).trim();
-
-                    Matcher homeMatcher = teamNamePattern.matcher(vsParts[1]);
-                    if (homeMatcher.find()) homeName = homeMatcher.group(1).trim();
-                }
-
-                // 3. 점수 파싱 (FINISHED 상태일 때만)
-                if ("FINISHED".equals(status)) {
-                    Pattern awayScorePattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)");
-                    Matcher awayScoreMatcher = awayScorePattern.matcher(playText);
-                    if(awayScoreMatcher.find()) {
-                        awayScore = Integer.parseInt(awayScoreMatcher.group(2));
+                    List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
+                    if (rows.isEmpty() || rows.get(0).getText().contains("해당 경기가 없습니다.")) {
+                        logger.info(monthVal + "월에 스케줄 데이터가 없어 건너뜁니다.");
+                        continue;
                     }
 
-                    Pattern homeScorePattern = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
-                    Matcher homeScoreMatcher = homeScorePattern.matcher(playText);
-                    if(homeScoreMatcher.find()) {
-                        homeScore = Integer.parseInt(homeScoreMatcher.group(1));
+                    String currentDayRaw = "";
+                    Map<String, Integer> doubleHeaderCounter = new HashMap<>();
+
+                    for (WebElement row : rows) {
+                        try {
+                            List<WebElement> days = row.findElements(By.cssSelector("td.day"));
+                            if (!days.isEmpty()) {
+                                currentDayRaw = days.get(0).getText().split("\\(")[0].trim();
+                            }
+                            if (currentDayRaw.isBlank()) continue;
+
+                            String playText = row.findElement(By.cssSelector("td.play")).getText();
+                            String timeText = row.findElement(By.cssSelector("td.time")).getText().trim();
+                            List<WebElement> tds = row.findElements(By.tagName("td"));
+                            String stadium = tds.get(tds.size() - 2).getText().trim();
+                            String remarks = tds.get(tds.size() - 1).getText().trim();
+
+                            String awayName = "", homeName = "";
+                            int awayScore = 0, homeScore = 0;
+                            String status = "SCHEDULED";
+
+                            // 버그 수정: 경기 상태와 관계없이 팀 이름 먼저 파싱
+                            String[] vsParts = playText.split("\\s*vs\\s*");
+                            if (vsParts.length == 2) {
+                                Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)?");
+                                Matcher awayMatcher = awayPattern.matcher(vsParts[0]);
+                                if (awayMatcher.find()) {
+                                    awayName = awayMatcher.group(1).trim();
+                                }
+
+                                Pattern homePattern = Pattern.compile("(\\d+)?\\s*([가-힣A-Z]+)");
+                                Matcher homeMatcher = homePattern.matcher(vsParts[1]);
+                                if (homeMatcher.find()) {
+                                    homeName = homeMatcher.group(2).trim();
+                                }
+                            }
+
+                            // 경기 상태 판단
+                            if (remarks.contains("취소")) {
+                                status = "CANCELED";
+                            } else if (playText.matches(".*\\d+\\s*vs\\s*\\d+.*")) {
+                                status = "FINISHED";
+                                // FINISHED 상태일 때만 점수 파싱
+                                Pattern awayScorePattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)");
+                                Matcher awayScoreMatcher = awayScorePattern.matcher(vsParts[0]);
+                                if (awayScoreMatcher.find()) awayScore = Integer.parseInt(awayScoreMatcher.group(2));
+
+                                Pattern homeScorePattern = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
+                                Matcher homeScoreMatcher = homeScorePattern.matcher(vsParts[1]);
+                                if (homeScoreMatcher.find()) homeScore = Integer.parseInt(homeScoreMatcher.group(1));
+                            }
+
+                            String awayCode = getTeamCode(awayName);
+                            String homeCode = getTeamCode(homeName);
+                            if ("XX".equals(awayCode) || "XX".equals(homeCode)) continue;
+
+                            String[] dateParts = currentDayRaw.split("\\.");
+                            String dbDateStr = year + String.format("%02d", Integer.parseInt(dateParts[0])) + String.format("%02d", Integer.parseInt(dateParts[1]));
+
+                            String matchKey = dbDateStr + homeCode + awayCode;
+                            int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
+                            doubleHeaderCounter.put(matchKey, gameNumber + 1);
+                            String gameId = matchKey + gameNumber;
+
+                            Game game = new Game();
+                            game.setGameId(gameId);
+                            game.setDate(LocalDate.parse(dbDateStr, DB_DATE));
+                            game.setTime(timeText.isBlank() ? null : LocalTime.parse(timeText, TIME_FMT));
+                            game.setStadium(stadium);
+                            game.setAwayTeam(awayName);
+                            game.setHomeTeam(homeName);
+                            game.setAwayScore(awayScore);
+                            game.setHomeScore(homeScore);
+                            game.setStatus(status);
+
+                            // 속도 개선: DB에 바로 저장하지 않고 리스트에 추가
+                            allGamesToSave.add(game);
+
+                        } catch (Exception e) {
+                            logger.warn("개별 경기 데이터 파싱 중 오류: " + e.getMessage());
+                        }
                     }
+                } catch (Exception e) {
+                    logger.error(monthVal + "월 처리 중 오류 발생", e);
                 }
-
-                String awayCode = getTeamCode(awayName);
-                String homeCode = getTeamCode(homeName);
-                if ("XX".equals(awayCode) || "XX".equals(homeCode)) continue;
-
-                String[] dateParts = currentDayRaw.split("\\.");
-                String dbDateStr = year + String.format("%02d", Integer.parseInt(dateParts[0])) + String.format("%02d", Integer.parseInt(dateParts[1]));
-
-                String matchKey = dbDateStr + homeCode + awayCode;
-                int gameNumber = doubleHeaderCounter.getOrDefault(matchKey, 0);
-                doubleHeaderCounter.put(matchKey, gameNumber + 1);
-                String gameId = matchKey + gameNumber;
-
-                Game game = new Game();
-                game.setGameId(gameId);
-                game.setDate(LocalDate.parse(dbDateStr, DB_DATE));
-                game.setTime(timeText.isBlank() ? null : LocalTime.parse(timeText, TIME_FMT));
-                game.setStadium(stadium);
-                game.setAwayTeam(awayName);
-                game.setHomeTeam(homeName);
-                game.setAwayScore(awayScore);
-                game.setHomeScore(homeScore);
-                game.setStatus(status);
-                monthlyGames.add(game);
-
-            } catch (Exception e) {
-                logger.warn("개별 경기 데이터 파싱 중 오류: " + e.getMessage());
             }
+
+            // 속도 개선: 모든 크롤링이 끝난 후 DB에 한 번에 저장
+            if (!allGamesToSave.isEmpty()) {
+                gameService.saveAllGames(allGamesToSave);
+                logger.info("총 " + allGamesToSave.size() + "개의 게임 정보를 DB에 저장 완료!");
+            }
+
+        } finally {
+            if (driver != null) {
+                driver.quit();
+            }
+            logger.info("Selenium 기반 크롤링 작업 완료");
         }
-        return monthlyGames;
     }
 
     private static String getTeamCode(String name) {
