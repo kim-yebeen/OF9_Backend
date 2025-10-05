@@ -18,6 +18,16 @@ import java.util.stream.Collectors;
 public class GameService {
     private final GameRepository gameRepo;
 
+    @Transactional
+    public void saveAllGames(List<Game> games) {
+        gameRepo.saveAll(games); // JpaRepository의 saveAll 메소드 활용
+    }
+
+    @Transactional
+    public void updateAllGames(List<Game> games) {
+        // saveAll은 id가 존재하면 UPDATE 쿼리를 실행하므로 동일하게 사용 가능
+        gameRepo.saveAll(games);
+    }
     /**
      * 날짜 범위(from/to) 내의 모든 경기 조회
      */
