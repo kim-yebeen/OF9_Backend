@@ -18,7 +18,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,14 +33,14 @@ public class GameScheduleService {
 
     private static final DateTimeFormatter DB_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("H:mm");
-    private static final Logger logger = Logger.getLogger(GameScheduleService.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(GameScheduleService.class.getName());
 
     public GameScheduleService(GameService gameService, RestTemplate restTemplate) {
         this.gameService = gameService;
         this.restTemplate = restTemplate;
         this.objectMapper = new ObjectMapper();
     }
-    @Scheduled(cron = "0 29 11 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 08 12 * * *", zone = "Asia/Seoul")
     public void performDailyCrawl() {
         logger.info("정기 스케줄러 실행: 전체 크롤링을 시작합니다.");
         // 2. 이 안에서 기존 메소드를 원하는 파라미터(true)로 호출합니다.
@@ -91,7 +93,7 @@ public class GameScheduleService {
                 Thread.sleep(200); // 서버 부하 방지를 위한 최소한의 대기
 
             } catch (Exception e) {
-                logger.severe(month + "월 처리 중 오류 발생: " + e.getMessage());
+                logger.error(month + "월 처리 중 오류 발생: " + e.getMessage());
                 e.printStackTrace();
             }
         }
@@ -193,7 +195,7 @@ public class GameScheduleService {
                 monthlyGames.add(game);
 
             } catch (Exception e) {
-                logger.warning("개별 경기 데이터 파싱 중 오류: " + e.getMessage());
+                logger.warn("개별 경기 데이터 파싱 중 오류: " + e.getMessage());
             }
         }
         return monthlyGames;
