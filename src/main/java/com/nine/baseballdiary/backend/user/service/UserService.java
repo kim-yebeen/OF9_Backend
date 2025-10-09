@@ -117,9 +117,17 @@ public class UserService {
         User me = userRepo.findById(meId).orElseThrow();
         User target = userRepo.findById(targetId).orElseThrow();
 
-        // 복합키 구조에 맞게 수정
+        // 이미팔로우 중인지 확인
         if (followRepo.existsByFollower_IdAndFollowee_Id(meId, targetId)) {
-            return new FollowResponse(false, false, null);
+            boolean isFollower = followRepo.existsByFollower_IdAndFollowee_Id(targetId, meId);
+            return FollowResponse.builder()
+                    .followed(false)
+                    .pending(false)
+                    .requestId(null)
+                    .isFollowing(true)
+                    .isFollower(isFollower)
+                    .isMutual(isFollower)
+                    .build();
         }
 
         if (Boolean.TRUE.equals(target.getIsPrivate())) {
@@ -130,8 +138,18 @@ public class UserService {
                     .build();
             req = reqRepo.save(req);
             notificationService.createFollowRequestNotification(targetId, meId);
-            return new FollowResponse(true, true, req.getId());
-        } else {
+            boolean isFollower = followRepo.existsByFollower_IdAndFollowee_Id(targetId, meId);
+
+            return FollowResponse.builder()
+                    .followed(true)
+                    .pending(true)
+                    .requestId(req.getId())
+                    .isFollowing(false)
+                    .isFollower(isFollower)
+                    .isMutual(false)
+                    .build();
+
+    } else {
             // 복합키 구조에서는 생성자 대신 세터 사용
             UserFollow userFollow = new UserFollow();
             userFollow.setFollower(me);
@@ -140,8 +158,17 @@ public class UserService {
             followRepo.save(userFollow);
 
             notificationService.createFollowNotification(targetId, meId);
-            return new FollowResponse(true, false, null);
-        }
+            boolean isFollower = followRepo.existsByFollower_IdAndFollowee_Id(targetId, meId);
+
+            return FollowResponse.builder()
+                    .followed(true)
+                    .pending(false)
+                    .requestId(null)
+                    .isFollowing(true)
+                    .isFollower(isFollower)
+                    .isMutual(isFollower)
+                    .build();
+            }
     }
     // 2) 내 계정으로 온 PENDING 요청 리스트 조회
     //    (import org.springframework.transaction.annotation.Transactional;)
