@@ -282,7 +282,30 @@ public class UserService {
         u.setProfileImageUrl(req.getProfileImageUrl() != null && !req.getProfileImageUrl().trim().isEmpty()
                 ? req.getProfileImageUrl().trim() : null);
 
-        if (req.getIsPrivate() != null) {
+        if (req.getIsPrivate() != null && !req.getIsPrivate().equals(u.getIsPrivate())) {
+            // 비공개 → 공개로 전환하는 경우
+            if (Boolean.FALSE.equals(req.getIsPrivate()) && Boolean.TRUE.equals(u.getIsPrivate())) {
+                // 대기 중인 모든 팔로우 요청을 자동 수락
+                List<FollowRequest> pendingRequests = reqRepo.findByTarget_IdAndStatus(userId, FollowRequestStatus.PENDING);
+
+                for (FollowRequest request : pendingRequests) {
+                    // 팔로우 관계 생성
+                    UserFollow userFollow = new UserFollow();
+                    userFollow.setFollower(request.getRequester());
+                    userFollow.setFollowee(request.getTarget());
+                    userFollow.setCreatedAt(LocalDateTime.now());
+                    followRepo.save(userFollow);
+
+                    // 요청 상태를 ACCEPTED로 변경
+                    request.setStatus(FollowRequestStatus.ACCEPTED);
+
+                    // ✅ 팔로우 알림 생성 (각 요청자에게)
+                    notificationService.createFollowNotification(userId, request.getRequester().getId());
+                }
+            }
+
+            u.setIsPrivate(req.getIsPrivate());
+        } else if (req.getIsPrivate() != null) {
             u.setIsPrivate(req.getIsPrivate());
         }
     }

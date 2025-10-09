@@ -70,7 +70,7 @@ public class KakaoService {
             return existingUser.get();
         }
 
-        
+
         String finalNickname = generateUniqueRandomNickname();
 
         User newUser = User.builder()
