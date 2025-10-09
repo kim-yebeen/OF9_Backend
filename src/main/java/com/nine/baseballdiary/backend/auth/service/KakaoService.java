@@ -70,21 +70,13 @@ public class KakaoService {
             return existingUser.get();
         }
 
-        // --- 신규 유저 생성 ---
-        Map<String, Object> kakaoAccount = (Map<String, Object>) kakaoUserInfo.get("kakao_account");
-        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
-        String kakaoProfileUrl = (String) profile.get("profile_image_url");
-
+        
         String finalNickname = generateUniqueRandomNickname();
 
-        // ✅ [개선] S3에 이미지를 먼저 업로드합니다. (kakaoId 사용)
-        String ourS3Url = s3Service.uploadImageFromUrl(kakaoProfileUrl, kakaoId, "profiles");
-
-        // ✅ [개선] 모든 정보가 준비된 후 User 엔티티를 생성하고 DB에 한 번만 저장합니다.
         User newUser = User.builder()
                 .kakaoId(kakaoId)
                 .nickname(finalNickname)
-                .profileImageUrl(ourS3Url)
+                .profileImageUrl(null)
                 .favTeam(favTeam)
                 .isPrivate(false)
                 .build();
