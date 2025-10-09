@@ -157,6 +157,19 @@ public class NotificationService {
                 dto.setUserNickname(user.getNickname());
                 dto.setUserProfileImage(user.getProfileImageUrl());
             });
+            if (notification.getType() == NotificationType.FOLLOW ||
+                    notification.getType() == NotificationType.FOLLOW_REQUEST) {
+
+                Long myId = notification.getUserId();  // 알림 받는 사람 (나)
+                Long otherId = notification.getRelatedUserId();  // 알림 보낸 사람 (상대방)
+
+                // 내가 상대방을 팔로우하고 있는지
+                dto.setIsFollowing(userFollowRepo.existsByFollower_IdAndFollowee_Id(myId, otherId));
+
+                // 상대방이 나를 팔로우하고 있는지 (맞팔 확인용)
+                dto.setIsFollower(userFollowRepo.existsByFollower_IdAndFollowee_Id(otherId, myId));
+            }
+
         } else if (notification.getType() == NotificationType.SYSTEM) {
             dto.setUserNickname("LookIT");
             dto.setUserProfileImage("/images/lookit-logo.png");

@@ -22,4 +22,7 @@ public class NotificationDto {
     private String actionButton;
     private String category;
 
+    private Boolean isFollowing;  // 내가 이 사람을 팔로우하고 있는지
+    private Boolean isFollower;   // 이 사람이 나를 팔로우하고 있는지 (맞팔 확인용)
+
 }
