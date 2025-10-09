@@ -299,7 +299,7 @@ public class UserService {
                     // 요청 상태를 ACCEPTED로 변경
                     request.setStatus(FollowRequestStatus.ACCEPTED);
 
-                    // ✅ 팔로우 알림 생성 (각 요청자에게)
+                    // 팔로우 알림 생성 (각 요청자에게)
                     notificationService.createFollowNotification(userId, request.getRequester().getId());
                 }
             }
