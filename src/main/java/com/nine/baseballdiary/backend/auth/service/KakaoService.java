@@ -93,7 +93,7 @@ public class KakaoService {
         return nickname;
     }
 
-
+//1234
     //카카오 액세스 토큰으로 카카오 ID만 조회
     public Long getKakaoIdFromToken(String accessToken) {
         Map<String, Object> kakaoUserInfo = getKakaoUserInfo(accessToken);
