@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS player (
     position VARCHAR(20) NOT NULL
     );
 
-CREATE INDEX idx_player_name ON player(name);
+CREATE INDEX IF NOT EXISTS idx_player_name ON player(name);
 CREATE INDEX IF NOT EXISTS idx_user_badge_user_id ON user_badge(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocker_id ON user_block(blocker_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocked_id ON user_block(blocked_id);
