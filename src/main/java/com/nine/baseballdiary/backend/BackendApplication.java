@@ -6,15 +6,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
 
-
 @SpringBootApplication
+@EnableScheduling  // 이 줄 추가!
 public class BackendApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(BackendApplication.class, args);
 	}
 
-	@Bean
+	@Bean  // 중괄호 위치 수정
 	public RestTemplate restTemplate() {
 		return new RestTemplate();
 	}
