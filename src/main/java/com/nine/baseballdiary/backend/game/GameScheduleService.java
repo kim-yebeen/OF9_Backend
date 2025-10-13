@@ -1,13 +1,11 @@
 package com.nine.baseballdiary.backend.game;
 
 import org.openqa.selenium.*;
-import org.openqa.selenium.chrome.ChromeDriver;
+        import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -35,29 +33,10 @@ public class GameScheduleService {
         this.gameService = gameService;
     }
 
-    /**
-     * 매일 새벽 1시 30분 실행
-     */
-    @Scheduled(cron = "0 30 1 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 40 2 * * *", zone = "Asia/Seoul")
     public void dailyUpdate() {
         logger.info("일일 업데이트 시작 (새벽 1시 30분) - " + LocalDate.now());
-        crawlSchedule(false);  // 당월만 크롤링
-    }
-
-    /**
-     * 애플리케이션 시작 시 전체 크롤링 (선택적)
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    public void onStartup() {
-        logger.info("애플리케이션 시작 - 10초 후 크롤링 시작");
-        new Thread(() -> {
-            try {
-                Thread.sleep(10000);
-                crawlSchedule(true);
-            } catch (Exception e) {
-                logger.severe("시작 시 크롤링 실패: " + e.getMessage());
-            }
-        }).start();
+        crawlSchedule(false);
     }
 
     public void crawlSchedule(boolean fullCrawl) {
@@ -78,7 +57,6 @@ public class GameScheduleService {
             driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(60));
             driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10));
 
-            // 페이지 로드 재시도
             boolean pageLoaded = false;
             for (int attempt = 1; attempt <= 3; attempt++) {
                 try {
@@ -95,15 +73,38 @@ public class GameScheduleService {
 
             if (!pageLoaded) throw new RuntimeException("페이지 로드 최종 실패");
 
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));  // ✅ 180초 → 30초
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+
+            // ✅ 포스트시즌 감지 및 정규시즌으로 전환
+            try {
+                WebElement seriesDropdown = driver.findElement(By.id("ddlSeries"));
+                if (seriesDropdown.isDisplayed()) {
+                    logger.info("⚾ 포스트시즌 페이지 감지 - 정규시즌으로 전환 시도");
+                    Select seriesSelect = new Select(seriesDropdown);
+
+                    // 정규시즌 선택 (value="0,9,6")
+                    seriesSelect.selectByValue("0,9,6");
+                    Thread.sleep(2000);
+
+                    logger.info("✅ 정규시즌으로 전환 완료");
+                }
+            } catch (NoSuchElementException e) {
+                logger.info("정규시즌 페이지 (포스트시즌 드롭다운 없음)");
+            } catch (Exception e) {
+                logger.warning("정규시즌 전환 중 오류 (계속 진행): " + e.getMessage());
+            }
 
             String year = driver.findElement(By.id("ddlYear")).getAttribute("value");
             String currentMonth = driver.findElement(By.id("ddlMonth")).getAttribute("value");
 
-            // ✅ 현재 월부터 12월까지만 크롤링 (과거 월은 스킵)
-            int startMonth = fullCrawl ? Integer.parseInt(currentMonth) : Integer.parseInt(currentMonth);
-            int endMonth = 12;
-
+            int startMonth, endMonth;
+            if (fullCrawl) {
+                startMonth = 3;  // KBO 시즌 시작월
+                endMonth = 11;   // KBO 시즌 종료월
+            } else {
+                startMonth = Integer.parseInt(currentMonth);
+                endMonth = Integer.parseInt(currentMonth);  // 현재 월만
+            }
             LocalDate today = LocalDate.now();
             logger.info("크롤링 범위: " + year + "년 " + startMonth + "월 ~ " + endMonth + "월");
 
@@ -113,7 +114,6 @@ public class GameScheduleService {
                     logger.info(monthVal + "월 크롤링 시작");
                     new Select(driver.findElement(By.id("ddlMonth"))).selectByValue(monthVal);
 
-                    // ✅ 타임아웃 줄이고 더 빠르게 체크
                     try {
                         wait.until(ExpectedConditions.or(
                                 ExpectedConditions.textToBePresentInElementLocated(
@@ -124,7 +124,7 @@ public class GameScheduleService {
                                         By.cssSelector("#tblScheduleList tbody tr")
                                 )
                         ));
-                        Thread.sleep(1000);  // ✅ 1초만 대기
+                        Thread.sleep(1000);
                     } catch (TimeoutException e) {
                         logger.info(monthVal + "월에 스케줄 데이터가 없어 건너뜁니다.");
                         continue;
@@ -132,7 +132,15 @@ public class GameScheduleService {
 
                     List<WebElement> rows = driver.findElements(By.cssSelector("#tblScheduleList tbody tr"));
 
-                    // ✅ 빈 테이블 체크
+                    // ✅ "데이터가 없습니다" 체크
+                    if (rows.size() == 1) {
+                        String singleRowText = rows.get(0).getText();
+                        if (singleRowText.contains("데이터가 없습니다") || singleRowText.contains("없습니다")) {
+                            logger.info(monthVal + "월에 경기 데이터가 없습니다.");
+                            continue;
+                        }
+                    }
+
                     if (rows.isEmpty() || rows.size() < 2) {
                         logger.info(monthVal + "월에 경기 데이터가 없습니다.");
                         continue;
@@ -144,7 +152,6 @@ public class GameScheduleService {
 
                     for (WebElement row : rows) {
                         try {
-                            // 날짜 추출
                             List<WebElement> days = row.findElements(By.cssSelector("td.day"));
                             if (!days.isEmpty()) {
                                 currentDayRaw = days.get(0).getText().split("\\(")[0].trim();
@@ -160,7 +167,6 @@ public class GameScheduleService {
                                     + String.format("%02d", Integer.parseInt(dateParts[1]));
                             LocalDate gameDate = LocalDate.parse(dbDateStr, DB_DATE);
 
-                            // ✅ 시간 정보 안전하게 추출
                             LocalTime startTime = null;
                             try {
                                 List<WebElement> timeElements = row.findElements(By.cssSelector("td.time"));
@@ -171,14 +177,12 @@ public class GameScheduleService {
                                     }
                                 }
                             } catch (Exception timeEx) {
-                                logger.fine("시간 정보 없음: " + timeEx.getMessage());
+                                // 시간 정보 없으면 무시
                             }
 
-                            // 경기장 정보
                             List<WebElement> tds = row.findElements(By.tagName("td"));
                             String stadium = tds.size() >= 8 ? tds.get(tds.size() - 2).getText().trim() : "";
 
-                            // 경기 정보
                             WebElement playCell = row.findElement(By.cssSelector("td.play"));
                             String playText = playCell.getText().trim();
 
@@ -193,7 +197,6 @@ public class GameScheduleService {
                             String status = "SCHEDULED";
                             String rowText = row.getText();
 
-                            // 취소 확인
                             boolean isCanceled = rowText.contains("우천취소") ||
                                     rowText.contains("경기취소") ||
                                     rowText.contains("취소") ||
@@ -210,7 +213,6 @@ public class GameScheduleService {
                                     String right = vsParts[1].trim();
                                     boolean hasScore = false;
 
-                                    // Away 팀 파싱
                                     Pattern awayPattern = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)?");
                                     Matcher awayMatcher = awayPattern.matcher(left);
                                     if (awayMatcher.find()) {
@@ -222,7 +224,6 @@ public class GameScheduleService {
                                         }
                                     }
 
-                                    // Home 팀 파싱
                                     Pattern homePattern1 = Pattern.compile("(\\d+)\\s*([가-힣A-Z]+)");
                                     Pattern homePattern2 = Pattern.compile("([가-힣A-Z]+)\\s*(\\d+)");
 
@@ -281,7 +282,6 @@ public class GameScheduleService {
                             processedGames++;
 
                         } catch (Exception rowException) {
-                            logger.fine("행 처리 중 오류 (무시): " + rowException.getMessage());
                             continue;
                         }
                     }
