@@ -15,7 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,99 +31,53 @@ public class FeedService {
     private final RecordLikeRepository likeRepo;
     private final RecordCommentRepository commentRepo;
 
+    /**
+     * 전체 피드 조회 (최신순, 팀 필터링 지원)
+     */
     @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
-        // 날짜는 필수
-        if (request.getDate() == null || request.getDate().trim().isEmpty()) {
-            throw new IllegalArgumentException("날짜는 필수입니다.");
-        }
-
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
+        String teamFilter = parseTeam(request.getTeam());
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        List<GameRecord> records;
-
-        if ("latest".equals(request.getSortBy())) {
-            // 최신순 - JPQL 사용
-            LocalDate dateFilter = LocalDate.parse(request.getDate());
-            String teamFilter = parseTeam(request.getTeam());
-            Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
-
-            records = recordRepo.findAllFeedRecordsByLatest(
-                    request.getUserId(), followingIds, dateFilter, teamFilter, pageable
-            );
-        } else {
-            // 인기순 (기본값) - Native Query 사용
-            String followingIdsStr = convertListToPostgresArray(followingIds);
-            String teamFilter = parseTeam(request.getTeam());
-            int offset = request.getPage() * request.getSize();
-
-            records = recordRepo.findAllFeedRecordsByPopularity(
-                    request.getUserId(),
-                    followingIdsStr,
-                    request.getDate(),
-                    teamFilter,
-                    request.getSize(),
-                    offset
-            );
-        }
+        // 차단 필터 포함 버전 사용
+        List<GameRecord> records = recordRepo.findAllFeedRecordsWithBlockFilter(
+                request.getUserId(),
+                followingIds,
+                teamFilter,
+                pageable
+        );
 
         return records.stream()
                 .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 팔로잉 피드 조회 (최신순, 팀 필터링 지원)
+     */
     @Transactional(readOnly = true)
     public List<FeedResponse> getFollowingFeed(FeedRequest request) {
-        // 날짜는 필수
-        if (request.getDate() == null || request.getDate().trim().isEmpty()) {
-            throw new IllegalArgumentException("날짜는 필수입니다.");
-        }
-
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
 
         if (followingIds.isEmpty()) {
             return List.of();
         }
 
-        List<GameRecord> records;
+        String teamFilter = parseTeam(request.getTeam());
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        if ("latest".equals(request.getSortBy())) {
-            // 최신순 - JPQL 사용
-            LocalDate dateFilter = LocalDate.parse(request.getDate());
-            String teamFilter = parseTeam(request.getTeam());
-            Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
-
-            records = recordRepo.findFollowingFeedRecordsByLatest(
-                    followingIds, dateFilter, teamFilter, pageable
-            );
-        } else {
-            // 인기순 (기본값) - Native Query 사용
-            String userIdsStr = convertListToPostgresArray(followingIds);
-            String teamFilter = parseTeam(request.getTeam());
-            int offset = request.getPage() * request.getSize();
-
-            records = recordRepo.findFollowingFeedRecordsByPopularity(
-                    userIdsStr,
-                    request.getDate(),
-                    teamFilter,
-                    request.getSize(),
-                    offset
-            );
-        }
+        // 차단 필터 포함 버전 사용
+        List<GameRecord> records = recordRepo.findFollowingFeedRecordsWithBlockFilter(
+                followingIds,
+                request.getUserId(),
+                teamFilter,
+                pageable
+        );
 
         return records.stream()
                 .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
-    }
-
-    // PostgreSQL 배열 형식으로 변환
-    private String convertListToPostgresArray(List<Long> list) {
-        if (list == null || list.isEmpty()) {
-            return "{}";
-        }
-        return "{" + list.stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(",")) + "}";
     }
 
     private String parseTeam(String team) {

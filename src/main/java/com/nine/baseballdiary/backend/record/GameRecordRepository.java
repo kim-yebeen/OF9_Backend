@@ -11,43 +11,7 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
-    // ✅ record_reaction → record_like로 변경
-    @Query(value = """
-        SELECT r.* FROM record r 
-        JOIN game g ON r.game_id = g.game_id 
-        JOIN users u ON r.user_id = u.id 
-        LEFT JOIN (
-            SELECT rl.record_id, COUNT(rl.id) as like_count 
-            FROM record_like rl 
-            GROUP BY rl.record_id
-        ) lc ON r.record_id = lc.record_id
-        LEFT JOIN (
-            SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
-            FROM user_follow uf 
-            GROUP BY uf.followee_id
-        ) fc ON u.id = fc.followee_id
-        WHERE (
-            u.is_private = false OR 
-            r.user_id = :currentUserId OR 
-            r.user_id = ANY(CAST(:followingIds AS bigint[]))
-        )
-        AND g.date = CAST(:date AS DATE)
-        AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
-        ORDER BY 
-            COALESCE(lc.like_count, 0) DESC,
-            COALESCE(fc.follower_count, 0) DESC,
-            u.nickname ASC
-        LIMIT :limit OFFSET :offset
-        """, nativeQuery = true)
-    List<GameRecord> findAllFeedRecordsByPopularity(
-            @Param("currentUserId") Long currentUserId,
-            @Param("followingIds") String followingIds,
-            @Param("date") String date,
-            @Param("team") String team,
-            @Param("limit") int limit,
-            @Param("offset") int offset
-    );
-
+    // ✅ 전체 피드 - 최신순 (날짜 필터 제거, 팀 필터만)
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -57,60 +21,17 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
         r.userId = :currentUserId OR 
         r.userId IN :followingIds
     )
-    AND g.date = :date
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findAllFeedRecordsByLatest(
+    List<GameRecord> findAllFeedRecords(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
-            @Param("date") LocalDate date,
             @Param("team") String team,
             Pageable pageable
     );
 
-    // ✅ record_reaction → record_like로 변경 (차단 필터 포함)
-    @Query(value = """
-        SELECT r.* FROM record r 
-        JOIN game g ON r.game_id = g.game_id 
-        JOIN users u ON r.user_id = u.id 
-        LEFT JOIN (
-            SELECT rl.record_id, COUNT(rl.id) as like_count 
-            FROM record_like rl 
-            GROUP BY rl.record_id
-        ) lc ON r.record_id = lc.record_id
-        LEFT JOIN (
-            SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
-            FROM user_follow uf 
-            GROUP BY uf.followee_id
-        ) fc ON u.id = fc.followee_id
-        WHERE (
-            u.is_private = false OR 
-            r.user_id = :currentUserId OR 
-            r.user_id = ANY(CAST(:followingIds AS bigint[]))
-        )
-        AND g.date = CAST(:date AS DATE)
-        AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
-        AND NOT EXISTS (
-            SELECT 1 FROM user_block ub 
-            WHERE (ub.blocker_id = :currentUserId AND ub.blocked_id = r.user_id)
-               OR (ub.blocker_id = r.user_id AND ub.blocked_id = :currentUserId)
-        )
-        ORDER BY 
-            COALESCE(lc.like_count, 0) DESC,
-            COALESCE(fc.follower_count, 0) DESC,
-            u.nickname ASC
-        LIMIT :limit OFFSET :offset
-        """, nativeQuery = true)
-    List<GameRecord> findAllFeedRecordsByPopularityWithBlockFilter(
-            @Param("currentUserId") Long currentUserId,
-            @Param("followingIds") String followingIds,
-            @Param("date") String date,
-            @Param("team") String team,
-            @Param("limit") int limit,
-            @Param("offset") int offset
-    );
-
+    // ✅ 전체 피드 - 차단 필터 포함
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -120,7 +41,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
         r.userId = :currentUserId OR 
         r.userId IN :followingIds
     )
-    AND g.date = :date
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     AND NOT EXISTS (
         SELECT 1 FROM UserBlock ub 
@@ -129,104 +49,32 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     )
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findAllFeedRecordsByLatestWithBlockFilter(
+    List<GameRecord> findAllFeedRecordsWithBlockFilter(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
-            @Param("date") LocalDate date,
             @Param("team") String team,
             Pageable pageable
     );
 
-    // ✅ 팔로잉 피드 - 인기순 (record_reaction → record_like)
-    @Query(value = """
-        SELECT r.* FROM record r 
-        JOIN game g ON r.game_id = g.game_id 
-        LEFT JOIN (
-            SELECT rl.record_id, COUNT(rl.id) as like_count 
-            FROM record_like rl 
-            GROUP BY rl.record_id
-        ) lc ON r.record_id = lc.record_id
-        LEFT JOIN users u ON r.user_id = u.id
-        LEFT JOIN (
-            SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
-            FROM user_follow uf 
-            GROUP BY uf.followee_id
-        ) fc ON u.id = fc.followee_id
-        WHERE r.user_id = ANY(CAST(:userIds AS bigint[]))
-        AND g.date = CAST(:date AS DATE)
-        AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
-        ORDER BY 
-            COALESCE(lc.like_count, 0) DESC,
-            COALESCE(fc.follower_count, 0) DESC,
-            u.nickname ASC
-        LIMIT :limit OFFSET :offset
-        """, nativeQuery = true)
-    List<GameRecord> findFollowingFeedRecordsByPopularity(
-            @Param("userIds") String userIds,
-            @Param("date") String date,
-            @Param("team") String team,
-            @Param("limit") int limit,
-            @Param("offset") int offset
-    );
-
+    // ✅ 팔로잉 피드 - 최신순
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
     WHERE r.userId IN :userIds
-    AND g.date = :date
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findFollowingFeedRecordsByLatest(
+    List<GameRecord> findFollowingFeedRecords(
             @Param("userIds") List<Long> userIds,
-            @Param("date") LocalDate date,
             @Param("team") String team,
             Pageable pageable
     );
 
-    // ✅ 팔로잉 피드 - 차단 사용자 제외 (record_reaction → record_like)
-    @Query(value = """
-        SELECT r.* FROM record r 
-        JOIN game g ON r.game_id = g.game_id 
-        LEFT JOIN (
-            SELECT rl.record_id, COUNT(rl.id) as like_count 
-            FROM record_like rl 
-            GROUP BY rl.record_id
-        ) lc ON r.record_id = lc.record_id
-        LEFT JOIN users u ON r.user_id = u.id
-        LEFT JOIN (
-            SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
-            FROM user_follow uf 
-            GROUP BY uf.followee_id
-        ) fc ON u.id = fc.followee_id
-        WHERE r.user_id = ANY(CAST(:userIds AS bigint[]))
-        AND g.date = CAST(:date AS DATE)
-        AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
-        AND NOT EXISTS (
-            SELECT 1 FROM user_block ub 
-            WHERE (ub.blocker_id = :currentUserId AND ub.blocked_id = r.user_id)
-               OR (ub.blocker_id = r.user_id AND ub.blocked_id = :currentUserId)
-        )
-        ORDER BY 
-            COALESCE(lc.like_count, 0) DESC,
-            COALESCE(fc.follower_count, 0) DESC,
-            u.nickname ASC
-        LIMIT :limit OFFSET :offset
-        """, nativeQuery = true)
-    List<GameRecord> findFollowingFeedRecordsByPopularityWithBlockFilter(
-            @Param("userIds") String userIds,
-            @Param("currentUserId") Long currentUserId,
-            @Param("date") String date,
-            @Param("team") String team,
-            @Param("limit") int limit,
-            @Param("offset") int offset
-    );
-
+    // ✅ 팔로잉 피드 - 차단 필터 포함
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
     WHERE r.userId IN :userIds
-    AND g.date = :date
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     AND NOT EXISTS (
         SELECT 1 FROM UserBlock ub 
@@ -235,14 +83,14 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     )
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findFollowingFeedRecordsByLatestWithBlockFilter(
+    List<GameRecord> findFollowingFeedRecordsWithBlockFilter(
             @Param("userIds") List<Long> userIds,
             @Param("currentUserId") Long currentUserId,
-            @Param("date") LocalDate date,
             @Param("team") String team,
             Pageable pageable
     );
 
+    // ✅ 기존 메서드들 (마이페이지, 검색 등)
     long countByUserId(Long userId);
 
     List<GameRecord> findByUserId(Long userId);

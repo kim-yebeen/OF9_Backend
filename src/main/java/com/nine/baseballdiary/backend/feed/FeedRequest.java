@@ -1,19 +1,12 @@
 package com.nine.baseballdiary.backend.feed;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Getter
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
+@Setter
 public class FeedRequest {
     private Long userId;
-    private String date;    // "2025-06-05" 형식
     private String team;    // "LG", "두산" 등
-    private int page;
-    private int size;
-    private String sortBy = "popularity";  // 기본값: 인기순
+    private int page=0;
+    private int size=20;
 }
