@@ -126,7 +126,7 @@ CREATE TABLE IF NOT EXISTS food (
     stadium_id INT REFERENCES stadium(id)
     );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
                                id SERIAL PRIMARY KEY,
                                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                                type VARCHAR(20) NOT NULL, -- 'FOLLOW', 'FOLLOW_REQUEST', 'LIKE', 'NEW_RECORD', 'COMMENT', 'REPLY', 'SYSTEM'
