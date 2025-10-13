@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS follow_request (
     );
 
 DROP TABLE IF EXISTS record_reaction CASCADE;
-CREATE TABLE record_like (
+CREATE TABLE IF NOT EXISTS record_like (
                              id SERIAL PRIMARY KEY,
                              record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
                              user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
