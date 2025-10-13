@@ -2,7 +2,7 @@ package com.nine.baseballdiary.backend.user.service;
 
 import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.S3.S3Service;
-import com.nine.baseballdiary.backend.reaction.RecordReactionRepository;
+import com.nine.baseballdiary.backend.like.RecordLikeRepository;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.search.dto.FollowStatus;
@@ -33,7 +33,7 @@ public class UserService {
     private final FollowRequestRepository reqRepo;
     private final NotificationService notificationService;
     private final UserBlockRepository userBlockRepo;
-    private final RecordReactionRepository recordReactionRepo;
+    private final RecordLikeRepository likeRepo;  // ✅ RecordReactionRepository → RecordLikeRepository
     private final S3Service s3Service;
 
     @Transactional(readOnly = true)
@@ -47,11 +47,8 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-
-    // ✅ 팔로잉 목록 (수정 완료)
     @Transactional(readOnly = true)
     public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
-        // 복합키 구조에 맞게 수정
         List<Long> followingIds = followRepo.findByFollower_Id(profileUserId).stream()
                 .map(follow -> follow.getFollowee().getId())
                 .collect(Collectors.toList());
@@ -64,10 +61,8 @@ public class UserService {
         return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
     }
 
-
     @Transactional(readOnly = true)
     public List<UserDto> getFollowers(Long profileUserId, Long currentUserId) {
-        // 복합키 구조에 맞게 수정
         List<Long> followerIds = followRepo.findByFollowee_Id(profileUserId).stream()
                 .map(follow -> follow.getFollower().getId())
                 .collect(Collectors.toList());
@@ -80,8 +75,6 @@ public class UserService {
         return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
     }
 
-
-    //유저 목록을 팔로우 상태가 포함된 userdto목록으로 변환하는 헬퍼 메서드
     private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
         if (userList.isEmpty()) {
             return Collections.emptyList();
@@ -105,9 +98,7 @@ public class UserService {
             return UserDto.from(user, status);
         }).collect(Collectors.toList());
     }
-    /**
-     * 1) 팔로우 요청 (공개면 즉시, 비공개면 PENDING 생성)
-     */
+
     @Transactional
     public FollowResponse requestFollow(Long meId, Long targetId) {
         if (isBlockedEachOther(meId, targetId)) {
@@ -117,7 +108,6 @@ public class UserService {
         User me = userRepo.findById(meId).orElseThrow();
         User target = userRepo.findById(targetId).orElseThrow();
 
-        // 이미팔로우 중인지 확인
         if (followRepo.existsByFollower_IdAndFollowee_Id(meId, targetId)) {
             boolean isFollower = followRepo.existsByFollower_IdAndFollowee_Id(targetId, meId);
             return FollowResponse.builder()
@@ -148,9 +138,7 @@ public class UserService {
                     .isFollower(isFollower)
                     .isMutual(false)
                     .build();
-
-    } else {
-            // 복합키 구조에서는 생성자 대신 세터 사용
+        } else {
             UserFollow userFollow = new UserFollow();
             userFollow.setFollower(me);
             userFollow.setFollowee(target);
@@ -168,10 +156,9 @@ public class UserService {
                     .isFollower(isFollower)
                     .isMutual(isFollower)
                     .build();
-            }
+        }
     }
-    // 2) 내 계정으로 온 PENDING 요청 리스트 조회
-    //    (import org.springframework.transaction.annotation.Transactional;)
+
     @Transactional(readOnly = true)
     public List<FollowRequestDto> listIncomingRequests(Long me) {
         return reqRepo.findByTarget_IdAndStatus(me, FollowRequestStatus.PENDING)
@@ -185,9 +172,6 @@ public class UserService {
                 .toList();
     }
 
-    /**
-     * 3) 비공개 계정 주인이 수락
-     */
     @Transactional
     public void acceptFollowRequest(Long me, Long requestId) {
         FollowRequest req = reqRepo.findById(requestId)
@@ -207,7 +191,6 @@ public class UserService {
             );
         }
 
-        // 복합키 구조에서는 생성자 대신 세터 사용
         UserFollow userFollow = new UserFollow();
         userFollow.setFollower(req.getRequester());
         userFollow.setFollowee(req.getTarget());
@@ -217,9 +200,6 @@ public class UserService {
         req.setStatus(FollowRequestStatus.ACCEPTED);
     }
 
-    /**
-     * 4) 비공개 계정 주인이 거절
-     */
     @Transactional
     public void rejectFollowRequest(Long me, Long requestId) {
         FollowRequest req = reqRepo.findById(requestId)
@@ -242,18 +222,14 @@ public class UserService {
         req.setStatus(FollowRequestStatus.REJECTED);
     }
 
-
     @Transactional
     public void unfollow(Long meId, Long targetId) {
-        // 복합키 구조에 맞게 수정
         followRepo.deleteByFollower_IdAndFollowee_Id(meId, targetId);
-        reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId, FollowRequestStatus.PENDING);
+        reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId);
     }
 
-    // 내 프로필 조회
     public UserProfileDto getMyProfile(Long userId) {
         User u = userRepo.findById(userId).orElseThrow();
-        // 복합키 구조에 맞게 수정
         long followerCnt = followRepo.countByFollowee_Id(userId);
         long followingCnt = followRepo.countByFollower_Id(userId);
         long recordCnt = recordRepo.countByUserId(userId);
@@ -264,14 +240,11 @@ public class UserService {
         );
     }
 
-
-    // 내 정보 수정
     @Transactional
     public void updateUser(Long userId, UpdateUserRequest req) {
         User u = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        // 닉네임 중복 확인 (닉네임이 변경된 경우만)
         if (!u.getNickname().equals(req.getNickname())
                 && userRepo.existsByNickname(req.getNickname())) {
             throw new IllegalArgumentException("이미 사용중인 닉네임입니다.");
@@ -283,23 +256,17 @@ public class UserService {
                 ? req.getProfileImageUrl().trim() : null);
 
         if (req.getIsPrivate() != null && !req.getIsPrivate().equals(u.getIsPrivate())) {
-            // 비공개 → 공개로 전환하는 경우
             if (Boolean.FALSE.equals(req.getIsPrivate()) && Boolean.TRUE.equals(u.getIsPrivate())) {
-                // 대기 중인 모든 팔로우 요청을 자동 수락
                 List<FollowRequest> pendingRequests = reqRepo.findByTarget_IdAndStatus(userId, FollowRequestStatus.PENDING);
 
                 for (FollowRequest request : pendingRequests) {
-                    // 팔로우 관계 생성
                     UserFollow userFollow = new UserFollow();
                     userFollow.setFollower(request.getRequester());
                     userFollow.setFollowee(request.getTarget());
                     userFollow.setCreatedAt(LocalDateTime.now());
                     followRepo.save(userFollow);
 
-                    // 요청 상태를 ACCEPTED로 변경
                     request.setStatus(FollowRequestStatus.ACCEPTED);
-
-                    // 팔로우 알림 생성 (각 요청자에게)
                     notificationService.createFollowNotification(userId, request.getRequester().getId());
                 }
             }
@@ -310,7 +277,6 @@ public class UserService {
         }
     }
 
-    // 로그아웃
     public void logout(Long userId) { /* JWT 토큰 무효화 로직 (필요시) */ }
 
     @Transactional
@@ -318,7 +284,6 @@ public class UserService {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        // ✅ List<Record> -> List<GameRecord>로 타입 변경
         List<GameRecord> userRecords = recordRepo.findByUserId(userId);
 
         userRecords.forEach(record -> {
@@ -329,8 +294,9 @@ public class UserService {
 
         s3Service.deleteFile(user.getProfileImageUrl());
 
-        recordReactionRepo.deleteAllByUserId(userId);
-        recordRepo.deleteAll(userRecords); // ✅ deleteAll(List<GameRecord>) 호출
+        // ✅ RecordReactionRepository → RecordLikeRepository
+        likeRepo.deleteAllByUserId(userId);
+        recordRepo.deleteAll(userRecords);
         reqRepo.deleteAllByRequesterIdOrTargetId(userId);
         userBlockRepo.deleteAllByBlockerIdOrBlockedId(userId);
         followRepo.deleteAllByFollowerIdOrFolloweeId(userId);
@@ -338,7 +304,6 @@ public class UserService {
         userRepo.delete(user);
     }
 
-    // ✅ [신규] 누락되었던 isNicknameAvailable 메서드를 다시 추가합니다.
     public boolean isNicknameAvailable(String nickname) {
         if (nickname == null || nickname.trim().isEmpty() || nickname.length() > 15) {
             return false;
@@ -355,11 +320,12 @@ public class UserService {
 
         userBlockRepo.save(UserBlock.builder().blocker(blocker).blocked(target).build());
 
-        // 복합키 구조에 맞게 수정
         followRepo.deleteByFollower_IdAndFollowee_Id(blockerId, targetId);
         followRepo.deleteByFollower_IdAndFollowee_Id(targetId, blockerId);
         reqRepo.deleteByBothUsers(blockerId, targetId);
-        recordReactionRepo.deleteByBothUsers(blockerId, targetId);
+
+        // ✅ RecordReactionRepository → RecordLikeRepository
+        likeRepo.deleteByBothUsers(blockerId, targetId);
     }
 
     @Transactional

@@ -1,12 +1,11 @@
 package com.nine.baseballdiary.backend.feed;
 
-import com.nine.baseballdiary.backend.reaction.TopReactionsResponse;
-import com.nine.baseballdiary.backend.record.GameRecord;
-import com.nine.baseballdiary.backend.record.GameRecordRepository;
+import com.nine.baseballdiary.backend.comment.RecordCommentRepository;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
-import com.nine.baseballdiary.backend.reaction.ReactionService;
-
+import com.nine.baseballdiary.backend.like.RecordLikeRepository;
+import com.nine.baseballdiary.backend.record.GameRecord;
+import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
@@ -28,9 +27,10 @@ public class FeedService {
 
     private final GameRecordRepository recordRepo;
     private final UserFollowRepository userFollowRepo;
-    private final ReactionService reactionService;
     private final GameRepository gameRepo;
     private final UserRepository userRepo;
+    private final RecordLikeRepository likeRepo;
+    private final RecordCommentRepository commentRepo;
 
     @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
@@ -69,7 +69,7 @@ public class FeedService {
         }
 
         return records.stream()
-                .map(this::convertToFeedResponse)
+                .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
     }
 
@@ -113,7 +113,7 @@ public class FeedService {
         }
 
         return records.stream()
-                .map(this::convertToFeedResponse)
+                .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
     }
 
@@ -131,13 +131,16 @@ public class FeedService {
         return (team != null && !team.trim().isEmpty()) ? team.trim() : null;
     }
 
-    private FeedResponse convertToFeedResponse(GameRecord record) {
+    private FeedResponse convertToFeedResponse(GameRecord record, Long currentUserId) {
         User user = userRepo.findById(record.getUserId()).orElseThrow();
         Game game = gameRepo.findById(record.getGame().getGameId()).orElseThrow();
 
-        // 상위 3개 공감 스티커 조회
-        TopReactionsResponse topReactions = reactionService.getTopReactions(record.getRecordId());
-        Integer totalCount = reactionService.getTotalCount(record.getRecordId());
+        // 좋아요 정보
+        long likeCount = likeRepo.countByRecordId(record.getRecordId());
+        boolean isLiked = likeRepo.existsByRecordIdAndUserId(record.getRecordId(), currentUserId);
+
+        // 댓글 개수
+        long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(record.getRecordId());
 
         List<String> mediaUrls = record.getMediaUrls() != null ? record.getMediaUrls() : List.of();
 
@@ -159,9 +162,9 @@ public class FeedService {
                 .emotionLabel(getEmotionLabel(record.getEmotionCode()))
                 .longContent(record.getLongContent())
                 .mediaUrls(mediaUrls)
-                .top3Reactions(topReactions.getTop3Reactions())
-                .remainingReactionCount(topReactions.getRemainingCount())
-                .totalReactionCount(totalCount)
+                .likeCount(likeCount)
+                .isLiked(isLiked)
+                .commentCount(commentCount)
                 .build();
     }
 

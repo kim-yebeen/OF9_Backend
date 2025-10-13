@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,38 +24,66 @@ public class NotificationService {
     private final UserFollowRepository userFollowRepo;
     private final GameRecordRepository recordRepo;
 
-    // 공감 매핑 정보
-    private static final Map<Integer, String> EMOTION_MAP = Map.of(
-            1, "짜릿해요", 2, "만족해요", 3, "감동이에요", 4, "놀랐어요", 5, "행복해요",
-            6, "답답해요", 7, "아쉬워요", 8, "화났어요", 9, "지쳤어요"
-    );
+    // 1. 좋아요 알림 생성
+    public void createLikeNotification(Long recordOwnerId, Long likerId, Long recordId) {
+        if (recordOwnerId.equals(likerId)) return;
 
-    private String getEmotionName(Integer code) {
-        return EMOTION_MAP.getOrDefault(code, "공감");
-    }
-
-    // 1. 공감 알림 생성
-    public void createReactionNotification(Long recordOwnerId, Long reactorId, Long recordId, Integer reactionTypeId) {
-        if (recordOwnerId.equals(reactorId)) return;
-
-        User reactor = userRepo.findById(reactorId).orElseThrow();
-        String emotionName = getEmotionName(reactionTypeId);
+        User liker = userRepo.findById(likerId).orElseThrow();
 
         Notification notification = Notification.builder()
                 .userId(recordOwnerId)
-                .type(NotificationType.REACTION)
+                .type(NotificationType.LIKE)
                 .title("반응 공감")
-                .content(reactor.getNickname() + "님이 나의 직관기록에 " + emotionName + " 반응을 남겼어요")
-                .relatedUserId(reactorId)
+                .content(liker.getNickname() + "님이 나의 직관기록에 좋아요를 남겼어요")
+                .relatedUserId(likerId)
                 .relatedRecordId(recordId)
-                .reactionTypeId(reactionTypeId)
                 .isRead(false)
                 .build();
 
         notificationRepo.save(notification);
     }
 
-    // 2. 팔로우 알림
+    // 2. 댓글 알림 생성
+    public void createCommentNotification(Long recordOwnerId, Long commenterId, Long recordId, Long commentId) {
+        if (recordOwnerId.equals(commenterId)) return;
+
+        User commenter = userRepo.findById(commenterId).orElseThrow();
+
+        Notification notification = Notification.builder()
+                .userId(recordOwnerId)
+                .type(NotificationType.COMMENT)
+                .title("댓글")
+                .content(commenter.getNickname() + "님이 나의 직관기록에 댓글을 남겼어요")
+                .relatedUserId(commenterId)
+                .relatedRecordId(recordId)
+                .relatedCommentId(commentId)
+                .isRead(false)
+                .build();
+
+        notificationRepo.save(notification);
+    }
+
+    // 3. 답글 알림 생성
+    public void createReplyNotification(Long parentCommentOwnerId, Long replierId, Long recordId, Long replyId) {
+        if (parentCommentOwnerId.equals(replierId)) return;
+
+        User replier = userRepo.findById(replierId).orElseThrow();
+
+        Notification notification = Notification.builder()
+                .userId(parentCommentOwnerId)
+                .type(NotificationType.REPLY)
+                .title("답글")
+                .content(replier.getNickname() + "님이 나의 댓글에 답글을 남겼어요")
+                .relatedUserId(replierId)
+                .relatedRecordId(recordId)
+                .relatedCommentId(replyId)
+                .isRead(false)
+                .build();
+
+        notificationRepo.save(notification);
+    }
+
+    // 4. 팔로우 알림
     public void createFollowNotification(Long followeeId, Long followerId) {
         User follower = userRepo.findById(followerId).orElseThrow();
 
@@ -72,7 +99,7 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // 3. 팔로우 요청 알림
+    // 5. 팔로우 요청 알림
     public void createFollowRequestNotification(Long targetId, Long requesterId) {
         User requester = userRepo.findById(requesterId).orElseThrow();
 
@@ -88,7 +115,7 @@ public class NotificationService {
         notificationRepo.save(notification);
     }
 
-    // 4. 새 게시글 알림
+    // 6. 새 게시글 알림
     public void createNewRecordNotification(Long recordOwnerId, Long recordId) {
         User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
 
@@ -112,7 +139,7 @@ public class NotificationService {
         notificationRepo.saveAll(notifications);
     }
 
-    // 5. 시스템 소식 생성
+    // 7. 시스템 소식 생성
     public void createSystemNotification(String title, String content) {
         List<User> allUsers = userRepo.findAll();
 
@@ -138,7 +165,7 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    // ✅ DTO 변환 메서드
+    // DTO 변환 메서드
     private NotificationDto convertToDto(Notification notification) {
         NotificationDto dto = NotificationDto.builder()
                 .id(notification.getId())
@@ -157,28 +184,19 @@ public class NotificationService {
                 dto.setUserNickname(user.getNickname());
                 dto.setUserProfileImage(user.getProfileImageUrl());
             });
+
             if (notification.getType() == NotificationType.FOLLOW ||
                     notification.getType() == NotificationType.FOLLOW_REQUEST) {
 
-                Long myId = notification.getUserId();  // 알림 받는 사람 (나)
-                Long otherId = notification.getRelatedUserId();  // 알림 보낸 사람 (상대방)
+                Long myId = notification.getUserId();
+                Long otherId = notification.getRelatedUserId();
 
-                // 내가 상대방을 팔로우하고 있는지
                 dto.setIsFollowing(userFollowRepo.existsByFollower_IdAndFollowee_Id(myId, otherId));
-
-                // 상대방이 나를 팔로우하고 있는지 (맞팔 확인용)
                 dto.setIsFollower(userFollowRepo.existsByFollower_IdAndFollowee_Id(otherId, myId));
             }
-
         } else if (notification.getType() == NotificationType.SYSTEM) {
             dto.setUserNickname("LookIT");
             dto.setUserProfileImage("/images/lookit-logo.png");
-        }
-
-        // 공감 타입 정보
-        if (notification.getReactionTypeId() != null) {
-            dto.setEmotionName(getEmotionName(notification.getReactionTypeId()));
-            dto.setEmotionCode(notification.getReactionTypeId());
         }
 
         return dto;
@@ -186,17 +204,17 @@ public class NotificationService {
 
     private String getCategoryFromType(NotificationType type) {
         return switch (type) {
-            case NEW_RECORD -> "FRIEND_RECORD";  // 친구가 새 게시글 올림
-            case REACTION -> "REACTION";         // 내 게시글에 공감
-            case FOLLOW, FOLLOW_REQUEST, SYSTEM -> "NEWS";  // 팔로우 관련 + 시스템
+            case NEW_RECORD -> "FRIEND_RECORD";
+            case LIKE, COMMENT, REPLY -> "REACTION";
+            case FOLLOW, FOLLOW_REQUEST, SYSTEM -> "NEWS";
         };
     }
 
     private String getActionButtonForType(NotificationType type) {
         return switch (type) {
-            case FOLLOW_REQUEST -> "ACCEPT_REJECT";  // 수락/거절 버튼
-            case FOLLOW -> "FOLLOW_BUTTON";          // 맞팔/팔로잉 버튼 (상황에 따라)
-            case REACTION, NEW_RECORD, SYSTEM -> null;  // 액션 버튼 없음
+            case FOLLOW_REQUEST -> "ACCEPT_REJECT";
+            case FOLLOW -> "FOLLOW_BUTTON";
+            case LIKE, COMMENT, REPLY, NEW_RECORD, SYSTEM -> null;
         };
     }
 

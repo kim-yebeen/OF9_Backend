@@ -37,10 +37,9 @@ public class Notification {
     @Column(name = "related_record_id")
     private Long relatedRecordId;
 
-    @Column(name = "reaction_type_id")
-    private Integer reactionTypeId;
+    @Column(name = "related_comment_id")
+    private Long relatedCommentId;  // 댓글/답글 관련 알림용
 
-    // ✅ 기본값 설정 강화
     @Column(name = "is_read", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     @Builder.Default
     private Boolean isRead = false;
@@ -51,7 +50,6 @@ public class Notification {
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        // ✅ 추가 안전장치
         if (this.isRead == null) {
             this.isRead = false;
         }

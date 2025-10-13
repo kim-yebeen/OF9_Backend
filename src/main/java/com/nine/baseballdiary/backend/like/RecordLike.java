@@ -1,4 +1,4 @@
-package com.nine.baseballdiary.backend.reaction;
+package com.nine.baseballdiary.backend.like;
 
 import jakarta.persistence.*;
 import lombok.Builder;
@@ -7,10 +7,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "record_reaction")
+@Table(name = "record_like")
 @Getter
 @NoArgsConstructor
-public class RecordReaction {
+public class RecordLike {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,20 +21,13 @@ public class RecordReaction {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "reaction_type_id", nullable = false)
-    private Integer reactionTypeId;
-
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Builder
-    public RecordReaction(Long recordId, Long userId, Integer reactionTypeId) {
+    public RecordLike(Long recordId, Long userId) {
         this.recordId = recordId;
         this.userId = userId;
-        this.reactionTypeId = reactionTypeId;
         this.createdAt = LocalDateTime.now();
-    }
-    public void updateReactionType(Integer reactionTypeId) {
-        this.reactionTypeId = reactionTypeId;
     }
 }

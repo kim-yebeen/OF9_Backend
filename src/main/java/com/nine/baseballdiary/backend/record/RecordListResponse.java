@@ -1,6 +1,5 @@
 package com.nine.baseballdiary.backend.record;
 
-import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
 import lombok.Getter;
 import lombok.Setter;
 import java.util.List;
@@ -32,14 +31,15 @@ public class RecordListResponse {
     private String longContent;
     private List<String> mediaUrls;
 
-    // 리액션 정보
-    private List<ReactionStatsResponse> reactions;
-    private Integer totalReactionCount;
+    // 좋아요 및 댓글 정보로 변경
+    private Long likeCount;        // 좋아요 개수
+    private Boolean isLiked;       // 현재 사용자가 좋아요 했는지
+    private Long commentCount;     // 댓글 개수
 
     // recordId 추가
     private Long recordId;
 
-    // 생성자 수정 - recordId를 마지막에 추가하거나 적절한 위치에
+    // 생성자 수정
     public RecordListResponse(Long userId,
                               String nickname,
                               String profileImageUrl,
@@ -56,8 +56,9 @@ public class RecordListResponse {
                               String emotionLabel,
                               String longContent,
                               List<String> mediaUrls,
-                              List<ReactionStatsResponse> reactions,
-                              Integer totalReactionCount,
+                              Long likeCount,
+                              Boolean isLiked,
+                              Long commentCount,
                               Long recordId
     ) {
         this.userId = userId;
@@ -76,10 +77,9 @@ public class RecordListResponse {
         this.emotionLabel = emotionLabel;
         this.longContent = longContent;
         this.mediaUrls = mediaUrls;
-        this.reactions = reactions;
-        this.totalReactionCount = totalReactionCount;
-        this.recordId=recordId;
-        // recordId는 별도로 설정하거나 생성자에 추가 필요
+        this.likeCount = likeCount;
+        this.isLiked = isLiked;
+        this.commentCount = commentCount;
+        this.recordId = recordId;
     }
-
 }

@@ -11,16 +11,16 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
-    // 기존 메서드들 (차단 로직 미적용 - 하위 호환성)
+    // ✅ record_reaction → record_like로 변경
     @Query(value = """
         SELECT r.* FROM record r 
         JOIN game g ON r.game_id = g.game_id 
         JOIN users u ON r.user_id = u.id 
         LEFT JOIN (
-            SELECT rr.record_id, COUNT(rr.id) as reaction_count 
-            FROM record_reaction rr 
-            GROUP BY rr.record_id
-        ) rc ON r.record_id = rc.record_id
+            SELECT rl.record_id, COUNT(rl.id) as like_count 
+            FROM record_like rl 
+            GROUP BY rl.record_id
+        ) lc ON r.record_id = lc.record_id
         LEFT JOIN (
             SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
             FROM user_follow uf 
@@ -34,7 +34,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
         AND g.date = CAST(:date AS DATE)
         AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
         ORDER BY 
-            COALESCE(rc.reaction_count, 0) DESC,
+            COALESCE(lc.like_count, 0) DESC,
             COALESCE(fc.follower_count, 0) DESC,
             u.nickname ASC
         LIMIT :limit OFFSET :offset
@@ -69,16 +69,16 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // 차단 사용자 제외 버전 (새로 추가)
+    // ✅ record_reaction → record_like로 변경 (차단 필터 포함)
     @Query(value = """
         SELECT r.* FROM record r 
         JOIN game g ON r.game_id = g.game_id 
         JOIN users u ON r.user_id = u.id 
         LEFT JOIN (
-            SELECT rr.record_id, COUNT(rr.id) as reaction_count 
-            FROM record_reaction rr 
-            GROUP BY rr.record_id
-        ) rc ON r.record_id = rc.record_id
+            SELECT rl.record_id, COUNT(rl.id) as like_count 
+            FROM record_like rl 
+            GROUP BY rl.record_id
+        ) lc ON r.record_id = lc.record_id
         LEFT JOIN (
             SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
             FROM user_follow uf 
@@ -97,7 +97,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
                OR (ub.blocker_id = r.user_id AND ub.blocked_id = :currentUserId)
         )
         ORDER BY 
-            COALESCE(rc.reaction_count, 0) DESC,
+            COALESCE(lc.like_count, 0) DESC,
             COALESCE(fc.follower_count, 0) DESC,
             u.nickname ASC
         LIMIT :limit OFFSET :offset
@@ -136,15 +136,16 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("team") String team,
             Pageable pageable
     );
-    // 팔로잉 피드 - 인기순 (기존)
+
+    // ✅ 팔로잉 피드 - 인기순 (record_reaction → record_like)
     @Query(value = """
         SELECT r.* FROM record r 
         JOIN game g ON r.game_id = g.game_id 
         LEFT JOIN (
-            SELECT rr.record_id, COUNT(rr.id) as reaction_count 
-            FROM record_reaction rr 
-            GROUP BY rr.record_id
-        ) rc ON r.record_id = rc.record_id
+            SELECT rl.record_id, COUNT(rl.id) as like_count 
+            FROM record_like rl 
+            GROUP BY rl.record_id
+        ) lc ON r.record_id = lc.record_id
         LEFT JOIN users u ON r.user_id = u.id
         LEFT JOIN (
             SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
@@ -155,7 +156,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
         AND g.date = CAST(:date AS DATE)
         AND (:team IS NULL OR g.home_team = :team OR g.away_team = :team)
         ORDER BY 
-            COALESCE(rc.reaction_count, 0) DESC,
+            COALESCE(lc.like_count, 0) DESC,
             COALESCE(fc.follower_count, 0) DESC,
             u.nickname ASC
         LIMIT :limit OFFSET :offset
@@ -168,7 +169,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("offset") int offset
     );
 
-    // 팔로잉 피드 - 최신순 (기존)
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -184,15 +184,15 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // 팔로잉 피드 - 차단 사용자 제외 버전 (새로 추가)
+    // ✅ 팔로잉 피드 - 차단 사용자 제외 (record_reaction → record_like)
     @Query(value = """
         SELECT r.* FROM record r 
         JOIN game g ON r.game_id = g.game_id 
         LEFT JOIN (
-            SELECT rr.record_id, COUNT(rr.id) as reaction_count 
-            FROM record_reaction rr 
-            GROUP BY rr.record_id
-        ) rc ON r.record_id = rc.record_id
+            SELECT rl.record_id, COUNT(rl.id) as like_count 
+            FROM record_like rl 
+            GROUP BY rl.record_id
+        ) lc ON r.record_id = lc.record_id
         LEFT JOIN users u ON r.user_id = u.id
         LEFT JOIN (
             SELECT uf.followee_id, COUNT(uf.follower_id) as follower_count 
@@ -208,7 +208,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
                OR (ub.blocker_id = r.user_id AND ub.blocked_id = :currentUserId)
         )
         ORDER BY 
-            COALESCE(rc.reaction_count, 0) DESC,
+            COALESCE(lc.like_count, 0) DESC,
             COALESCE(fc.follower_count, 0) DESC,
             u.nickname ASC
         LIMIT :limit OFFSET :offset
@@ -242,12 +242,11 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             @Param("team") String team,
             Pageable pageable
     );
-    // 게시글 수 계산
+
     long countByUserId(Long userId);
 
     List<GameRecord> findByUserId(Long userId);
 
-    // 검색 기능 (기존)
     @Query(value = """
     SELECT r.*, 
            (CASE 
@@ -300,7 +299,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // 검색 기능 - 차단 사용자 제외 버전 (새로 추가)
     @Query(value = """
     SELECT r.*, 
            (CASE 
@@ -363,22 +361,17 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // 특정 유저의 특정 월 직관 기록 조회
     @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game g WHERE gr.userId = :userId AND g.date BETWEEN :startDate AND :endDate")
     List<GameRecord> findByUserIdAndGameDateBetween(@Param("userId") Long userId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    // 특정 유저의 응원팀 직관 기록 수
     @Query("SELECT count(gr) FROM GameRecord gr JOIN gr.game g WHERE gr.userId = :userId AND (g.homeTeam = :favTeam OR g.awayTeam = :favTeam)")
     long countByUserIdAndFavTeam(@Param("userId") Long userId, @Param("favTeam") String favTeam);
 
-    // 특정 유저의 승/패/무 기록 수
     long countByUserIdAndResult(Long userId, String result);
 
-    // 특정 유저가 방문한 모든 구장 이름 (중복 제거)
     @Query("SELECT DISTINCT gr.stadium FROM GameRecord gr WHERE gr.userId = :userId")
     Set<String> findDistinctStadiumsByUserId(@Param("userId") Long userId);
 
     @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game WHERE gr.userId = :userId ORDER BY gr.createdAt DESC")
     List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
-
 }

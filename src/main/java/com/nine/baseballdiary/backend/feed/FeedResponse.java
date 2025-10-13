@@ -1,6 +1,5 @@
 package com.nine.baseballdiary.backend.feed;
 
-import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,8 +31,8 @@ public class FeedResponse {
     private String longContent;
     private List<String> mediaUrls;
 
-    // 리액션 정보
-    private List<ReactionStatsResponse> top3Reactions;  // 상위 3개만
-    private Integer remainingReactionCount;             // 나머지 개수
-    private Integer totalReactionCount; // 전체 개수
+    // 좋아요 및 댓글 정보
+    private Long likeCount;        // 좋아요 개수
+    private Boolean isLiked;       // 현재 사용자가 좋아요 했는지
+    private Long commentCount;     // 댓글 개수
 }

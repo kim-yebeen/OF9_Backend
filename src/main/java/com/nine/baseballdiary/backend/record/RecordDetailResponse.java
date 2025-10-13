@@ -1,14 +1,13 @@
 package com.nine.baseballdiary.backend.record;
 
-import com.nine.baseballdiary.backend.reaction.ReactionStatsResponse;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import lombok.Getter;
 import lombok.Builder;
 import lombok.Setter;
 
 import java.util.List;
-//클릭 시 상세 보기 용
 
+// 클릭 시 상세 보기 용
 @Getter @Setter
 @Builder
 public class RecordDetailResponse {
@@ -32,8 +31,9 @@ public class RecordDetailResponse {
     private List<String> foodTags;
     private List<String> mediaUrls;
     private String createdAt;
-    // 리액션 정보 추가
-    private List<ReactionStatsResponse> reactions;
-    private Integer totalReactionCount;
 
+    //좋아요 및 댓글 정보로 변경
+    private Long likeCount;        // 좋아요 개수
+    private Boolean isLiked;       // 현재 사용자가 좋아요 했는지
+    private Long commentCount;     // 댓글 개수
 }
