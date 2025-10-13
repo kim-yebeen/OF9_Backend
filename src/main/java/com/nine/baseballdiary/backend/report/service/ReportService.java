@@ -3,6 +3,7 @@ package com.nine.baseballdiary.backend.report.service;
 import com.nine.baseballdiary.backend.badge.Badge;
 import com.nine.baseballdiary.backend.badge.BadgeRepository;
 import com.nine.baseballdiary.backend.badge.UserBadgeRepository;
+import com.nine.baseballdiary.backend.player.PlayerService;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.report.dto.*;
@@ -34,6 +35,7 @@ public class ReportService {
     private final UserBadgeRepository userBadgeRepository;
     private final UserFollowRepository userFollowRepository;
     private final PlayerDataService playerDataService;
+    private final PlayerService playerService;
 
     public EmotionSummaryDto getEmotionSummary(Long userId, int year, int month) {
         LocalDate startDate = LocalDate.of(year, month, 1);
@@ -232,12 +234,10 @@ public class ReportService {
     }
 
     private String findTeamByPlayerName(String playerName) {
-        return playerDataService.getAllPlayers().stream()
-                .filter(p -> p.getName().equals(playerName))
-                .findFirst()
-                .map(PlayerInfoDto::getTeam)
-                .orElse("XX");
+        List<PlayerInfoDto> result = playerService.searchPlayers(playerName);
+        return result.isEmpty() ? "XX" : result.get(0).getTeam();
     }
+
 
     private String convertTeamCodeToName(String code) {
         return switch(code) {

@@ -169,6 +169,14 @@ CREATE TABLE IF NOT EXISTS user_badge (
     UNIQUE(user_id, badge_id)
     );
 
+CREATE TABLE IF NOT EXISTS player (
+                                      id BIGSERIAL PRIMARY KEY,
+                                      name VARCHAR(50) NOT NULL,
+    team VARCHAR(10) NOT NULL,
+    position VARCHAR(20) NOT NULL
+    );
+
+CREATE INDEX idx_player_name ON player(name);
 CREATE INDEX IF NOT EXISTS idx_user_badge_user_id ON user_badge(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocker_id ON user_block(blocker_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocked_id ON user_block(blocked_id);
