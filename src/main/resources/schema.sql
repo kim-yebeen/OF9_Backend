@@ -95,7 +95,6 @@ CREATE TABLE IF NOT EXISTS follow_request (
     updated_at TIMESTAMP NOT NULL DEFAULT now()
     );
 
-DROP TABLE IF EXISTS record_reaction CASCADE;
 CREATE TABLE IF NOT EXISTS record_like (
                              id SERIAL PRIMARY KEY,
                              record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
@@ -127,7 +126,6 @@ CREATE TABLE IF NOT EXISTS food (
     stadium_id INT REFERENCES stadium(id)
     );
 
-DROP TABLE IF EXISTS notifications CASCADE;
 CREATE TABLE notifications (
                                id SERIAL PRIMARY KEY,
                                user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -193,4 +191,3 @@ CREATE INDEX IF NOT EXISTS idx_record_user_id ON record(user_id);
 CREATE INDEX IF NOT EXISTS idx_record_companions_record_id ON record_companions(record_id);
 CREATE INDEX IF NOT EXISTS idx_record_companions_companion_id ON record_companions(companion_id);
 
-DROP TABLE IF EXISTS reaction_type CASCADE;
