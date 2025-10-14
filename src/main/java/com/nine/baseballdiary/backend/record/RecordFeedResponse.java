@@ -6,14 +6,16 @@ public class RecordFeedResponse {
     private Long recordId;
     private String gameDate;
     private List<String> mediaUrls;
+    private Long likeCount;  // 좋아요 개수
 
-    public RecordFeedResponse(Long recordId, String gameDate, List<String> mediaUrls) {
+    public RecordFeedResponse(Long recordId, String gameDate, List<String> mediaUrls, Long likeCount) {
         this.recordId = recordId;
         this.gameDate = gameDate;
         // 항상 첫 번째 이미지 하나만 저장
         this.mediaUrls = (mediaUrls != null && !mediaUrls.isEmpty())
                 ? List.of(mediaUrls.get(0))
                 : List.of();
+        this.likeCount = likeCount;
     }
 
     public Long getRecordId() {
@@ -54,5 +56,13 @@ public class RecordFeedResponse {
         this.mediaUrls = (mediaUrls != null && !mediaUrls.isEmpty())
                 ? List.of(mediaUrls.get(0))
                 : List.of();
+    }
+
+    public Long getLikeCount() {
+        return likeCount;
+    }
+
+    public void setLikeCount(Long likeCount) {
+        this.likeCount = likeCount;
     }
 }

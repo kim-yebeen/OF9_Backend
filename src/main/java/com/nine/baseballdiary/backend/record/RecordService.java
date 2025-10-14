@@ -221,11 +221,17 @@ public class RecordService {
 
         return records.stream()
                 .filter(r -> r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
-                .map(r -> new RecordFeedResponse(
-                        r.getRecordId(),
-                        r.getGame().getDate().format(FEED_FMT),
-                        List.of(r.getMediaUrls().get(0))
-                )).collect(Collectors.toList());
+                .map(r -> {
+                    // 좋아요 개수 조회
+                    long likeCount = likeRepo.countByRecordId(r.getRecordId());
+
+                    return new RecordFeedResponse(
+                            r.getRecordId(),
+                            r.getGame().getDate().format(FEED_FMT),
+                            List.of(r.getMediaUrls().get(0)),
+                            likeCount
+                    );
+                }).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
