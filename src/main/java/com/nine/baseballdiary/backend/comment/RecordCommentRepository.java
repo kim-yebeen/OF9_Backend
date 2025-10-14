@@ -31,4 +31,12 @@ public interface RecordCommentRepository extends JpaRepository<RecordComment, Lo
 
     // 특정 댓글의 대댓글 개수 (삭제되지 않은 것만)
     long countByParentCommentIdAndDeletedAtIsNull(Long parentCommentId);
+
+    //대댓글 조회 메서드
+    @Query("""
+    SELECT c FROM RecordComment c
+    WHERE c.parentCommentId = :parentId
+    AND c.deletedAt IS NULL
+""")
+    List<RecordComment> findRepliesByParentId(@Param("parentId") Long parentId);
 }

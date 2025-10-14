@@ -129,7 +129,11 @@ public class CommentService {
         if (!comment.getUserId().equals(userId)) {
             throw new IllegalArgumentException("댓글 삭제 권한이 없습니다.");
         }
-
+        //부모 댓글인 경우 대댓글도 함께 삭제
+        if (comment.getParentCommentId() == null) {
+            List<RecordComment> replies = commentRepo.findRepliesByParentId(commentId);
+            replies.forEach(RecordComment::delete);
+        }
         comment.delete();
     }
 
