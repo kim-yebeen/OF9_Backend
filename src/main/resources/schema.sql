@@ -96,16 +96,18 @@ CREATE TABLE IF NOT EXISTS follow_request (
     );
 
 CREATE TABLE IF NOT EXISTS record_like (
-                             id SERIAL PRIMARY KEY,
-                             record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
-                             user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                             created_at TIMESTAMP NOT NULL DEFAULT now(),
-                             UNIQUE(record_id, user_id)
+        id SERIAL PRIMARY KEY,
+        record_id INT NOT NULL REFERENCES record(record_id)
+            ON DELETE CASCADE,
+        user_id INT NOT NULL REFERENCES users(id)
+            ON DELETE CASCADE,
+        created_at TIMESTAMP NOT NULL DEFAULT now(),
+            UNIQUE(record_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS record_comment (
-                                              id SERIAL PRIMARY KEY,
-                                              record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
+    id SERIAL PRIMARY KEY,
+    record_id INT NOT NULL REFERENCES record(record_id) ON DELETE CASCADE,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     parent_comment_id INT REFERENCES record_comment(id) ON DELETE CASCADE,  -- 대댓글용
     content TEXT NOT NULL,

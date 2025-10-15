@@ -225,7 +225,7 @@ public class UserService {
     @Transactional
     public void unfollow(Long meId, Long targetId) {
         followRepo.deleteByFollower_IdAndFollowee_Id(meId, targetId);
-        reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId);
+        reqRepo.deleteByRequester_IdAndTarget_IdAndStatus(meId, targetId, FollowRequestStatus.PENDING);
     }
 
     public UserProfileDto getMyProfile(Long userId) {
