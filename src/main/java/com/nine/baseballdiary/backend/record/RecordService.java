@@ -5,6 +5,7 @@ import com.nine.baseballdiary.backend.comment.RecordCommentRepository;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.like.RecordLikeRepository;
+import com.nine.baseballdiary.backend.report.service.BadgeService;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
@@ -31,6 +32,7 @@ public class RecordService {
     private final RecordLikeRepository likeRepo;
     private final RecordCommentRepository commentRepo;
     private final NotificationService notificationService;
+    private final BadgeService badgeService;
 
     // 피드, 리스트에서 짧게 보여줄 때 — "25/04/29 Fri"
     private static final DateTimeFormatter FEED_FMT =
@@ -74,6 +76,7 @@ public class RecordService {
         GameRecord savedRecord = recordRepo.save(record);
 
         notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
+        badgeService.checkAndAwardBadgesForUser(userId);
 
         String dateStr = game.getDate().format(UPLOAD_FMT);
         return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);

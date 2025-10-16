@@ -10,6 +10,7 @@ import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,25 @@ public class BadgeService {
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final GameRecordRepository gameRecordRepository;
+
+    @Async
+    public void checkAndAwardBadgesForUser(Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) return;
+
+        List<Badge> allBadges = badgeRepository.findAll();
+        Set<Integer> achievedBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
+        List<GameRecord> userRecords = gameRecordRepository.findByUserId(userId);
+
+        for (Badge badge : allBadges) {
+            if (achievedBadgeIds.contains(badge.getId())) continue;
+
+            if (checkBadgeAchievement(user, badge, userRecords)) {
+                UserBadge userBadge = UserBadge.builder().user(user).badge(badge).build();
+                userBadgeRepository.save(userBadge);
+            }
+        }
+    }
 
     public void checkAndAwardBadgesForAllUsers() {
         List<User> allUsers = userRepository.findAll();
