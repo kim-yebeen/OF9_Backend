@@ -11,6 +11,19 @@ public class WinRateSummaryDto {
     private final int totalWinCount;
     private final int totalLoseCount;
     private final int totalDrawCount;
+    private final int totalGameCount;
+
+    // 홈/원정 승률 추가
+    private final double homeWinRate;
+    private final int homeWinCount;
+    private final int homeLoseCount;
+    private final int homeGameCount;
+
+    private final double awayWinRate;
+    private final int awayWinCount;
+    private final int awayLoseCount;
+    private final int awayGameCount;
+
     private final List<TeamWinRate> teamWinRates;
 
     @Getter

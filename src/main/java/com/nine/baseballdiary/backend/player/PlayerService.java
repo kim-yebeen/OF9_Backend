@@ -1,6 +1,5 @@
 package com.nine.baseballdiary.backend.player;
 
-import com.nine.baseballdiary.backend.report.dto.PlayerInfoDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

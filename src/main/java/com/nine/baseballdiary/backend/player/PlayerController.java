@@ -1,7 +1,6 @@
 package com.nine.baseballdiary.backend.player;
 
 import com.nine.baseballdiary.backend.common.response.ApiResponse;
-import com.nine.baseballdiary.backend.report.dto.PlayerInfoDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
