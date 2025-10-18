@@ -115,6 +115,11 @@ public class RecordService {
     public RecordDetailResponse getRecordDetail(Long recordId) {
         GameRecord rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
+
+        // 작성자 정보 조회 추가
+        User author = userRepo.findById(rec.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작성자: " + rec.getUserId()));
+
         Game game = rec.getGame();
         if (game == null) {
             throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
@@ -140,6 +145,10 @@ public class RecordService {
 
         return RecordDetailResponse.builder()
                 .recordId(rec.getRecordId())
+                .userId(author.getId())
+                .nickname(author.getNickname())
+                .profileImageUrl(author.getProfileImageUrl())
+                .favTeam(author.getFavTeam())
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
@@ -161,6 +170,8 @@ public class RecordService {
                 .likeCount(likeCount)
                 .isLiked(false)  // currentUserId 없으면 false
                 .commentCount(commentCount)
+                .gameDate(fmtDate)
+                .gameTime(fmtTime)
                 .build();
     }
 
@@ -172,6 +183,9 @@ public class RecordService {
         if (game == null) {
             throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
         }
+
+        User author = userRepo.findById(rec.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작성자: " + rec.getUserId()));
 
         List<Long> companionIds = rec.getCompanions();
         List<UserDto> companionDetails = List.of();
@@ -194,6 +208,10 @@ public class RecordService {
 
         return RecordDetailResponse.builder()
                 .recordId(rec.getRecordId())
+                .userId(author.getId())
+                .nickname(author.getNickname())
+                .profileImageUrl(author.getProfileImageUrl())
+                .favTeam(author.getFavTeam())
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
@@ -215,6 +233,8 @@ public class RecordService {
                 .likeCount(likeCount)
                 .isLiked(isLiked)
                 .commentCount(commentCount)
+                .gameDate(fmtDate)
+                .gameTime(fmtTime)
                 .build();
     }
 

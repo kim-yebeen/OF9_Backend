@@ -11,6 +11,12 @@ import java.util.List;
 @Getter @Setter
 @Builder
 public class RecordDetailResponse {
+
+    private Long userId;           // 작성자 ID
+    private String nickname;       // 작성자 닉네임
+    private String profileImageUrl; // 작성자 프로필 이미지
+    private String favTeam;        // 작성자 응원팀
+
     private Long recordId;
     private String gameDate;
     private String gameTime;
