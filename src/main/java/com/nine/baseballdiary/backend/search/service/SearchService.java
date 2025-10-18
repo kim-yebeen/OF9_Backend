@@ -1,7 +1,9 @@
 package com.nine.baseballdiary.backend.search.service;
 
+import com.nine.baseballdiary.backend.comment.RecordCommentRepository;
 import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
+import com.nine.baseballdiary.backend.like.RecordLikeRepository;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.search.dto.*;
@@ -35,6 +37,8 @@ public class SearchService {
     private final FollowRequestRepository followRequestRepository;
     private final UserBlockRepository userBlockRepository; // 추가
     private final RedisTemplate<String, String> redisTemplate;
+    private final RecordLikeRepository likeRepository;      // 추가 필요
+    private final RecordCommentRepository commentRepository; // 추가 필요
 
     private static final String RECENT_SEARCH_PREFIX = "search:recent:";
     private static final String POPULAR_SEARCH_KEY = "search:popular:global";
@@ -97,7 +101,12 @@ public class SearchService {
                 .map(record -> {
                     Game game = gameRepository.findById(record.getGame().getGameId()).orElseThrow();
                     User author = userRepository.findById(record.getUserId()).orElseThrow();
-                    return SearchRecordDto.from(record, game, author);
+
+                    Long likeCount = likeRepository.countByRecordId(record.getRecordId());
+                    Boolean isLiked = likeRepository.existsByRecordIdAndUserId(record.getRecordId(), userId);
+                    Long commentCount = commentRepository.countByRecordIdAndDeletedAtIsNull(record.getRecordId());
+
+                    return SearchRecordDto.from(record, game, author, likeCount, isLiked, commentCount);
                 })
                 .collect(Collectors.toList());
 

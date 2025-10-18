@@ -35,8 +35,12 @@ public class SearchRecordDto {
     private String result;
     private List<String> mediaUrls;
     private String createdAt;
+    private Long likeCount;        // 좋아요 개수
+    private Boolean isLiked;       // 현재 사용자가 좋아요 했는지
+    private Long commentCount;     // 댓글 개수
 
-    public static SearchRecordDto from(GameRecord record, Game game, User author) {
+    public static SearchRecordDto from(GameRecord record, Game game, User author,
+                                       Long likeCount, Boolean isLiked, Long commentCount) {
         return SearchRecordDto.builder()
                 .recordId(record.getRecordId())
                 .authorId(author.getId())
@@ -57,6 +61,9 @@ public class SearchRecordDto {
                 .result(record.getResult() != null ? record.getResult() : "")
                 .mediaUrls(record.getMediaUrls() != null ? record.getMediaUrls() : Collections.emptyList())
                 .createdAt(record.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+                .likeCount(likeCount)
+                .isLiked(isLiked)
+                .commentCount(commentCount)
                 .build();
     }
 
