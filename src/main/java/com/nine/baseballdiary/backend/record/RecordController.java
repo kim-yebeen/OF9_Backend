@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/records")
@@ -154,16 +155,14 @@ public class RecordController {
 
     // 캘린더 형식으로 직관 기록 조회
     @GetMapping("/me/calendar")
-    public ResponseEntity<ApiResponse<List<RecordCalendarResponse>>> getUserRecordsCalendar() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getUserRecordsCalendar(
+            @RequestParam(defaultValue = "2025") int year,
+            @RequestParam(defaultValue = "10") int month) {
         try {
             Long userId = getCurrentUserId();
-            List<RecordCalendarResponse> response = service.getUserRecordsCalendar(userId);
+            Map<String, Object> response = service.getUserRecordsCalendar(userId, year, month);
 
             return ResponseEntity.ok(ApiResponse.success("캘린더 형식 직관 기록을 성공적으로 조회했습니다", response));
-
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error(e.getMessage(), "UNAUTHORIZED"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("캘린더 조회 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));

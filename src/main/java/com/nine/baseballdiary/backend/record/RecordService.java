@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -291,10 +293,16 @@ public class RecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecordCalendarResponse> getUserRecordsCalendar(Long userId) {
-        List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
+    public Map<String, Object> getUserRecordsCalendar(Long userId, int year, int month) {
+        // 해당 월의 시작일과 종료일
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
-        return records.stream()
+        // 해당 월의 기록들 조회
+        List<GameRecord> monthRecords = recordRepo.findByUserIdAndGameDateBetween(userId, startDate, endDate);
+
+        // 개별 기록들 (기존 방식)
+        List<RecordCalendarResponse> records = monthRecords.stream()
                 .map(r -> {
                     Game g = r.getGame();
                     return new RecordCalendarResponse(
@@ -303,6 +311,30 @@ public class RecordService {
                     );
                 })
                 .collect(Collectors.toList());
+
+        // 월별 통계 계산
+        long wins = monthRecords.stream().filter(r -> "WIN".equals(r.getResult())).count();
+        long losses = monthRecords.stream().filter(r -> "LOSE".equals(r.getResult())).count();
+        double winRate = (wins + losses == 0) ? 0.0 : Math.round(((double) wins / (wins + losses)) * 1000.0) / 10.0;
+
+        int recordCount = monthRecords.size();
+
+        long totalLikes = monthRecords.stream()
+                .mapToLong(r -> likeRepo.countByRecordId(r.getRecordId()))
+                .sum();
+
+        // 월별 통계
+        Map<String, Object> monthlyStats = Map.of(
+                "winRate", winRate,
+                "recordCount", recordCount,
+                "totalLikes", totalLikes
+        );
+
+        // 최종 응답
+        return Map.of(
+                "records", records,
+                "monthlyStats", monthlyStats
+        );
     }
 
     @Transactional
