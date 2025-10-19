@@ -1,9 +1,11 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter @Setter
+@JsonInclude(JsonInclude.Include.NON_NULL)  // 추가
 public class RecordCalendarResponse {
     private String gameDate;
     private String result;
