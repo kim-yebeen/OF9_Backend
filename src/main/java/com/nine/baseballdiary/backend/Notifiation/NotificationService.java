@@ -237,4 +237,15 @@ public class NotificationService {
             return createdAt.format(DateTimeFormatter.ofPattern("yyyy년 M월 d일"));
         }
     }
+
+    // NotificationService에 추가해야 할 메서드들
+    public void deleteLikeNotification(Long likerId, Long recordId) {
+        // LIKE 타입 알림에서 해당 사용자의 좋아요 알림 삭제
+        notificationRepo.deleteByTypeAndTriggerIdAndTargetId("LIKE", likerId, recordId);
+    }
+
+    public void deleteCommentNotification(Long commenterId, Long commentId) {
+        // COMMENT 타입 알림에서 해당 댓글 알림 삭제
+        notificationRepo.deleteByTypeAndTriggerIdAndTargetId("COMMENT", commenterId, commentId);
+    }
 }

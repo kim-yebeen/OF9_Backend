@@ -132,9 +132,15 @@ public class CommentService {
         //부모 댓글인 경우 대댓글도 함께 삭제
         if (comment.getParentCommentId() == null) {
             List<RecordComment> replies = commentRepo.findRepliesByParentId(commentId);
-            replies.forEach(RecordComment::delete);
+            replies.forEach(reply -> {
+                reply.delete();
+                // 대댓글 알림도 삭제
+                notificationService.deleteCommentNotification(reply.getUserId(), reply.getId());
+            });
         }
         comment.delete();
+
+        notificationService.deleteCommentNotification(userId, commentId);
     }
 
     // 댓글 개수 조회
