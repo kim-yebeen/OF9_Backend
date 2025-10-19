@@ -31,11 +31,14 @@ public class LikeService {
             // 이미 좋아요가 있으면 삭제
             likeRepo.delete(existing.get());
 
+            // 좋아요 알림도 삭제 (수정)
             if (!record.getUserId().equals(userId)) {
                 notificationService.deleteLikeNotification(userId, recordId);
             }
+
             long totalLikes = likeRepo.countByRecordId(recordId);
             return new LikeResponse(false, totalLikes);
+
         } else {
             // 좋아요 추가
             RecordLike newLike = RecordLike.builder()

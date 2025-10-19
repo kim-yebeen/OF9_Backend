@@ -57,9 +57,7 @@ public class ReportService {
     }
 
 
-    /**
-     * 뱃지 요약 정보 조회
-     */
+    //뱃지 요약 조회
     public BadgeSummaryDto getBadgeSummary(Long userId) {
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
@@ -92,6 +90,7 @@ public class ReportService {
         List<GameRecord> records = gameRecordRepository.findByUserId(userId);
         User user = userRepository.findById(userId).orElse(null);
         String favTeam = user != null ? user.getFavTeam() : null;
+        String shortFavTeam = convertFavTeam(favTeam);
 
         // 전체 통계
         long totalWins = records.stream().filter(r -> "WIN".equals(r.getResult())).count();
@@ -103,7 +102,7 @@ public class ReportService {
 
         // 홈 경기 통계 (응원팀이 홈팀인 경우)
         List<GameRecord> homeGames = records.stream()
-                .filter(r -> r.getGame() != null && favTeam != null && favTeam.equals(r.getGame().getHomeTeam()))
+                .filter(r -> r.getGame() != null && shortFavTeam != null && shortFavTeam.equals(r.getGame().getHomeTeam()))
                 .collect(Collectors.toList());
 
         long homeWins = homeGames.stream().filter(r -> "WIN".equals(r.getResult())).count();
@@ -113,7 +112,7 @@ public class ReportService {
 
         // 원정 경기 통계 (응원팀이 원정팀인 경우)
         List<GameRecord> awayGames = records.stream()
-                .filter(r -> r.getGame() != null && favTeam != null && favTeam.equals(r.getGame().getAwayTeam()))
+                .filter(r -> r.getGame() != null && shortFavTeam != null && shortFavTeam.equals(r.getGame().getAwayTeam()))
                 .collect(Collectors.toList());
 
         long awayWins = awayGames.stream().filter(r -> "WIN".equals(r.getResult())).count();
@@ -490,6 +489,22 @@ public class ReportService {
             case "문학" -> "인천";
             case "수원" -> "수원";
             default -> "기타";
+        };
+    }
+
+    private String convertFavTeam(String fav) {
+        return switch(fav) {
+            case "KIA 타이거즈" -> "KIA";
+            case "두산 베어스" -> "두산";
+            case "롯데 자이언츠" -> "롯데";
+            case "삼성 라이온즈" -> "삼성";
+            case "키움 히어로즈" -> "키움";
+            case "한화 이글스" -> "한화";
+            case "KT WIZ" -> "KT";
+            case "LG 트윈스" -> "LG";
+            case "NC 다이노스" -> "NC";
+            case "SSG 랜더스" -> "SSG";
+            default -> fav;
         };
     }
 }
