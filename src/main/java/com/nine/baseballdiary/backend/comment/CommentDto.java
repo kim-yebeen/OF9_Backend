@@ -25,4 +25,5 @@ public class CommentDto {
     private boolean isAuthor;  // 현재 사용자가 작성자인지
     private Long replyCount;   // 대댓글 개수
     private List<CommentDto> replies;  // 대댓글 목록
+    private Long totalCommentCount;
 }

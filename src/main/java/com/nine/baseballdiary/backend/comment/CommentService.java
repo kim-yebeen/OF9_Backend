@@ -60,8 +60,34 @@ public class CommentService {
                         parentComment.getUserId(), userId, recordId, savedComment.getId());
             }
         }
+        long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
-        return convertToDto(savedComment, userId);
+        return convertToDtoWithCount(savedComment, userId, totalCommentCount);
+    }
+
+    // ✅ 댓글 개수를 포함한 DTO 변환 메서드 추가
+    private CommentDto convertToDtoWithCount(RecordComment comment, Long currentUserId, Long totalCommentCount) {
+        User user = userRepo.findById(comment.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        boolean isEdited = !comment.getCreatedAt().equals(comment.getUpdatedAt());
+
+        return CommentDto.builder()
+                .id(comment.getId())
+                .recordId(comment.getRecordId())
+                .userId(comment.getUserId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .favTeam(user.getFavTeam())
+                .content(comment.getContent())
+                .createdAt(comment.getCreatedAt().format(formatter))
+                .updatedAt(comment.getUpdatedAt().format(formatter))
+                .isEdited(isEdited)
+                .isAuthor(comment.getUserId().equals(currentUserId))
+                .replyCount(0L)
+                .totalCommentCount(totalCommentCount) // ✅ 핵심: 좋아요 API와 동일한 방식
+                .build();
     }
 
     // 특정 게시물의 모든 댓글 조회
