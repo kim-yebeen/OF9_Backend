@@ -69,4 +69,11 @@ public class FeedController {
         List<FeedResponse> response = feedService.getFollowingFeed(request);
         return ResponseEntity.ok(ApiResponse.success("팔로잉 피드를 성공적으로 조회했습니다", response));
     }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<UserFeedResponse>> getUserFeed(@PathVariable Long userId) {
+        Long currentUserId = getCurrentUserId();
+        UserFeedResponse response = feedService.getUserFeed(currentUserId, userId);
+        return ResponseEntity.ok(ApiResponse.success("사용자 피드를 성공적으로 조회했습니다", response));
+    }
 }
