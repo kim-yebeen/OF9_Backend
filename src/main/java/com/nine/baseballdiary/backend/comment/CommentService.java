@@ -143,11 +143,13 @@ public class CommentService {
         }
 
         comment.updateContent(request.getContent());
-        return convertToDto(comment, userId);
+        long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(comment.getRecordId());
+
+        return convertToDtoWithCount(comment, userId, totalCommentCount);
     }
 
     // 댓글 삭제 (soft delete)
-    public void deleteComment(Long commentId, Long userId) {
+    public CommentDto deleteComment(Long commentId, Long userId) {
         RecordComment comment = commentRepo.findByIdNotDeleted(commentId)
                 .orElseThrow(() -> new IllegalArgumentException("댓글을 찾을 수 없습니다."));
 
@@ -155,6 +157,8 @@ public class CommentService {
         if (!comment.getUserId().equals(userId)) {
             throw new IllegalArgumentException("댓글 삭제 권한이 없습니다.");
         }
+        Long recordId = comment.getRecordId(); // 삭제 전에 recordId 저장
+
         //부모 댓글인 경우 대댓글도 함께 삭제
         if (comment.getParentCommentId() == null) {
             List<RecordComment> replies = commentRepo.findRepliesByParentId(commentId);
@@ -165,8 +169,14 @@ public class CommentService {
             });
         }
         comment.delete();
-
         notificationService.deleteCommentNotification(userId, commentId);
+        long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
+
+        return CommentDto.builder()
+                .id(commentId)
+                .recordId(recordId)
+                .totalCommentCount(totalCommentCount) // 최신 댓글 개수
+                .build();
     }
 
     // 댓글 개수 조회

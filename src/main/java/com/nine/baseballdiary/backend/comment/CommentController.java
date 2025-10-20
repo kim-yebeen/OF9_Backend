@@ -55,15 +55,13 @@ public class CommentController {
 
     // 댓글 삭제
     @DeleteMapping("/{commentId}")
-    public ResponseEntity<ApiResponse<Void>> deleteComment(
-            @PathVariable Long recordId,
-            @PathVariable Long commentId) {
+    public ResponseEntity<ApiResponse<CommentDto>> deleteComment(@PathVariable Long commentId) {
         Long userId = getCurrentUserId();
-        commentService.deleteComment(commentId, userId);
-        return ResponseEntity.ok(ApiResponse.success("댓글이 삭제되었습니다"));
+        CommentDto result = commentService.deleteComment(commentId, userId);
+        return ResponseEntity.ok(ApiResponse.success("댓글이 삭제되었습니다", result));
     }
 
-    // 댓글 개수 조회
+        // 댓글 개수 조회
     @GetMapping("/count")
     public ResponseEntity<ApiResponse<Long>> getCommentCount(@PathVariable Long recordId) {
         long count = commentService.getCommentCount(recordId);
