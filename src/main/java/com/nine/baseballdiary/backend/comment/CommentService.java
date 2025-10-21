@@ -95,6 +95,8 @@ public class CommentService {
     public List<CommentDto> getCommentsByRecordId(Long recordId, Long currentUserId) {
         List<RecordComment> allComments = commentRepo.findAllByRecordIdNotDeleted(recordId);
 
+        long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
+
         // 부모 댓글만 필터링
         List<RecordComment> parentComments = allComments.stream()
                 .filter(c -> c.getParentCommentId() == null)
@@ -125,6 +127,7 @@ public class CommentService {
                             .isAuthor(dto.isAuthor())
                             .replyCount((long) replies.size())
                             .replies(replies)
+                            .totalCommentCount(totalCommentCount)
                             .build();
 
                     return dto;
