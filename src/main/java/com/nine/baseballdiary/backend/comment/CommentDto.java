@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.comment;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class CommentDto {
     private Long id;
     private Long recordId;
