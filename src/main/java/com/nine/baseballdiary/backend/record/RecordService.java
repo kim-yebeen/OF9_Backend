@@ -359,7 +359,7 @@ public class RecordService {
 
         int home = game.getHomeScore() == null ? 0 : game.getHomeScore();
         int away = game.getAwayScore() == null ? 0 : game.getAwayScore();
-        if (home == away) return "DRAW";
+        if (home == away) return "TIE";
         boolean win = (isHome && home > away) || (isAway && away > home);
         return win ? "WIN" : "LOSE";
     }
