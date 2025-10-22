@@ -95,6 +95,7 @@ public class CommentService {
     public List<CommentDto> getCommentsByRecordId(Long recordId, Long currentUserId) {
         List<RecordComment> allComments = commentRepo.findAllByRecordIdNotDeleted(recordId);
 
+        // 전체 댓글 개수 계산 (한 번만)
         long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
         // 부모 댓글만 필터링
@@ -105,15 +106,17 @@ public class CommentService {
         // 각 부모 댓글에 대해 대댓글을 찾아서 DTO로 변환
         return parentComments.stream()
                 .map(parent -> {
-                    CommentDto dto = convertToDto(parent, currentUserId);
+                    // convertToDtoWithCount 사용으로 변경
+                    CommentDto dto = convertToDtoWithCount(parent, currentUserId, totalCommentCount);
 
-                    // 대댓글 찾기
+                    // 대댓글도 convertToDtoWithCount 사용
                     List<CommentDto> replies = allComments.stream()
                             .filter(c -> parent.getId().equals(c.getParentCommentId()))
-                            .map(reply -> convertToDto(reply, currentUserId))
+                            .map(reply -> convertToDtoWithCount(reply, currentUserId, totalCommentCount))
                             .collect(Collectors.toList());
 
-                    dto = CommentDto.builder()
+                    // 재구성 시에도 totalCommentCount 포함
+                    return CommentDto.builder()
                             .id(dto.getId())
                             .recordId(dto.getRecordId())
                             .userId(dto.getUserId())
@@ -127,10 +130,8 @@ public class CommentService {
                             .isAuthor(dto.isAuthor())
                             .replyCount((long) replies.size())
                             .replies(replies)
-                            .totalCommentCount(totalCommentCount)
+                            .totalCommentCount(totalCommentCount) // 핵심: 이 값이 포함되어야 함
                             .build();
-
-                    return dto;
                 })
                 .collect(Collectors.toList());
     }
