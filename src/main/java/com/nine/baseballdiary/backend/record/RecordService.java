@@ -260,11 +260,12 @@ public class RecordService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecordListResponse> getUserRecordsList(Long userId) {
-        List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
+    public List<RecordListResponse> getUserRecordsList(Long targetUserId, Long currentUserId) {
+        // userId -> targetUserId로 변경
+        List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
 
-        User user = userRepo.findById(userId).orElseThrow(
-                () -> new IllegalArgumentException("존재하지 않는 사용자: " + userId)
+        User user = userRepo.findById(targetUserId).orElseThrow(
+                () -> new IllegalArgumentException("존재하지 않는 사용자: " + targetUserId)
         );
 
         return records.stream()
@@ -273,7 +274,7 @@ public class RecordService {
 
                     // ✅ 좋아요 및 댓글 정보 조회
                     long likeCount = likeRepo.countByRecordId(r.getRecordId());
-                    boolean isLiked = likeRepo.existsByRecordIdAndUserId(r.getRecordId(), userId);
+                    boolean isLiked = likeRepo.existsByRecordIdAndUserId(r.getRecordId(), currentUserId);
                     long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(r.getRecordId());
 
                     return new RecordListResponse(
@@ -293,13 +294,12 @@ public class RecordService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getUserRecordsCalendar(Long userId, int year, int month) {
-        // 해당 월의 시작일과 종료일
+    public Map<String, Object> getUserRecordsCalendar(Long targetUserId, int year, int month) {    // 해당 월의 시작일과 종료일
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.plusMonths(1).minusDays(1);
 
         // 해당 월의 기록들 조회
-        List<GameRecord> monthRecords = recordRepo.findByUserIdAndGameDateBetween(userId, startDate, endDate);
+        List<GameRecord> monthRecords = recordRepo.findByUserIdAndGameDateBetween(targetUserId, startDate, endDate);
 
         // 개별 기록들 (기존 방식)
         List<RecordCalendarResponse> records = monthRecords.stream()

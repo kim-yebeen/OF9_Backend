@@ -140,8 +140,8 @@ public class RecordController {
     public ResponseEntity<ApiResponse<List<RecordListResponse>>> getUserRecordsList() {
         try {
             Long userId = getCurrentUserId();
-            List<RecordListResponse> response = service.getUserRecordsList(userId);
-
+            // (userId) -> (userId, userId)로 변경
+            List<RecordListResponse> response = service.getUserRecordsList(userId, userId);
             return ResponseEntity.ok(ApiResponse.success("리스트 형식 직관 기록을 성공적으로 조회했습니다", response));
 
         } catch (IllegalStateException e) {
@@ -160,8 +160,8 @@ public class RecordController {
             @RequestParam(defaultValue = "10") int month) {
         try {
             Long userId = getCurrentUserId();
+            // (userId, year, month) -> (userId, year, month) (파라미터 이름만 변경됨)
             Map<String, Object> response = service.getUserRecordsCalendar(userId, year, month);
-
             return ResponseEntity.ok(ApiResponse.success("캘린더 형식 직관 기록을 성공적으로 조회했습니다", response));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

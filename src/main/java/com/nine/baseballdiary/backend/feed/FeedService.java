@@ -6,8 +6,12 @@ import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.like.RecordLikeRepository;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
+import com.nine.baseballdiary.backend.record.RecordListResponse;
+import com.nine.baseballdiary.backend.record.RecordService;
 import com.nine.baseballdiary.backend.search.dto.FollowStatus;
+import com.nine.baseballdiary.backend.user.entity.FollowRequestStatus;
 import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.repository.FollowRequestRepository;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,10 +19,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +37,8 @@ public class FeedService {
     private final RecordLikeRepository likeRepo;
     private final RecordCommentRepository commentRepo;
 
+    private final FollowRequestRepository followRequestRepo;
+    private final RecordService recordService;
     /**
      * 전체 피드 조회 (최신순, 팀 필터링 지원)
      */
@@ -138,21 +144,28 @@ public class FeedService {
         long followerCount = userFollowRepo.countByFollowee_Id(targetUserId);
         long followingCount = userFollowRepo.countByFollower_Id(targetUserId);
 
-        // 사용자 기록들 (피드 형식)
-        List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
+        boolean canViewContent = !targetUser.getIsPrivate() ||
+                followStatus == FollowStatus.ME ||
+                followStatus == FollowStatus.FOLLOWING;
 
-        List<UserFeedItem> feedItems = records.stream()
-                .filter(r -> r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
-                .map(r -> {
-                    long likeCount = likeRepo.countByRecordId(r.getRecordId());
-                    return UserFeedItem.builder()
-                            .recordId(r.getRecordId())
-                            .gameDate(r.getGame().getDate().format(DateTimeFormatter.ofPattern("yy/MM/dd EEE", Locale.ENGLISH)))
-                            .imageUrl(r.getMediaUrls().get(0))
-                            .likeCount(likeCount)
-                            .build();
-                })
-                .collect(Collectors.toList());
+        List<UserFeedItem> feedItems = List.of();
+
+        if (canViewContent) {
+            // 사용자 기록들 (피드 형식)
+            List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
+
+            feedItems = records.stream()
+                    .map(r -> {
+                        long likeCount = likeRepo.countByRecordId(r.getRecordId());
+                        return UserFeedItem.builder()
+                                .recordId(r.getRecordId())
+                                .gameDate(r.getGame().getDate().format(DateTimeFormatter.ofPattern("yy/MM/dd EEE", Locale.ENGLISH)))
+                                .imageUrl(r.getMediaUrls().get(0))
+                                .likeCount(likeCount)
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
 
         return UserFeedResponse.builder()
                 .userId(targetUser.getId())
@@ -168,6 +181,47 @@ public class FeedService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public List<RecordListResponse> getUserList(Long currentUserId, Long targetUserId) {
+        User targetUser = userRepo.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+
+        FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
+
+        boolean canViewContent = !targetUser.getIsPrivate() ||
+                followStatus == FollowStatus.ME ||
+                followStatus == FollowStatus.FOLLOWING;
+
+        if (!canViewContent) {
+            // 비공개 계정이면 빈 리스트 반환
+            return List.of();
+        }
+
+        // RecordService의 재사용
+        return recordService.getUserRecordsList(targetUserId, currentUserId);
+    }
+
+    // 5. 캘린더 뷰를 위한 새 메서드
+    @Transactional(readOnly = true)
+    public Map<String, Object> getUserCalendar(Long currentUserId, Long targetUserId, int year, int month) {
+        User targetUser = userRepo.findById(targetUserId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+
+        FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
+
+        boolean canViewContent = !targetUser.getIsPrivate() ||
+                followStatus == FollowStatus.ME ||
+                followStatus == FollowStatus.FOLLOWING;
+
+        if (!canViewContent) {
+            // 비공개 계정이면 빈 맵 반환 (혹은 에러 처리)
+            return Map.of("records", List.of(), "monthlyStats", Map.of());
+        }
+
+        // RecordService의 재사용
+        return recordService.getUserRecordsCalendar(targetUserId, year, month);
+    }
+
     private FollowStatus getFollowStatus(Long currentUserId, Long targetUserId) {
         if (currentUserId.equals(targetUserId)) {
             return FollowStatus.ME;
@@ -179,15 +233,17 @@ public class FeedService {
             return FollowStatus.FOLLOWING;
         }
 
-        // 팔로우 요청 대기 중인지 확인 (필요시 추가)
-        // boolean isPending = followRequestRepo.existsByRequester_IdAndTarget_IdAndStatus(
-        //         currentUserId, targetUserId, FollowRequestStatus.PENDING);
-        // if (isPending) {
-        //     return FollowStatus.REQUESTED;
-        // }
+        // 2. 주석 해제 (FollowRequestStatus.PENDING은 실제 Enum 값에 맞춰주세요)
+        boolean isPending = followRequestRepo.existsByRequester_IdAndTarget_IdAndStatus(
+                currentUserId, targetUserId, FollowRequestStatus.PENDING);
+        if (isPending) {
+            return FollowStatus.REQUESTED;
+        }
 
         return FollowStatus.NOT_FOLLOWING;
     }
+
+
 
     private String getEmotionLabel(Integer emotionCode) {
         switch (emotionCode) {
