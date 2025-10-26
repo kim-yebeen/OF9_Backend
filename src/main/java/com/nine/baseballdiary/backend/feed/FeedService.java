@@ -155,6 +155,7 @@ public class FeedService {
             List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
 
             feedItems = records.stream()
+                    .filter(r -> r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
                     .map(r -> {
                         long likeCount = likeRepo.countByRecordId(r.getRecordId());
                         return UserFeedItem.builder()
