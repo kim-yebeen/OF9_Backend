@@ -172,42 +172,70 @@ public class ReportService {
         LocalDate today = LocalDate.now();
         int currentYear = today.getYear();
 
-        // 2025 시즌: 3월 23일 ~ 11월 15일
-        LocalDate seasonStart = LocalDate.of(currentYear, 3, 23);
-        LocalDate seasonEnd = LocalDate.of(currentYear, 11, 1);
+        // 1. KBO 시즌 주요 일정
+        LocalDate regularSeasonStart = LocalDate.of(currentYear, 3, 23);
+        LocalDate regularSeasonEnd = LocalDate.of(currentYear, 10, 15); // 예: 정규시즌 종료일
+        LocalDate postSeasonStart = LocalDate.of(currentYear, 10, 25);  // 예: 포스트시즌 시작일
+        LocalDate postSeasonEnd = LocalDate.of(currentYear, 11, 2); // 예: 포스트시즌 종료일
 
-        // 다음 시즌 시작일
-        LocalDate nextSeasonStart = LocalDate.of(currentYear + 1, 3, 23);
+        // 2. 내년 시즌 시작일
+        LocalDate nextRegularSeasonStart = LocalDate.of(currentYear + 1, 3, 28);
 
-        if (today.isBefore(seasonStart)) {
-            // 시즌 시작 전
-            int daysUntilStart = (int) ChronoUnit.DAYS.between(today, seasonStart);
+
+        // 3. 4가지 시나리오 분기
+        if (today.isBefore(regularSeasonStart)) {
+            // 3-1. (오프시즌) 정규시즌 시작 전
+            int daysUntilStart = (int) ChronoUnit.DAYS.between(today, regularSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilStart)
-                    .seasonEndDate(seasonStart.toString())
+                    .seasonEndDate(regularSeasonStart.toString())
                     .status("BEFORE_START")
-                    .message(currentYear + " 시즌 시작까지")
+                    .message(currentYear + " 정규시즌 시작까지")
                     .build();
-        } else if (today.isAfter(seasonEnd)) {
-            // 시즌 종료 후
-            int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextSeasonStart);
-            return SeasonDdayDto.builder()
-                    .seasonYear(currentYear + 1)
-                    .daysRemaining(daysUntilNextStart)
-                    .seasonEndDate(nextSeasonStart.toString())
-                    .status("ENDED")
-                    .message((currentYear + 1) + " 시즌 시작까지")
-                    .build();
-        } else {
-            // 시즌 진행 중
-            int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, seasonEnd);
+
+        } else if (today.isBefore(regularSeasonEnd) || today.isEqual(regularSeasonEnd)) {
+            // 3-2. 정규시즌 진행 중
+            int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, regularSeasonEnd);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilEnd)
-                    .seasonEndDate(seasonEnd.toString())
-                    .status("IN_PROGRESS")
-                    .message(currentYear + " 시즌 종료까지")
+                    .seasonEndDate(regularSeasonEnd.toString())
+                    .status("IN_PROGRESS_REGULAR")
+                    .message(currentYear + " 정규 시즌 종료까지")
+                    .build();
+
+        } else if (today.isBefore(postSeasonStart)) {
+            // 3-3. 정규시즌 종료 ~ 포스트시즌 시작 전
+            int daysUntilPSStart = (int) ChronoUnit.DAYS.between(today, postSeasonStart);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear)
+                    .daysRemaining(daysUntilPSStart)
+                    .seasonEndDate(postSeasonStart.toString())
+                    .status("BEFORE_POSTSEASON")
+                    .message(currentYear + " 포스트 시즌 시작까지")
+                    .build();
+
+        } else if (today.isBefore(postSeasonEnd) || today.isEqual(postSeasonEnd)) {
+            // 3-4. 포스트시즌 진행 중
+            int daysUntilPSEnd = (int) ChronoUnit.DAYS.between(today, postSeasonEnd);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear)
+                    .daysRemaining(daysUntilPSEnd)
+                    .seasonEndDate(postSeasonEnd.toString())
+                    .status("IN_PROGRESS_POSTSEASON")
+                    .message(currentYear + " 포스트 시즌 종료까지")
+                    .build();
+
+        } else {
+            // 3-5. (오프시즌) 포스트시즌 종료 ~ 내년 시즌 시작 전
+            int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextRegularSeasonStart);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear + 1)
+                    .daysRemaining(daysUntilNextStart)
+                    .seasonEndDate(nextRegularSeasonStart.toString())
+                    .status("ENDED")
+                    .message((currentYear + 1) + " 정규시즌 시작까지")
                     .build();
         }
     }
@@ -420,6 +448,7 @@ public class ReportService {
         List<PlayerInfoDto> result = playerService.searchPlayers(playerName);
         return result.isEmpty() ? "XX" : result.get(0).getTeam();
     }
+
 
 
     private String convertTeamCodeToName(String code) {
