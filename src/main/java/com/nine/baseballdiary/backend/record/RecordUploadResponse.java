@@ -9,8 +9,11 @@ import lombok.Setter;
 public class RecordUploadResponse {
     private Long    recordId;
     private String gameDate;
-    public RecordUploadResponse(Long recordId, String gameDate) {
+    private boolean isFirstRecord;
+
+    public RecordUploadResponse(Long recordId, String gameDate, boolean isFirstRecord) {
         this.recordId = recordId;
         this.gameDate = gameDate;
+        this.isFirstRecord = isFirstRecord;
     }
 }

@@ -77,11 +77,14 @@ public class RecordService {
 
         GameRecord savedRecord = recordRepo.save(record);
 
+        long totalRecords = recordRepo.countByUserId(userId); //
+        boolean isFirst = (totalRecords == 1);
+
         notificationService.createNewRecordNotification(userId, savedRecord.getRecordId());
         badgeService.checkAndAwardBadgesForUser(userId);
 
         String dateStr = game.getDate().format(UPLOAD_FMT);
-        return new RecordUploadResponse(savedRecord.getRecordId(), dateStr);
+        return new RecordUploadResponse(savedRecord.getRecordId(), dateStr, isFirst);
     }
 
     private void validateMutualFriends(Long userId, List<Long> companionIds) {
