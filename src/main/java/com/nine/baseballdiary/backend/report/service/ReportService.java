@@ -298,7 +298,7 @@ public class ReportService {
                 .orElse(null);
 
         return TopEmotionDto.builder()
-                .emotion(convertEmotionToNoun(topEntry.getKey()))
+                .emotion(convertEmotionLabel(topEntry.getKey()))
                 .count(topEntry.getValue().intValue())
                 .emotionCode(topEntry.getKey())
                 .build();
