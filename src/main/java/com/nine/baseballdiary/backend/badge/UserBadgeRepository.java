@@ -17,10 +17,10 @@ public interface UserBadgeRepository extends JpaRepository<UserBadge, Long> {
 
     // 최근 획득한 뱃지 조회 메서드 추가
     @Query("SELECT ub FROM UserBadge ub JOIN FETCH ub.badge WHERE ub.user.id = :userId ORDER BY ub.achievedAt DESC")
-    List<UserBadge> findTop3ByUserIdOrderByAchievedAtDesc(@Param("userId") Long userId, Pageable pageable);
+    List<UserBadge> findTop5ByUserIdOrderByAchievedAtDesc(@Param("userId") Long userId, Pageable pageable);
 
     // 편의 메서드
-    default List<UserBadge> findTop3ByUserIdOrderByAchievedAtDesc(Long userId) {
-        return findTop3ByUserIdOrderByAchievedAtDesc(userId, PageRequest.of(0, 3));
+    default List<UserBadge> findTop5ByUserIdOrderByAchievedAtDesc(Long userId) {
+        return findTop5ByUserIdOrderByAchievedAtDesc(userId, PageRequest.of(0, 5));
     }
 }

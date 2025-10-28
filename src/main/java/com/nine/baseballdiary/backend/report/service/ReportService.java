@@ -63,7 +63,7 @@ public class ReportService {
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
         // 최근 획득한 뱃지 3개 조회
-        List<UserBadge> recentUserBadges = userBadgeRepository.findTop3ByUserIdOrderByAchievedAtDesc(userId);
+        List<UserBadge> recentUserBadges = userBadgeRepository.findTop5ByUserIdOrderByAchievedAtDesc(userId);
         List<BadgeSummaryDto.RecentBadgeDto> recentBadges = recentUserBadges.stream()
                 .map(ub -> BadgeSummaryDto.RecentBadgeDto.builder()
                         .name(ub.getBadge().getName())
