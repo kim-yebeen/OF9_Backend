@@ -152,7 +152,9 @@ public class RecordService {
 
         Game game = rec.getGame();
         if (game == null) {
-            throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
+            // [수정] game이 null일 때를 대비한 방어 코드 (상세 조회에서도 필요)
+            // throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
+            // 혹은, null을 허용하고 아래에서 처리
         }
 
         List<Long> companionIds = rec.getCompanions();
@@ -164,8 +166,9 @@ public class RecordService {
                     .collect(Collectors.toList());
         }
 
-        String fmtDate = game.getDate().format(UPLOAD_FMT);
-        String fmtTime = game.getTime().format(TIME_FMT);
+        // [수정] game이 null일 수 있으므로 null 체크
+        String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
+        String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
@@ -183,12 +186,13 @@ public class RecordService {
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
                 .emotionLabel(emoLabel)
-                .homeTeam(convertHomeTeam(game.getHomeTeam()))
-                .awayTeam(convertAwayTeam(game.getAwayTeam()))
-                .stadium(convertStadium(game.getStadium()))
+                // [수정] game이 null일 수 있으므로 null 체크
+                .homeTeam(game != null ? convertHomeTeam(game.getHomeTeam()) : "팀 정보 없음")
+                .awayTeam(game != null ? convertAwayTeam(game.getAwayTeam()) : "팀 정보 없음")
+                .stadium(convertStadium(rec.getStadium()))
                 .seatInfo(rec.getSeatInfo())
-                .homeScore(game.getHomeScore())
-                .awayScore(game.getAwayScore())
+                .homeScore(game != null ? game.getHomeScore() : 0)
+                .awayScore(game != null ? game.getAwayScore() : 0)
                 .result(rec.getResult())
                 .comment(rec.getComment())
                 .longContent(rec.getLongContent())
@@ -200,8 +204,6 @@ public class RecordService {
                 .likeCount(likeCount)
                 .isLiked(false)  // currentUserId 없으면 false
                 .commentCount(commentCount)
-                .gameDate(fmtDate)
-                .gameTime(fmtTime)
                 .build();
     }
 
