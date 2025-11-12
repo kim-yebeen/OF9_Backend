@@ -100,7 +100,7 @@ public class RecordService {
 
     @Transactional
     public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
-        GameRecord rec = recordRepo.findById(recordId)
+        GameRecord rec = recordRepo.findByIdWithDetails(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
