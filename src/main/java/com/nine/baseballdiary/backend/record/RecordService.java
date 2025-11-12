@@ -104,17 +104,41 @@ public class RecordService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
-        if (req.getCompanions() != null && !req.getCompanions().isEmpty()) {
-            validateCompanions(req.getCompanions());
+        if (req.getComment() != null) {rec.setComment(req.getComment());}
+        if (req.getLongContent() != null) {rec.setLongContent(req.getLongContent());}
+        if (req.getBestPlayer() != null) {rec.setBestPlayer(req.getBestPlayer());}
+        if (req.getCompanions() != null) {
+            if (!req.getCompanions().isEmpty()) { validateCompanions(req.getCompanions());}
+            rec.setCompanions(req.getCompanions());
         }
-        rec.setComment(req.getComment());
-        rec.setLongContent(req.getLongContent());
-        rec.setBestPlayer(req.getBestPlayer());
-        rec.setCompanions(req.getCompanions());
-        rec.setFoodTags(req.getFoodTags());
-        rec.setMediaUrls(req.getMediaUrls());
+        if (req.getFoodTags() != null) { rec.setFoodTags(req.getFoodTags());}
+        if (req.getMediaUrls() != null) { rec.setMediaUrls(req.getMediaUrls()); }
+        if (req.getStadium() != null) { rec.setStadium(req.getStadium());}
+        if (req.getSeatInfo() != null) { rec.setSeatInfo(req.getSeatInfo());}
+        if (req.getEmotionCode() != null) {rec.setEmotionCode(req.getEmotionCode());}
+
+        if (req.getGameId() != null && !req.getGameId().equals(rec.getGame().getGameId())) {
+
+            // 3-1. 새로운 Game 엔티티를 조회합니다.
+            Game newGame = gameRepo.findById(req.getGameId())
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
+
+            // 3-2. 레코드의 Game을 교체합니다.
+            rec.setGame(newGame);
+
+            // 3-3. Game이 바뀌었으므로, 승/패/무 결과(result)를 다시 계산해야 합니다.
+            User user = userRepo.findById(currentUserId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + currentUserId));
+            String newResult = calculateResult(user.getFavTeam(), newGame);
+            rec.setResult(newResult);
+        }
+
+        // 4. 모든 변경 사항을 DB에 저장
         recordRepo.save(rec);
-        return getRecordDetail(recordId);
+
+        // 5. 수정된 전체 정보를 다시 조회하여 반환합니다.
+        //    (getRecordDetail 대신 getRecordDetailWithUser 사용)
+        return getRecordDetailWithUser(recordId, currentUserId);
     }
 
     @Transactional(readOnly = true)

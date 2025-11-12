@@ -14,4 +14,9 @@ public class UpdateRecordRequest {
     private List<Long>        companions;
     private List<String>         foodTags;
     private List<String>         mediaUrls;
+
+    private String gameId;
+    private String stadium;
+    private String seatInfo;
+    private Integer emotionCode; // 1~9의 정수
 }
