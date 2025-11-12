@@ -49,7 +49,7 @@ public class RecordService {
 
     public RecordUploadResponse uploadRecord(Long userId, CreateRecordRequest req) {
         if (req.getCompanions() != null && !req.getCompanions().isEmpty()) {
-            validateMutualFriends(userId, req.getCompanions());
+            validateCompanions(req.getCompanions());
         }
 
         Game game = gameRepo.findById(req.getGameId())
@@ -87,15 +87,14 @@ public class RecordService {
         return new RecordUploadResponse(savedRecord.getRecordId(), dateStr, isFirst);
     }
 
-    private void validateMutualFriends(Long userId, List<Long> companionIds) {
-        List<Long> mutualFriendIds = getMutualFriends(userId, null).stream()
-                .map(UserDto::getId)
-                .collect(Collectors.toList());
+    private void validateCompanions(List<Long> companionIds) {
+        // 'findAllById'는 Spring Data JPA의 기본 CrudRepository 메소드입니다.
+        List<User> foundUsers = userRepo.findAllById(companionIds);
 
-        for (Long companionId : companionIds) {
-            if (!mutualFriendIds.contains(companionId)) {
-                throw new IllegalArgumentException("맞팔 친구만 태그할 수 있습니다: " + companionId);
-            }
+        // 요청한 ID 목록의 크기와 실제 DB에서 찾은 사용자 목록의 크기가 다르면,
+        // 존재하지 않는 사용자가 포함된 것입니다.
+        if (foundUsers.size() != companionIds.size()) {
+            throw new IllegalArgumentException("태그한 사용자 중 존재하지 않는 사용자가 있습니다.");
         }
     }
 
@@ -105,14 +104,16 @@ public class RecordService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
-
+        if (req.getCompanions() != null && !req.getCompanions().isEmpty()) {
+            validateCompanions(req.getCompanions());
+        }
         rec.setComment(req.getComment());
         rec.setLongContent(req.getLongContent());
         rec.setBestPlayer(req.getBestPlayer());
         rec.setCompanions(req.getCompanions());
         rec.setFoodTags(req.getFoodTags());
         rec.setMediaUrls(req.getMediaUrls());
-
+        recordRepo.save(rec);
         return getRecordDetail(recordId);
     }
 
@@ -435,20 +436,19 @@ public class RecordService {
 
     @Transactional(readOnly = true)
     public List<UserDto> getMutualFriends(Long userId, String query) {
-        List<Long> followingIds = userflRepo.findByFollower_Id(userId).stream()
-                .map(uf -> uf.getFollowee().getId())
-                .collect(Collectors.toList());
+        // userId 파라미터는 컨트롤러와의 호환성을 위해 유지하지만, 실제 로직에서는 사용되지 않습니다.
 
-        Stream<User> mutualFriendsStream = userflRepo.findByFollowee_Id(userId).stream()
-                .map(uf -> uf.getFollower())
-                .filter(follower -> followingIds.contains(follower.getId()));
-
-        if (query != null && !query.trim().isEmpty()) {
-            mutualFriendsStream = mutualFriendsStream
-                    .filter(user -> user.getNickname().toLowerCase().contains(query.toLowerCase()));
+        if (query == null || query.trim().isEmpty()) {
+            // 검색어가 없으면 빈 리스트를 반환합니다.
+            // (모든 사용자를 반환하는 것은 성능 및 UX에 좋지 않습니다.)
+            return List.of();
         }
+        List<User> allUsers = userRepo.findAll();
 
-        return mutualFriendsStream
+        Stream<User> filteredUsers = allUsers.stream()
+                .filter(user -> user.getNickname().toLowerCase().contains(query.toLowerCase()));
+
+        return filteredUsers
                 .map(UserDto::from)
                 .collect(Collectors.toList());
     }

@@ -191,21 +191,23 @@ public class RecordController {
     }
 
     // 함께한 사람(맞팔+검색) 불러오기 API
-    @GetMapping("/me/mutual-friends")
+    @GetMapping("/users/search")
     public ResponseEntity<ApiResponse<List<UserDto>>> getMutualFriends(
             @RequestParam(required = false) String query) {
         try {
             Long userId = getCurrentUserId();
+            // 서비스의 getMutualFriends는 이제 '전체 사용자 검색' 로직을 수행합니다.
             List<UserDto> response = service.getMutualFriends(userId, query);
 
-            return ResponseEntity.ok(ApiResponse.success("맞팔 친구 목록을 성공적으로 조회했습니다", response));
+            // [수정] 응답 메시지 변경
+            return ResponseEntity.ok(ApiResponse.success("사용자 검색을 성공적으로 완료했습니다", response));
 
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error(e.getMessage(), "UNAUTHORIZED"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("맞팔 친구 조회 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
+                    .body(ApiResponse.error("사용자 검색 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
         }
     }
 }
