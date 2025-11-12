@@ -117,20 +117,36 @@ public class RecordService {
         if (req.getSeatInfo() != null) { rec.setSeatInfo(req.getSeatInfo());}
         if (req.getEmotionCode() != null) {rec.setEmotionCode(req.getEmotionCode());}
 
-        if (req.getGameId() != null && !req.getGameId().equals(rec.getGame().getGameId())) {
+        // 1. 클라이언트가 gameId 수정을 요청했는지 (null이 아닌지) 확인
+        if (req.getGameId() != null) {
 
-            // 3-1. 새로운 Game 엔티티를 조회합니다.
-            Game newGame = gameRepo.findById(req.getGameId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
+            boolean needsGameUpdate = false;
 
-            // 3-2. 레코드의 Game을 교체합니다.
-            rec.setGame(newGame);
+            // 2. [NullPointerException 방지] 기존 레코드에 Game이 아예 없었는지 확인
+            if (rec.getGame() == null) {
+                needsGameUpdate = true; // 원래 게임이 없었으니 무조건 업데이트
+            }
+            // 3. 기존 레코드에 Game이 있었고, ID가 다른지 확인
+            else if (!req.getGameId().equals(rec.getGame().getGameId())) {
+                needsGameUpdate = true; // ID가 다르니 업데이트
+            }
+            // (else: gameId가 같으면 needsGameUpdate는 false로 유지)
 
-            // 3-3. Game이 바뀌었으므로, 승/패/무 결과(result)를 다시 계산해야 합니다.
-            User user = userRepo.findById(currentUserId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + currentUserId));
-            String newResult = calculateResult(user.getFavTeam(), newGame);
-            rec.setResult(newResult);
+            // 4. 업데이트가 필요하다고 판단될 때만 아래 로직 실행
+            if (needsGameUpdate) {
+                // 4-1. 새로운 Game 엔티티를 조회합니다.
+                Game newGame = gameRepo.findById(req.getGameId())
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
+
+                // 4-2. 레코드의 Game을 교체합니다.
+                rec.setGame(newGame);
+
+                // 4-3. Game이 바뀌었으므로, 승/패/무 결과(result)를 다시 계산해야 합니다.
+                User user = userRepo.findById(currentUserId)
+                        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + currentUserId));
+                String newResult = calculateResult(user.getFavTeam(), newGame);
+                rec.setResult(newResult);
+            }
         }
 
         // 4. 모든 변경 사항을 DB에 저장
@@ -212,9 +228,6 @@ public class RecordService {
         GameRecord rec = recordRepo.findById(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
         Game game = rec.getGame();
-        if (game == null) {
-            throw new IllegalArgumentException("존재하지 않는 게임 ID 참조: " + rec.getRecordId());
-        }
 
         User author = userRepo.findById(rec.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작성자: " + rec.getUserId()));
@@ -228,8 +241,10 @@ public class RecordService {
                     .collect(Collectors.toList());
         }
 
-        String fmtDate = game.getDate().format(UPLOAD_FMT);
-        String fmtTime = game.getTime().format(TIME_FMT);
+        // [수정 1] game이 null이어도 오류가 나지 않도록 함
+        String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
+        // [수정 2] game.getTime()이 null일 경우 NullPointerException 방지
+        String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
@@ -245,15 +260,16 @@ public class RecordService {
                 .profileImageUrl(author.getProfileImageUrl())
                 .favTeam(author.getFavTeam())
                 .gameDate(fmtDate)
-                .gameTime(fmtTime)
+                .gameTime(fmtTime) // [수정 3] 중복 호출 제거 (여기 하나만 남김)
                 .emotionCode(rec.getEmotionCode())
                 .emotionLabel(emoLabel)
-                .homeTeam(convertHomeTeam(game.getHomeTeam()))
-                .awayTeam(convertAwayTeam(game.getAwayTeam()))
-                .stadium(convertStadium(game.getStadium()))
+                .homeTeam(game != null ? convertHomeTeam(game.getHomeTeam()) : "팀 정보 없음")
+                .awayTeam(game != null ? convertAwayTeam(game.getAwayTeam()) : "팀 정보 없음")
+                // [수정 4] game.getStadium() -> rec.getStadium()
+                .stadium(convertStadium(rec.getStadium()))
                 .seatInfo(rec.getSeatInfo())
-                .homeScore(game.getHomeScore())
-                .awayScore(game.getAwayScore())
+                .homeScore(game != null ? game.getHomeScore() : 0)
+                .awayScore(game != null ? game.getAwayScore() : 0)
                 .result(rec.getResult())
                 .comment(rec.getComment())
                 .longContent(rec.getLongContent())
@@ -265,8 +281,6 @@ public class RecordService {
                 .likeCount(likeCount)
                 .isLiked(isLiked)
                 .commentCount(commentCount)
-                .gameDate(fmtDate)
-                .gameTime(fmtTime)
                 .build();
     }
 
@@ -469,12 +483,11 @@ public class RecordService {
             // (모든 사용자를 반환하는 것은 성능 및 UX에 좋지 않습니다.)
             return List.of();
         }
-        List<User> allUsers = userRepo.findAll();
+        List<User> users = userRepo.findByNicknameContainingIgnoreCase(query);
 
-        Stream<User> filteredUsers = allUsers.stream()
-                .filter(user -> user.getNickname().toLowerCase().contains(query.toLowerCase()));
-
-        return filteredUsers
+        // [수정] 자기 자신(userId)을 필터로 제외합니다.
+        return users.stream()
+                .filter(user -> !user.getId().equals(userId))
                 .map(UserDto::from)
                 .collect(Collectors.toList());
     }
