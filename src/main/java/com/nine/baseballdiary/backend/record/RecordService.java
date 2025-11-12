@@ -100,10 +100,15 @@ public class RecordService {
 
     @Transactional
     public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
+        // 1. 레코드 조회
         GameRecord rec = recordRepo.findByIdWithDetails(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드"));
+
+        // 2. 권한 확인
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
+
+        // 3. (님이 원하신) "null이 아니면 수정" 로직 (완벽하게 잘 작동합니다)
         if (req.getComment() != null) {rec.setComment(req.getComment());}
         if (req.getLongContent() != null) {rec.setLongContent(req.getLongContent());}
         if (req.getBestPlayer() != null) {rec.setBestPlayer(req.getBestPlayer());}
@@ -117,44 +122,79 @@ public class RecordService {
         if (req.getSeatInfo() != null) { rec.setSeatInfo(req.getSeatInfo());}
         if (req.getEmotionCode() != null) {rec.setEmotionCode(req.getEmotionCode());}
 
-        // 1. 클라이언트가 gameId 수정을 요청했는지 (null이 아닌지) 확인
+        // 4. gameId가 변경되었을 때의 복잡한 로직 (이건 어쩔 수 없음, 잘 짜셨습니다)
         if (req.getGameId() != null) {
-
             boolean needsGameUpdate = false;
-
-            // 2. [NullPointerException 방지] 기존 레코드에 Game이 아예 없었는지 확인
             if (rec.getGame() == null) {
-                needsGameUpdate = true; // 원래 게임이 없었으니 무조건 업데이트
+                needsGameUpdate = true;
             }
-            // 3. 기존 레코드에 Game이 있었고, ID가 다른지 확인
             else if (!req.getGameId().equals(rec.getGame().getGameId())) {
-                needsGameUpdate = true; // ID가 다르니 업데이트
+                needsGameUpdate = true;
             }
-            // (else: gameId가 같으면 needsGameUpdate는 false로 유지)
 
-            // 4. 업데이트가 필요하다고 판단될 때만 아래 로직 실행
             if (needsGameUpdate) {
-                // 4-1. 새로운 Game 엔티티를 조회합니다.
                 Game newGame = gameRepo.findById(req.getGameId())
                         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 게임: " + req.getGameId()));
-
-                // 4-2. 레코드의 Game을 교체합니다.
                 rec.setGame(newGame);
 
-                // 4-3. Game이 바뀌었으므로, 승/패/무 결과(result)를 다시 계산해야 합니다.
                 User user = userRepo.findById(currentUserId)
                         .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저: " + currentUserId));
                 String newResult = calculateResult(user.getFavTeam(), newGame);
                 rec.setResult(newResult);
             }
         }
+        User author = userRepo.findById(rec.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작성자: " + rec.getUserId()));
 
-        // 4. 모든 변경 사항을 DB에 저장
-        recordRepo.save(rec);
+        Game game = rec.getGame(); // 방금 업데이트한 최신 game 정보가 들어있음
 
-        // 5. 수정된 전체 정보를 다시 조회하여 반환합니다.
-        //    (getRecordDetail 대신 getRecordDetailWithUser 사용)
-        return getRecordDetailWithUser(recordId, currentUserId);
+        List<Long> companionIds = rec.getCompanions();
+        List<UserDto> companionDetails = List.of();
+
+        if (companionIds != null && !companionIds.isEmpty()) {
+            companionDetails = userRepo.findAllById(companionIds).stream()
+                    .map(UserDto::from)
+                    .collect(Collectors.toList());
+        }
+
+        String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
+        String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
+        String emoLabel = convertEmotionLabel(rec.getEmotionCode());
+        String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        long likeCount = likeRepo.countByRecordId(recordId);
+        boolean isLiked = likeRepo.existsByRecordIdAndUserId(recordId, currentUserId);
+        long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
+
+        // 7. 새로 만든 Response를 반환
+        return RecordDetailResponse.builder()
+                .recordId(rec.getRecordId())
+                .userId(author.getId())
+                .nickname(author.getNickname())
+                .profileImageUrl(author.getProfileImageUrl())
+                .favTeam(author.getFavTeam())
+                .gameDate(fmtDate)
+                .gameTime(fmtTime)
+                .emotionCode(rec.getEmotionCode())
+                .emotionLabel(emoLabel)
+                .homeTeam(game != null ? convertHomeTeam(game.getHomeTeam()) : "팀 정보 없음")
+                .awayTeam(game != null ? convertAwayTeam(game.getAwayTeam()) : "팀 정보 없음")
+                .stadium(convertStadium(rec.getStadium()))
+                .seatInfo(rec.getSeatInfo())
+                .homeScore(game != null ? game.getHomeScore() : 0)
+                .awayScore(game != null ? game.getAwayScore() : 0)
+                .result(rec.getResult())
+                .comment(rec.getComment())
+                .longContent(rec.getLongContent())
+                .bestPlayer(rec.getBestPlayer())
+                .companions(companionDetails)
+                .foodTags(rec.getFoodTags())
+                .mediaUrls(rec.getMediaUrls())
+                .createdAt(createdAtStr)
+                .likeCount(likeCount)
+                .isLiked(isLiked)
+                .commentCount(commentCount)
+                .build();
     }
 
     @Transactional(readOnly = true)
