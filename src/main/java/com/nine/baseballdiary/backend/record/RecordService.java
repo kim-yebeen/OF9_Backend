@@ -159,7 +159,7 @@ public class RecordService {
 
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long recordId) {
-        GameRecord rec = recordRepo.findById(recordId)
+        GameRecord rec = recordRepo.findByIdWithDetails(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
 
         // 작성자 정보 조회 추가
@@ -225,7 +225,7 @@ public class RecordService {
 
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetailWithUser(Long recordId, Long currentUserId) {
-        GameRecord rec = recordRepo.findById(recordId)
+        GameRecord rec = recordRepo.findByIdWithDetails(recordId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 레코드 ID: " + recordId));
         Game game = rec.getGame();
 

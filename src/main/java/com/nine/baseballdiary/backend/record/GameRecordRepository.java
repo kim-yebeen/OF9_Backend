@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
@@ -222,4 +223,11 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
     @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game WHERE gr.userId = :userId ORDER BY gr.createdAt DESC")
     List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
+    @Query("SELECT gr FROM GameRecord gr " +
+            "LEFT JOIN FETCH gr.game " +
+            "LEFT JOIN FETCH gr.companions " +
+            "LEFT JOIN FETCH gr.foodTags " +
+            "LEFT JOIN FETCH gr.mediaUrls " +
+            "WHERE gr.recordId = :recordId")
+    Optional<GameRecord> findByIdWithDetails(@Param("recordId") Long recordId);
 }
