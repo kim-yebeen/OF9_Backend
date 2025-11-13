@@ -59,6 +59,7 @@ public class RecordController {
     }
 
     // 레코드 수정
+    // 레코드 수정
     @PatchMapping("/{recordId}")
     public ResponseEntity<ApiResponse<RecordDetailResponse>> updateRecord(
             @PathVariable Long recordId,
@@ -76,6 +77,10 @@ public class RecordController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST"));
         } catch (Exception e) {
+            // ✅✅✅ 에러 로그 추가!
+            System.err.println("========== updateRecord 에러 발생 ==========");
+            e.printStackTrace();
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("직관 기록 수정 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
         }
