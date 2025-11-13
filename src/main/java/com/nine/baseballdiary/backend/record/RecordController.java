@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -59,7 +60,6 @@ public class RecordController {
     }
 
     // 레코드 수정
-    // 레코드 수정
     @PatchMapping("/{recordId}")
     public ResponseEntity<ApiResponse<RecordDetailResponse>> updateRecord(
             @PathVariable Long recordId,
@@ -73,11 +73,13 @@ public class RecordController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error(e.getMessage(), "UNAUTHORIZED"));
+        } catch (ResponseStatusException e) {  // ✅ IllegalArgumentException 보다 먼저!
+            return ResponseEntity.status(e.getStatusCode())
+                    .body(ApiResponse.error(e.getReason(), e.getStatusCode().toString()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error(e.getMessage(), "BAD_REQUEST"));
         } catch (Exception e) {
-            // ✅✅✅ 에러 로그 추가!
             System.err.println("========== updateRecord 에러 발생 ==========");
             e.printStackTrace();
 
@@ -85,6 +87,7 @@ public class RecordController {
                     .body(ApiResponse.error("직관 기록 수정 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
         }
     }
+
 
     // 상세 정보 페이지에 표시될 모든 정보 (로그인한 사용자 정보 포함)
     @GetMapping("/{recordId}/details")
