@@ -93,21 +93,29 @@ public class RecordController {
     @GetMapping("/{recordId}/details")
     public ResponseEntity<ApiResponse<RecordDetailResponse>> getRecordDetail(@PathVariable Long recordId) {
         try {
-            // ✅ [수정] 현재 로그인한 사용자 ID를 가져와 서비스에 전달합니다.
+            System.out.println("========== getRecordDetail 시작 ==========");
+            System.out.println("recordId: " + recordId);
+
             Long currentUserId = getCurrentUserId();
+            System.out.println("currentUserId: " + currentUserId);
+
             RecordDetailResponse response = service.getRecordDetailWithUser(recordId, currentUserId);
+            System.out.println("========== getRecordDetail 성공 ==========");
 
             return ResponseEntity.ok(ApiResponse.success("직관 기록 상세 정보를 성공적으로 조회했습니다", response));
 
         } catch (IllegalArgumentException e) {
+            System.err.println("========== IllegalArgumentException ==========");
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiResponse.error(e.getMessage(), "NOT_FOUND"));
         } catch (Exception e) {
+            System.err.println("========== Exception 발생 ==========");
+            e.printStackTrace();  // 이게 중요!
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("직관 기록 조회 중 서버 오류가 발생했습니다", "INTERNAL_SERVER_ERROR"));
         }
     }
-
     // 공개용 레코드 상세 조회 (로그인 없이 접근 가능)
     @GetMapping("/{recordId}/public")
     public ResponseEntity<ApiResponse<RecordDetailResponse>> getPublicRecordDetail(@PathVariable Long recordId) {
