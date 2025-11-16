@@ -33,17 +33,17 @@ public class GameRecord {
     private String longContent;
     private String bestPlayer;
 
-    @ElementCollection(fetch=FetchType.EAGER)
+    @ElementCollection(fetch=FetchType.LAZY)
     @CollectionTable(name = "record_companions", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "companion_id")
     private List<Long> companions;
 
-    @ElementCollection(fetch=FetchType.EAGER)
+    @ElementCollection(fetch=FetchType.LAZY)
     @CollectionTable(name = "record_food_tags", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "tag")
     private List<String> foodTags;
 
-    @ElementCollection(fetch=FetchType.EAGER)
+    @ElementCollection(fetch=FetchType.LAZY)
     @CollectionTable(name = "record_media_urls", joinColumns = @JoinColumn(name = "record_id"))
     @Column(name = "url", columnDefinition = "TEXT")
     private List<String> mediaUrls;

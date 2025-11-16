@@ -225,9 +225,6 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
     @Query("SELECT gr FROM GameRecord gr " +
             "LEFT JOIN FETCH gr.game " +
-            "LEFT JOIN FETCH gr.companions " +
-            "LEFT JOIN FETCH gr.foodTags " +
-            "LEFT JOIN FETCH gr.mediaUrls " +
             "WHERE gr.recordId = :recordId")
     Optional<GameRecord> findByIdWithDetails(@Param("recordId") Long recordId);
 }
