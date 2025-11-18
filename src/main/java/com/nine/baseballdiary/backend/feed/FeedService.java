@@ -118,7 +118,7 @@ public class FeedService {
                 .awayTeam(game.getAwayTeam())
                 .homeScore(game.getHomeScore())
                 .awayScore(game.getAwayScore())
-                .stadium(record.getStadium())
+                .stadium(recordService.convertStadium(record.getStadium()))
                 .emotionCode(record.getEmotionCode())
                 .emotionLabel(getEmotionLabel(record.getEmotionCode()))
                 .longContent(record.getLongContent())
@@ -151,7 +151,7 @@ public class FeedService {
         List<UserFeedItem> feedItems = List.of();
 
         if (canViewContent) {
-            // 사용자 기록들 (피드 형식)
+            // 사용자 기록들 (피드 g형식)
             List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
 
             feedItems = records.stream()
