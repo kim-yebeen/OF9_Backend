@@ -18,6 +18,7 @@ public class RecordDetailResponse {
     private String favTeam;        // 작성자 응원팀
 
     private Long recordId;
+    private String gameId;
     private String gameDate;
     private String gameTime;
     private Integer emotionCode;

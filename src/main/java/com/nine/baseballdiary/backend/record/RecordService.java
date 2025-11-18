@@ -98,7 +98,6 @@ public class RecordService {
         }
     }
 
-    // [!!! 수정된 updateRecord 메소드 !!!]
     @Transactional
     public RecordDetailResponse updateRecord(Long currentUserId, Long recordId, UpdateRecordRequest req) {
         // 1. 레코드 조회 (FetchType.LAZY를 고려하여 기본 findById 사용)
@@ -109,7 +108,7 @@ public class RecordService {
         if (!rec.getUserId().equals(currentUserId))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "기록을 수정할 권한이 없습니다.");
 
-        // 3. (님이 원하신) "null이 아니면 수정" 로직
+        // 3. "null이 아니면 수정" 로직
         if (req.getComment() != null) {rec.setComment(req.getComment());}
         if (req.getLongContent() != null) {rec.setLongContent(req.getLongContent());}
         if (req.getBestPlayer() != null) {rec.setBestPlayer(req.getBestPlayer());}
@@ -123,7 +122,7 @@ public class RecordService {
         if (req.getSeatInfo() != null) { rec.setSeatInfo(req.getSeatInfo());}
         if (req.getEmotionCode() != null) {rec.setEmotionCode(req.getEmotionCode());}
 
-        // 4. gameId가 변경되었을 때의 로직 (null 방어 코드 포함)
+        // 4. gameId가 변경되었을 때의 로직
         if (req.getGameId() != null) {
             boolean needsGameUpdate = false;
             // [null 방어 1] 기존 게임이 아예 없었는지 확인
@@ -146,10 +145,7 @@ public class RecordService {
                 rec.setResult(newResult);
             }
         }
-
-        // 5. [!!! 여기가 핵심 수정 !!!]
         //    DB에 다시 묻지 않고, 지금 가진 'rec' 객체로 'Response'를 직접 만듭니다.
-        //    (save는 @Transactional이 끝나면 자동으로 됩니다.)
 
         User author = userRepo.findById(rec.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 작성자: " + rec.getUserId()));
@@ -165,7 +161,7 @@ public class RecordService {
                     .collect(Collectors.toList());
         }
 
-        // [null 방어 3] game 객체 자체가 null일 때를 대비
+        // game 객체 자체가 null일 때를 대비
         String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
         String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
@@ -182,6 +178,7 @@ public class RecordService {
                 .nickname(author.getNickname())
                 .profileImageUrl(author.getProfileImageUrl())
                 .favTeam(author.getFavTeam())
+                .gameId(game != null ? game.getGameId() : null)    // ← [수정] 1. updateRecord
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
@@ -206,7 +203,6 @@ public class RecordService {
                 .build();
     }
 
-    // [!!! 수정된 getRecordDetail 메소드 (null 방어) !!!]
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long recordId) {
         GameRecord rec = recordRepo.findByIdWithDetails(recordId)
@@ -227,13 +223,13 @@ public class RecordService {
                     .collect(Collectors.toList());
         }
 
-        // [수정] game이 null일 수 있으므로 null 체크
+        // game이 null일 수 있으므로 null 체크
         String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
         String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-        // ✅ 좋아요 및 댓글 정보 조회
+        // 좋아요 및 댓글 정보 조회
         long likeCount = likeRepo.countByRecordId(recordId);
         long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
@@ -243,11 +239,11 @@ public class RecordService {
                 .nickname(author.getNickname())
                 .profileImageUrl(author.getProfileImageUrl())
                 .favTeam(author.getFavTeam())
+                .gameId(game != null ? game.getGameId() : null)
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
                 .emotionLabel(emoLabel)
-                // [수정] game이 null일 수 있으므로 null 체크
                 .homeTeam(game != null ? convertHomeTeam(game.getHomeTeam()) : "팀 정보 없음")
                 .awayTeam(game != null ? convertAwayTeam(game.getAwayTeam()) : "팀 정보 없음")
                 .stadium(convertStadium(rec.getStadium()))
@@ -268,7 +264,6 @@ public class RecordService {
                 .build();
     }
 
-    // [!!! 수정된 getRecordDetailWithUser 메소드 (null 방어) !!!]
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetailWithUser(Long recordId, Long currentUserId) {
         GameRecord rec = recordRepo.findByIdWithDetails(recordId)
@@ -287,14 +282,14 @@ public class RecordService {
                     .collect(Collectors.toList());
         }
 
-        // [수정] game이 null이어도 오류가 나지 않도록 함
+        // game이 null이어도 오류가 나지 않도록 함
         String fmtDate = (game != null) ? game.getDate().format(UPLOAD_FMT) : "날짜 정보 없음";
-        // [수정] game.getTime()이 null일 경우 NullPointerException 방지
+        // game.getTime()이 null일 경우 NullPointerException 방지
         String fmtTime = (game != null && game.getTime() != null) ? game.getTime().format(TIME_FMT) : "";
         String emoLabel = convertEmotionLabel(rec.getEmotionCode());
         String createdAtStr = rec.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
-        // ✅ 좋아요 및 댓글 정보 조회 (currentUserId 포함)
+        // 좋아요 및 댓글 정보 조회 (currentUserId 포함)
         long likeCount = likeRepo.countByRecordId(recordId);
         boolean isLiked = likeRepo.existsByRecordIdAndUserId(recordId, currentUserId);
         long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
@@ -305,6 +300,7 @@ public class RecordService {
                 .nickname(author.getNickname())
                 .profileImageUrl(author.getProfileImageUrl())
                 .favTeam(author.getFavTeam())
+                .gameId(game != null ? game.getGameId() : null)
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
                 .emotionCode(rec.getEmotionCode())
@@ -329,7 +325,6 @@ public class RecordService {
                 .build();
     }
 
-    // [!!! 수정된 getUserRecordsFeed 메소드 (null 방어) !!!]
     @Transactional(readOnly = true)
     public List<RecordFeedResponse> getUserRecordsFeed(Long userId) {
         List<GameRecord> records = recordRepo.findByUserIdWithDetails(userId);
@@ -353,7 +348,6 @@ public class RecordService {
                 }).collect(Collectors.toList());
     }
 
-    // [!!! 수정된 getUserRecordsList 메소드 (null 방어) !!!]
     @Transactional(readOnly = true)
     public List<RecordListResponse> getUserRecordsList(Long targetUserId, Long currentUserId) {
         // userId -> targetUserId로 변경
@@ -367,7 +361,7 @@ public class RecordService {
                 .map(r -> {
                     Game g = r.getGame(); // g가 null일 수 있음
 
-                    // ✅ 좋아요 및 댓글 정보 조회
+                    // 좋아요 및 댓글 정보 조회
                     long likeCount = likeRepo.countByRecordId(r.getRecordId());
                     boolean isLiked = likeRepo.existsByRecordIdAndUserId(r.getRecordId(), currentUserId);
                     long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(r.getRecordId());
@@ -384,12 +378,12 @@ public class RecordService {
                     return new RecordListResponse(
                             user.getId(), user.getNickname(), user.getProfileImageUrl(), user.getFavTeam(),
                             r.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                            gameDate,   // [수정]
-                            gameTime,   // [수정]
-                            homeTeam,   // [수정]
-                            awayTeam,   // [수정]
-                            homeScore,  // [수정]
-                            awayScore,  // [수정]
+                            gameDate,
+                            gameTime,
+                            homeTeam,
+                            awayTeam,
+                            homeScore,
+                            awayScore,
                             convertStadium(r.getStadium()),
                             r.getEmotionCode(), convertEmotionLabel(r.getEmotionCode()),
                             r.getLongContent(), r.getMediaUrls(),
@@ -399,7 +393,6 @@ public class RecordService {
                 .collect(Collectors.toList());
     }
 
-    // [!!! 수정된 getUserRecordsCalendar 메소드 (null 방어) !!!]
     @Transactional(readOnly = true)
     public Map<String, Object> getUserRecordsCalendar(Long targetUserId, int year, int month) {    // 해당 월의 시작일과 종료일
         LocalDate startDate = LocalDate.of(year, month, 1);
@@ -460,9 +453,7 @@ public class RecordService {
         recordRepo.delete(record);
     }
 
-    // Helper methods
-    // [!!! 수정된 calculateResult 메소드 (null 방어) !!!]
-    private String calculateResult(String favTeam, Game game) {
+       private String calculateResult(String favTeam, Game game) {
         // [수정] game이 null이면 계산 불가
         if (game == null) {
             return "ETC";
@@ -540,28 +531,25 @@ public class RecordService {
         return convertHomeTeam(t);
     }
 
-    // [!!! 수정된 convertStadium 메소드 (null 방어) !!!]
     private String convertStadium(String s) {
-        // [수정] s가 null일 경우 NullPointerException 방지
         if (s == null) {
             return "알 수 없음";
         }
 
         return switch(s) {
-            case "잠실" -> "잠실야구장";
-            case "문학" -> "문학야구장";
+            case "잠실" -> "잠실 야구장";
+            case "문학" -> "SSG 랜더스 필드";
             case "고척" -> "고척 SKYDOME";
-            case "사직" -> "사직야구장";
-            case "수원" -> "KT 위즈 파크";
-            case "대전(신)" -> "한화생명 이글스 파크";
+            case "사직" -> "사직 야구장";
+            case "수원" -> "수원 케이티 위즈 파크";
+            case "대전(신)" -> "한화생명 볼파크";
             case "대구" -> "대구삼성라이온즈파크";
             case "광주" -> "기아 챔피언스 필드";
-            case "창원" -> "NC 파크";
+            case "창원" -> "창원 NC 파크";
             default -> s;
         };
     }
 
-    // [!!! 수정된 getMutualFriends 메소드 (성능 개선) !!!]
     @Transactional(readOnly = true)
     public List<UserDto> getMutualFriends(Long userId, String query) {
         // userId 파라미터는 컨트롤러와의 호환성을 위해 유지합니다.
