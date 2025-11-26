@@ -12,6 +12,7 @@ import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import com.nine.baseballdiary.backend.user.entity.FollowRequestStatus;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.FollowRequestRepository;
+import com.nine.baseballdiary.backend.user.repository.UserBlockRepository;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class FeedService {
 
     private final FollowRequestRepository followRequestRepo;
     private final RecordService recordService;
+    private final UserBlockRepository userBlockRepo;
     /**
      * 전체 피드 조회 (최신순, 팀 필터링 지원)
      */
@@ -144,10 +146,12 @@ public class FeedService {
         long followerCount = userFollowRepo.countByFollowee_Id(targetUserId);
         long followingCount = userFollowRepo.countByFollower_Id(targetUserId);
 
-        boolean canViewContent = !targetUser.getIsPrivate() ||
-                followStatus == FollowStatus.ME ||
-                followStatus == FollowStatus.FOLLOWING;
+        boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
+                userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
 
+        boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
+                followStatus == FollowStatus.ME ||
+                followStatus == FollowStatus.FOLLOWING);
         List<UserFeedItem> feedItems = List.of();
 
         if (canViewContent) {
@@ -189,9 +193,12 @@ public class FeedService {
 
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
 
-        boolean canViewContent = !targetUser.getIsPrivate() ||
+        boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
+                userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
+
+        boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
-                followStatus == FollowStatus.FOLLOWING;
+                followStatus == FollowStatus.FOLLOWING);
 
         if (!canViewContent) {
             // 비공개 계정이면 빈 리스트 반환
@@ -210,9 +217,12 @@ public class FeedService {
 
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
 
-        boolean canViewContent = !targetUser.getIsPrivate() ||
+        boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
+                userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
+
+        boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
-                followStatus == FollowStatus.FOLLOWING;
+                followStatus == FollowStatus.FOLLOWING);
 
         if (!canViewContent) {
             // 비공개 계정이면 빈 맵 반환 (혹은 에러 처리)
