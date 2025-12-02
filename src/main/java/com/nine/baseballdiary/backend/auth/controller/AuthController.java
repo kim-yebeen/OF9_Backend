@@ -83,38 +83,18 @@ public class AuthController {
         response.sendRedirect(kakaoAuthUrl);
     }
     @GetMapping("/web/kakao/callback")
-    public ResponseEntity<String> kakaoWebRedirectForTest(@RequestParam String code) {
-        String html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>인증 코드 확인</title>
-                <style>
-                    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f2f5; }
-                    .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
-                    h2 { color: #333; }
-                    .code-box { background: #eee; padding: 15px; border-radius: 4px; word-break: break-all; margin: 20px 0; font-family: monospace; font-size: 1.1em; }
-                    button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h2>✅ 인증 코드 발급 성공</h2>
-                    <p>아래 코드를 복사하여 Postman에서 사용하세요.</p>
-                    <div id="code" class="code-box">%s</div>
-                    <button onclick="copyCode()">코드 복사</button>
-                </div>
-                <script>
-                    function copyCode() {
-                        navigator.clipboard.writeText(document.getElementById('code').textContent);
-                        alert('코드가 복사되었습니다!');
-                    }
-                </script>
-            </body>
-            </html>
-        """;
-        return ResponseEntity.ok(String.format(html, code));
+    public void kakaoWebRedirect(@RequestParam String code, HttpServletResponse response) throws IOException {
+
+        // 1. 프론트 Manifest에 설정한 scheme(dodada)과 host(callback)를 정확히 입력
+        // 2. 쿼리 파라미터로 code를 붙여서 앱에 전달
+        String appUrl = "dodada://callback?code=" + code;
+
+        log.info("App으로 리다이렉트 시도: {}", appUrl);
+
+        // 3. 리다이렉트 전송 (앱이 설치되어 있다면 앱이 켜짐)
+        response.sendRedirect(appUrl);
     }
+    
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {
