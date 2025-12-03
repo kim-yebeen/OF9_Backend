@@ -1,11 +1,13 @@
 package com.nine.baseballdiary.backend.game;
-
+/*
 import org.openqa.selenium.*;
-        import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
+
+ */
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -40,6 +42,7 @@ public class GameScheduleService {
     }
 
     public void crawlSchedule(boolean fullCrawl) {
+        /*
         WebDriver driver = null;
         try {
             logger.info("크롤링 시작 - fullCrawl: " + fullCrawl);
@@ -359,6 +362,7 @@ public class GameScheduleService {
             case "롯데" -> "LT";
             case "SSG" -> "SK";
             default -> "XX";
-        };
+        };*/
+        logger.info("현재 Selenium 크롤링 기능이 비활성화되어 있습니다.");
     }
 }
