@@ -34,6 +34,9 @@ public class FeedController {
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<FeedResponse>>> getAllFeed(
             @RequestParam(required = false) String team,
+            @RequestParam(required = false) String stadium,
+            @RequestParam(required = false) String seatInfo,
+            @RequestParam(required = false) String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -42,6 +45,9 @@ public class FeedController {
         FeedRequest request = new FeedRequest();
         request.setUserId(userId);
         request.setTeam(team);
+        request.setStadium(stadium);
+        request.setSeatInfo(seatInfo);
+        request.setDate(date);
         request.setPage(page);
         request.setSize(size);
 
@@ -58,6 +64,9 @@ public class FeedController {
     @GetMapping("/following")
     public ResponseEntity<ApiResponse<List<FeedResponse>>> getFollowingFeed(
             @RequestParam(required = false) String team,
+            @RequestParam(required = false) String stadium,
+            @RequestParam(required = false) String seatInfo,
+            @RequestParam(required = false) String date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -66,6 +75,9 @@ public class FeedController {
         FeedRequest request = new FeedRequest();
         request.setUserId(userId);
         request.setTeam(team);
+        request.setStadium(stadium);
+        request.setSeatInfo(seatInfo);
+        request.setDate(date);
         request.setPage(page);
         request.setSize(size);
 

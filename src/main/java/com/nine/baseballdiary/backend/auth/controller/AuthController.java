@@ -94,7 +94,7 @@ public class AuthController {
         // 3. 리다이렉트 전송 (앱이 설치되어 있다면 앱이 켜짐)
         response.sendRedirect(appUrl);
     }
-    
+
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(@RequestBody RefreshTokenRequest request) {
         try {

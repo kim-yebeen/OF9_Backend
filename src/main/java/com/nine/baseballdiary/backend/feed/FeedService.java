@@ -20,11 +20,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.google.gson.JsonParser.parseString;
+import static org.apache.commons.lang3.time.DateUtils.parseDate;
 
 @Service
 @RequiredArgsConstructor
@@ -44,17 +49,25 @@ public class FeedService {
     /**
      * 전체 피드 조회 (최신순, 팀 필터링 지원)
      */
-    @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
-        String teamFilter = parseTeam(request.getTeam());
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        // 차단 필터 포함 버전 사용
-        List<GameRecord> records = recordRepo.findAllFeedRecordsWithBlockFilter(
+        String teamFilter = parseString(request.getTeam());
+        String stadiumFilter = parseString(request.getStadium());
+        String seatFilter = parseString(request.getSeatInfo());
+
+        // 날짜 String -> LocalDate 변환
+        LocalDate targetDate = parseDate(request.getDate());
+
+        // 수정된 Repository 메서드 호출
+        List<GameRecord> records = recordRepo.findAllFeedRecordsWithFilters(
                 request.getUserId(),
                 followingIds,
                 teamFilter,
+                stadiumFilter,
+                seatFilter,
+                targetDate,
                 pageable
         );
 
@@ -74,20 +87,45 @@ public class FeedService {
             return List.of();
         }
 
-        String teamFilter = parseTeam(request.getTeam());
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
-        // 차단 필터 포함 버전 사용
-        List<GameRecord> records = recordRepo.findFollowingFeedRecordsWithBlockFilter(
+        String teamFilter = parseString(request.getTeam());
+        String stadiumFilter = parseString(request.getStadium());
+        String seatFilter = parseString(request.getSeatInfo());
+
+        LocalDate targetDate = parseDate(request.getDate());
+
+        // 수정된 Repository 메서드 호출
+        List<GameRecord> records = recordRepo.findFollowingFeedRecordsWithFilters(
                 followingIds,
                 request.getUserId(),
                 teamFilter,
+                stadiumFilter,
+                seatFilter,
+                targetDate,
                 pageable
         );
 
         return records.stream()
                 .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
+    }
+
+    // 빈 문자열, 공백 처리 유틸
+    private String parseString(String value) {
+        return (value != null && !value.trim().isEmpty()) ? value.trim() : null;
+    }
+
+    // 날짜 파싱 유틸
+    private LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dateStr.trim());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String parseTeam(String team) {
@@ -98,13 +136,9 @@ public class FeedService {
         User user = userRepo.findById(record.getUserId()).orElseThrow();
         Game game = gameRepo.findById(record.getGame().getGameId()).orElseThrow();
 
-        // 좋아요 정보
         long likeCount = likeRepo.countByRecordId(record.getRecordId());
         boolean isLiked = likeRepo.existsByRecordIdAndUserId(record.getRecordId(), currentUserId);
-
-        // 댓글 개수
         long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(record.getRecordId());
-
         List<String> mediaUrls = record.getMediaUrls() != null ? record.getMediaUrls() : List.of();
 
         return FeedResponse.builder()
@@ -134,30 +168,20 @@ public class FeedService {
     //특정 사용자의 피드 조회
     @Transactional(readOnly = true)
     public UserFeedResponse getUserFeed(Long currentUserId, Long targetUserId) {
-        // 사용자 정보 조회
         User targetUser = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
-
-        // 팔로우 상태 확인
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
-
-        // 사용자 통계
         long recordCount = recordRepo.countByUserId(targetUserId);
         long followerCount = userFollowRepo.countByFollowee_Id(targetUserId);
         long followingCount = userFollowRepo.countByFollower_Id(targetUserId);
-
         boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
-
         boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
                 followStatus == FollowStatus.FOLLOWING);
         List<UserFeedItem> feedItems = List.of();
-
         if (canViewContent) {
-            // 사용자 기록들 (피드 g형식)
             List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
-
             feedItems = records.stream()
                     .filter(r -> r.getMediaUrls() != null && !r.getMediaUrls().isEmpty())
                     .map(r -> {
@@ -171,7 +195,6 @@ public class FeedService {
                     })
                     .collect(Collectors.toList());
         }
-
         return UserFeedResponse.builder()
                 .userId(targetUser.getId())
                 .nickname(targetUser.getNickname())
@@ -190,48 +213,30 @@ public class FeedService {
     public List<RecordListResponse> getUserList(Long currentUserId, Long targetUserId) {
         User targetUser = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
-
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
-
         boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
-
         boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
                 followStatus == FollowStatus.FOLLOWING);
-
-        if (!canViewContent) {
-            // 비공개 계정이면 빈 리스트 반환
-            return List.of();
-        }
-
-        // RecordService의 재사용
+        if (!canViewContent) return List.of();
         return recordService.getUserRecordsList(targetUserId, currentUserId);
     }
 
-    // 5. 캘린더 뷰를 위한 새 메서드
     @Transactional(readOnly = true)
     public Map<String, Object> getUserCalendar(Long currentUserId, Long targetUserId, int year, int month) {
         User targetUser = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
-
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
-
         boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
-
         boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
                 followStatus == FollowStatus.FOLLOWING);
-
-        if (!canViewContent) {
-            // 비공개 계정이면 빈 맵 반환 (혹은 에러 처리)
-            return Map.of("records", List.of(), "monthlyStats", Map.of());
-        }
-
-        // RecordService의 재사용
+        if (!canViewContent) return Map.of("records", List.of(), "monthlyStats", Map.of());
         return recordService.getUserRecordsCalendar(targetUserId, year, month);
     }
+
 
     private FollowStatus getFollowStatus(Long currentUserId, Long targetUserId) {
         if (currentUserId.equals(targetUserId)) {

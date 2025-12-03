@@ -12,6 +12,63 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
+    // ✅ 전체 피드 조회 (다중 필터링 적용)
+    @Query("""
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    JOIN User u ON r.userId = u.id 
+    WHERE (
+        u.isPrivate = false OR 
+        r.userId = :currentUserId OR 
+        r.userId IN :followingIds
+    )
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    AND (:stadium IS NULL OR r.stadium = :stadium)
+    AND (:seatInfo IS NULL OR r.seatInfo LIKE CONCAT('%', :seatInfo, '%'))
+    AND (cast(:date as date) IS NULL OR g.date = :date)
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub 
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
+           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
+    )
+    ORDER BY r.createdAt DESC
+    """)
+    List<GameRecord> findAllFeedRecordsWithFilters(
+            @Param("currentUserId") Long currentUserId,
+            @Param("followingIds") List<Long> followingIds,
+            @Param("team") String team,
+            @Param("stadium") String stadium,
+            @Param("seatInfo") String seatInfo,
+            @Param("date") LocalDate date,
+            Pageable pageable
+    );
+
+    // ✅ 팔로잉 피드 조회 (다중 필터링 적용)
+    @Query("""
+    SELECT r FROM GameRecord r 
+    JOIN Game g ON r.game.gameId = g.gameId 
+    WHERE r.userId IN :userIds
+    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
+    AND (:stadium IS NULL OR r.stadium = :stadium)
+    AND (:seatInfo IS NULL OR r.seatInfo LIKE CONCAT('%', :seatInfo, '%'))
+    AND (cast(:date as date) IS NULL OR g.date = :date)
+    AND NOT EXISTS (
+        SELECT 1 FROM UserBlock ub 
+        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
+           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
+    )
+    ORDER BY r.createdAt DESC
+    """)
+    List<GameRecord> findFollowingFeedRecordsWithFilters(
+            @Param("userIds") List<Long> userIds,
+            @Param("currentUserId") Long currentUserId,
+            @Param("team") String team,
+            @Param("stadium") String stadium,
+            @Param("seatInfo") String seatInfo,
+            @Param("date") LocalDate date,
+            Pageable pageable
+    );
+
     // ✅ 전체 피드 - 최신순 (날짜 필터 제거, 팀 필터만)
     @Query("""
     SELECT r FROM GameRecord r 
