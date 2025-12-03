@@ -9,22 +9,36 @@ import java.util.*;
 @Service
 public class StadiumService {
 
+    // 표준 구장 명칭을 Key로 사용하는 맵
     private final Map<String, List<String>> stadiumZoneMap = new HashMap<>();
 
     public StadiumSeatResponse getStadiumSeats(String stadiumName) {
+        // 1. 정확한 명칭으로 먼저 검색
         List<String> zones = stadiumZoneMap.get(stadiumName);
+        String foundName = stadiumName;
 
+        // 2. 못 찾았다면, 공백을 모두 제거하고 비교 검색 (유연성 확보)
+        // 예: "창원NC파크"로 들어와도 "창원 NC 파크"를 찾을 수 있음
         if (zones == null) {
-            // 정확한 이름이 없을 경우 공백 제거 후 검색 시도 (유연성 확보)
-            zones = stadiumZoneMap.entrySet().stream()
-                    .filter(entry -> entry.getKey().replace(" ", "").equals(stadiumName.replace(" ", "")))
-                    .findFirst()
-                    .map(Map.Entry::getValue)
-                    .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 구장입니다: " + stadiumName));
+            String inputNoSpace = stadiumName.replace(" ", "");
+
+            for (Map.Entry<String, List<String>> entry : stadiumZoneMap.entrySet()) {
+                // 저장된 키(표준명칭)의 공백을 제거한 것과 비교
+                if (entry.getKey().replace(" ", "").equals(inputNoSpace)) {
+                    zones = entry.getValue();
+                    foundName = entry.getKey(); // 표준 명칭을 찾음
+                    break;
+                }
+            }
+        }
+
+        // 3. 그래도 없으면 에러
+        if (zones == null) {
+            throw new IllegalArgumentException("지원하지 않는 구장입니다: " + stadiumName);
         }
 
         return StadiumSeatResponse.builder()
-                .stadiumName(stadiumName)
+                .stadiumName(foundName) // 표준 명칭으로 반환
                 .zones(zones)
                 .build();
     }
@@ -45,16 +59,7 @@ public class StadiumService {
                 "1루 외야석", "3루 외야석", "1루 외야 탁자석", "3루 외야 탁자석", "휠체어석"
         ));
 
-        // 3. 고척 SKYDOME
-        stadiumZoneMap.put("고척 SKYDOME", List.of(
-                "R.d_club석", "1루 테이블석", "중앙 테이블석", "3루 테이블석",
-                "1루 다크버건디석", "3루 다크버건디석", "1루 버건디석", "3루 버건디석",
-                "1루 3층 지정석", "3루 3층 지정석", "1루 4층 지정석", "중앙 4층 지정석", "3루 4층 지정석",
-                "1루 1~2층 외야 일반석", "1루 3~4층 외야 일반석", "3루 1~2층 외야 일반석", "3루 3~4층 외야 일반석",
-                "커플석", "패밀리석", "유아동반석", "휠체어석"
-        ));
-
-        // 4. 대구삼성라이온즈파크
+        // 3. 대구삼성라이온즈파크
         stadiumZoneMap.put("대구삼성라이온즈파크", List.of(
                 "VIP석", "1루 테이블석", "중앙 테이블석", "3루 테이블석",
                 "1루 익사이팅석", "3루 익사이팅석", "원정응원석", "블루존",
@@ -64,8 +69,17 @@ public class StadiumService {
                 "루프탑 테이블석", "파티플로어 라이브석", "캠핑존", "잔디그린존", "휠체어 장애인석"
         ));
 
-        // 5. 대전 한화생명볼파크
-        stadiumZoneMap.put("대전 한화생명볼파크", List.of(
+        // 4. 고척 SKYDOME
+        stadiumZoneMap.put("고척 SKYDOME", List.of(
+                "R.d_club석", "1루 테이블석", "중앙 테이블석", "3루 테이블석",
+                "1루 다크버건디석", "3루 다크버건디석", "1루 버건디석", "3루 버건디석",
+                "1루 3층 지정석", "3루 3층 지정석", "1루 4층 지정석", "중앙 4층 지정석", "3루 4층 지정석",
+                "1루 1~2층 외야 일반석", "1루 3~4층 외야 일반석", "3루 1~2층 외야 일반석", "3루 3~4층 외야 일반석",
+                "커플석", "패밀리석", "유아동반석", "휠체어석"
+        ));
+
+        // 5. 한화생명 볼파크 (표준 명칭 준수)
+        stadiumZoneMap.put("한화생명 볼파크", List.of(
                 "1루 내야지정석A", "3루 내야지정석A", "1루 내야지정석B", "3루 내야지정석B",
                 "응원단석", "포수후면석", "중앙지정석", "중앙탁자석",
                 "1루 내야커플석", "3루 내야박스석", "1루 내야탁자석",
@@ -83,16 +97,16 @@ public class StadiumService {
                 "외야석", "1루 휠체어 장애인석", "3루 휠체어 장애인석", "스카이박스석"
         ));
 
-        // 7. 수원 KT WIZ 파크
-        stadiumZoneMap.put("수원 KT WIZ 파크", List.of(
+        // 7. 수원 케이티 위즈 파크 (표준 명칭 준수)
+        stadiumZoneMap.put("수원 케이티 위즈 파크", List.of(
                 "중앙 내야석", "1루 테이블석", "3루 테이블석", "중앙 지정석",
                 "1루 응원 지정석", "3루 응원 지정석", "1루 스카이존", "3루 스카이존",
                 "익사이팅", "외야잔디/자유석", "외야 테이블석", "위즈 캠핑존",
                 "1루 휠체어석", "3루 휠체어석"
         ));
 
-        // 8. 창원 NC파크
-        stadiumZoneMap.put("창원 NC파크", List.of(
+        // 8. 창원 NC 파크 (표준 명칭 준수 - 띄어쓰기 포함)
+        stadiumZoneMap.put("창원 NC 파크", List.of(
                 "프리미엄석", "1루 내야석", "2루 내야석", "3루 내야석",
                 "미니테이블석", "테이블석", "피크닉테이블석", "라운드테이블석",
                 "외야잔디석(5인)", "외야석", "바베큐석", "가족석(2인)",
