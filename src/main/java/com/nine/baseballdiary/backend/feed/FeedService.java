@@ -28,9 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.google.gson.JsonParser.parseString;
-import static org.apache.commons.lang3.time.DateUtils.parseDate;
-
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -42,12 +39,12 @@ public class FeedService {
     private final UserRepository userRepo;
     private final RecordLikeRepository likeRepo;
     private final RecordCommentRepository commentRepo;
-
     private final FollowRequestRepository followRequestRepo;
     private final RecordService recordService;
     private final UserBlockRepository userBlockRepo;
+
     /**
-     * 전체 피드 조회 (최신순, 팀 필터링 지원)
+     * 전체 피드 조회 (최신순, 필터링 적용)
      */
     @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
@@ -55,9 +52,15 @@ public class FeedService {
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
         String teamFilter = parseString(request.getTeam());
-        String stadiumFilter = parseString(request.getStadium());
 
-        // [수정] 자바에서 미리 %를 붙여서 패턴을 만듭니다.
+        // [수정] 입력된 구장 이름을 표준 명칭으로 변환 (예: "대전" -> "대전 한화생명볼파크")
+        String rawStadium = parseString(request.getStadium());
+        String stadiumFilter = null;
+        if (rawStadium != null) {
+            stadiumFilter = recordService.convertStadium(rawStadium);
+        }
+
+        // 좌석 정보 와일드카드 처리
         String seatFilter = parseString(request.getSeatInfo());
         if (seatFilter != null) {
             seatFilter = "%" + seatFilter + "%";
@@ -65,12 +68,11 @@ public class FeedService {
 
         LocalDate targetDate = parseDate(request.getDate());
 
-        // 수정된 Repository 메서드 호출
         List<GameRecord> records = recordRepo.findAllFeedRecordsWithFilters(
                 request.getUserId(),
                 followingIds,
                 teamFilter,
-                stadiumFilter,
+                stadiumFilter, // 변환된 표준 이름으로 검색
                 seatFilter,
                 targetDate,
                 pageable
@@ -82,7 +84,7 @@ public class FeedService {
     }
 
     /**
-     * 팔로잉 피드 조회 (최신순, 팀 필터링 지원)
+     * 팔로잉 피드 조회 (최신순, 필터링 적용)
      */
     @Transactional(readOnly = true)
     public List<FeedResponse> getFollowingFeed(FeedRequest request) {
@@ -95,9 +97,14 @@ public class FeedService {
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
         String teamFilter = parseString(request.getTeam());
-        String stadiumFilter = parseString(request.getStadium());
 
-        // [수정] 자바에서 미리 %를 붙여서 패턴을 만듭니다.
+        // [수정] 입력된 구장 이름을 표준 명칭으로 변환
+        String rawStadium = parseString(request.getStadium());
+        String stadiumFilter = null;
+        if (rawStadium != null) {
+            stadiumFilter = recordService.convertStadium(rawStadium);
+        }
+
         String seatFilter = parseString(request.getSeatInfo());
         if (seatFilter != null) {
             seatFilter = "%" + seatFilter + "%";
@@ -105,12 +112,11 @@ public class FeedService {
 
         LocalDate targetDate = parseDate(request.getDate());
 
-        // 수정된 Repository 메서드 호출
         List<GameRecord> records = recordRepo.findFollowingFeedRecordsWithFilters(
                 followingIds,
                 request.getUserId(),
                 teamFilter,
-                stadiumFilter,
+                stadiumFilter, // 변환된 표준 이름으로 검색
                 seatFilter,
                 targetDate,
                 pageable
@@ -121,12 +127,12 @@ public class FeedService {
                 .collect(Collectors.toList());
     }
 
-    // 빈 문자열, 공백 처리 유틸
+    // 빈 문자열이나 공백을 null로 변환
     private String parseString(String value) {
         return (value != null && !value.trim().isEmpty()) ? value.trim() : null;
     }
 
-    // 날짜 파싱 유틸
+    // 날짜 문자열(YYYY-MM-DD)을 LocalDate로 변환
     private LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
@@ -136,10 +142,6 @@ public class FeedService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private String parseTeam(String team) {
-        return (team != null && !team.trim().isEmpty()) ? team.trim() : null;
     }
 
     private FeedResponse convertToFeedResponse(GameRecord record, Long currentUserId) {
@@ -175,7 +177,6 @@ public class FeedService {
                 .build();
     }
 
-    //특정 사용자의 피드 조회
     @Transactional(readOnly = true)
     public UserFeedResponse getUserFeed(Long currentUserId, Long targetUserId) {
         User targetUser = userRepo.findById(targetUserId)
@@ -247,29 +248,15 @@ public class FeedService {
         return recordService.getUserRecordsCalendar(targetUserId, year, month);
     }
 
-
     private FollowStatus getFollowStatus(Long currentUserId, Long targetUserId) {
-        if (currentUserId.equals(targetUserId)) {
-            return FollowStatus.ME;
-        }
-
-        // 이미 팔로잉 중인지 확인
+        if (currentUserId.equals(targetUserId)) return FollowStatus.ME;
         boolean isFollowing = userFollowRepo.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
-        if (isFollowing) {
-            return FollowStatus.FOLLOWING;
-        }
-
-        // 2. 주석 해제 (FollowRequestStatus.PENDING은 실제 Enum 값에 맞춰주세요)
+        if (isFollowing) return FollowStatus.FOLLOWING;
         boolean isPending = followRequestRepo.existsByRequester_IdAndTarget_IdAndStatus(
                 currentUserId, targetUserId, FollowRequestStatus.PENDING);
-        if (isPending) {
-            return FollowStatus.REQUESTED;
-        }
-
+        if (isPending) return FollowStatus.REQUESTED;
         return FollowStatus.NOT_FOLLOWING;
     }
-
-
 
     private String getEmotionLabel(Integer emotionCode) {
         switch (emotionCode) {
