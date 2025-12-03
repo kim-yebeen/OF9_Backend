@@ -12,7 +12,7 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
-    // ✅ 전체 피드 조회 (다중 필터링 적용)
+    // ✅ 전체 피드 조회 (LIKE 파라미터 단순화 - 에러 해결)
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -24,7 +24,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     )
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     AND (:stadium IS NULL OR r.stadium = :stadium)
-    AND (:seatInfo IS NULL OR r.seatInfo LIKE CONCAT('%', :seatInfo, '%'))
+    AND (:seatInfo IS NULL OR r.seatInfo LIKE :seatInfo)
     AND (cast(:date as date) IS NULL OR g.date = :date)
     AND NOT EXISTS (
         SELECT 1 FROM UserBlock ub 
@@ -43,14 +43,14 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // ✅ 팔로잉 피드 조회 (다중 필터링 적용)
+    // ✅ 팔로잉 피드 조회 (LIKE 파라미터 단순화 - 에러 해결)
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
     WHERE r.userId IN :userIds
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
     AND (:stadium IS NULL OR r.stadium = :stadium)
-    AND (:seatInfo IS NULL OR r.seatInfo LIKE CONCAT('%', :seatInfo, '%'))
+    AND (:seatInfo IS NULL OR r.seatInfo LIKE :seatInfo)
     AND (cast(:date as date) IS NULL OR g.date = :date)
     AND NOT EXISTS (
         SELECT 1 FROM UserBlock ub 
@@ -69,90 +69,12 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // ✅ 전체 피드 - 최신순 (날짜 필터 제거, 팀 필터만)
-    @Query("""
-    SELECT r FROM GameRecord r 
-    JOIN Game g ON r.game.gameId = g.gameId 
-    JOIN User u ON r.userId = u.id 
-    WHERE (
-        u.isPrivate = false OR 
-        r.userId = :currentUserId OR 
-        r.userId IN :followingIds
-    )
-    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    ORDER BY r.createdAt DESC
-    """)
-    List<GameRecord> findAllFeedRecords(
-            @Param("currentUserId") Long currentUserId,
-            @Param("followingIds") List<Long> followingIds,
-            @Param("team") String team,
-            Pageable pageable
-    );
-
-    // ✅ 전체 피드 - 차단 필터 포함
-    @Query("""
-    SELECT r FROM GameRecord r 
-    JOIN Game g ON r.game.gameId = g.gameId 
-    JOIN User u ON r.userId = u.id 
-    WHERE (
-        u.isPrivate = false OR 
-        r.userId = :currentUserId OR 
-        r.userId IN :followingIds
-    )
-    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    AND NOT EXISTS (
-        SELECT 1 FROM UserBlock ub 
-        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
-           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
-    )
-    ORDER BY r.createdAt DESC
-    """)
-    List<GameRecord> findAllFeedRecordsWithBlockFilter(
-            @Param("currentUserId") Long currentUserId,
-            @Param("followingIds") List<Long> followingIds,
-            @Param("team") String team,
-            Pageable pageable
-    );
-
-    // ✅ 팔로잉 피드 - 최신순
-    @Query("""
-    SELECT r FROM GameRecord r 
-    JOIN Game g ON r.game.gameId = g.gameId 
-    WHERE r.userId IN :userIds
-    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    ORDER BY r.createdAt DESC
-    """)
-    List<GameRecord> findFollowingFeedRecords(
-            @Param("userIds") List<Long> userIds,
-            @Param("team") String team,
-            Pageable pageable
-    );
-
-    // ✅ 팔로잉 피드 - 차단 필터 포함
-    @Query("""
-    SELECT r FROM GameRecord r 
-    JOIN Game g ON r.game.gameId = g.gameId 
-    WHERE r.userId IN :userIds
-    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    AND NOT EXISTS (
-        SELECT 1 FROM UserBlock ub 
-        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
-           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
-    )
-    ORDER BY r.createdAt DESC
-    """)
-    List<GameRecord> findFollowingFeedRecordsWithBlockFilter(
-            @Param("userIds") List<Long> userIds,
-            @Param("currentUserId") Long currentUserId,
-            @Param("team") String team,
-            Pageable pageable
-    );
-
-    // ✅ 기존 메서드들 (마이페이지, 검색 등)
+    // ... (이하 기존 메서드들은 그대로 유지) ...
     long countByUserId(Long userId);
 
     List<GameRecord> findByUserId(Long userId);
 
+    // 검색 관련 메서드 (기존 유지)
     @Query(value = """
     SELECT r.*, 
            (CASE 

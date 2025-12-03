@@ -49,15 +49,20 @@ public class FeedService {
     /**
      * 전체 피드 조회 (최신순, 팀 필터링 지원)
      */
+    @Transactional(readOnly = true)
     public List<FeedResponse> getAllFeed(FeedRequest request) {
         List<Long> followingIds = userFollowRepo.findFollowingIds(request.getUserId());
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
 
         String teamFilter = parseString(request.getTeam());
         String stadiumFilter = parseString(request.getStadium());
-        String seatFilter = parseString(request.getSeatInfo());
 
-        // 날짜 String -> LocalDate 변환
+        // [수정] 자바에서 미리 %를 붙여서 패턴을 만듭니다.
+        String seatFilter = parseString(request.getSeatInfo());
+        if (seatFilter != null) {
+            seatFilter = "%" + seatFilter + "%";
+        }
+
         LocalDate targetDate = parseDate(request.getDate());
 
         // 수정된 Repository 메서드 호출
@@ -91,7 +96,12 @@ public class FeedService {
 
         String teamFilter = parseString(request.getTeam());
         String stadiumFilter = parseString(request.getStadium());
+
+        // [수정] 자바에서 미리 %를 붙여서 패턴을 만듭니다.
         String seatFilter = parseString(request.getSeatInfo());
+        if (seatFilter != null) {
+            seatFilter = "%" + seatFilter + "%";
+        }
 
         LocalDate targetDate = parseDate(request.getDate());
 
