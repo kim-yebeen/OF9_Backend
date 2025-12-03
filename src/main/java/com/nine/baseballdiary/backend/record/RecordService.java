@@ -60,10 +60,12 @@ public class RecordService {
 
         String result = calculateResult(user.getFavTeam(), game);
 
+        String standardizedStadium = convertStadium(req.getStadium());
+
         GameRecord record = GameRecord.builder()
                 .userId(userId)
                 .game(game)
-                .stadium(req.getStadium())
+                .stadium(standardizedStadium)
                 .seatInfo(req.getSeatInfo())
                 .emotionCode(req.getEmotionCode())
                 .comment(req.getComment())
@@ -118,7 +120,9 @@ public class RecordService {
         }
         if (req.getFoodTags() != null) { rec.setFoodTags(req.getFoodTags());}
         if (req.getMediaUrls() != null) { rec.setMediaUrls(req.getMediaUrls()); }
-        if (req.getStadium() != null) { rec.setStadium(req.getStadium());}
+        if (req.getStadium() != null) {
+            rec.setStadium(convertStadium(req.getStadium()));
+        }
         if (req.getSeatInfo() != null) { rec.setSeatInfo(req.getSeatInfo());}
         if (req.getEmotionCode() != null) {rec.setEmotionCode(req.getEmotionCode());}
 

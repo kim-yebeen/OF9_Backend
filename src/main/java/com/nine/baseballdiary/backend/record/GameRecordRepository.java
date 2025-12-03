@@ -14,27 +14,18 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
     // ✅ 전체 피드 조회 (LIKE 파라미터 단순화 - 에러 해결)
     @Query("""
-    SELECT r FROM GameRecord r 
-    JOIN Game g ON r.game.gameId = g.gameId 
-    JOIN User u ON r.userId = u.id 
-    WHERE (
-        u.isPrivate = false OR 
-        r.userId = :currentUserId OR 
-        r.userId IN :followingIds
-    )
-    AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    AND (:stadium IS NULL OR r.stadium = :stadium)
-    AND (:seatInfo IS NULL OR r.seatInfo LIKE :seatInfo)
-    AND (cast(:date as date) IS NULL OR g.date = :date)
-    AND NOT EXISTS (
-        SELECT 1 FROM UserBlock ub 
-        WHERE (ub.blocker.id = :currentUserId AND ub.blocked.id = r.userId)
-           OR (ub.blocker.id = r.userId AND ub.blocked.id = :currentUserId)
-    )
-    ORDER BY r.createdAt DESC
+    SELECT gr FROM GameRecord gr
+    WHERE gr.deletedAt IS NULL
+    AND (:userId IS NULL OR gr.userId != :userId)
+    AND (:followingIds IS NULL OR gr.userId NOT IN :followingIds)
+    AND (:team IS NULL OR gr.game.homeTeam = :team OR gr.game.awayTeam = :team)
+    AND (:stadium IS NULL OR gr.stadium LIKE :stadium)  
+    AND (:seatInfo IS NULL OR gr.seatInfo LIKE :seatInfo)
+    AND (:date IS NULL OR gr.game.date = :date)
+    ORDER BY gr.createdAt DESC
     """)
     List<GameRecord> findAllFeedRecordsWithFilters(
-            @Param("currentUserId") Long currentUserId,
+            @Param("userId") Long userId,
             @Param("followingIds") List<Long> followingIds,
             @Param("team") String team,
             @Param("stadium") String stadium,

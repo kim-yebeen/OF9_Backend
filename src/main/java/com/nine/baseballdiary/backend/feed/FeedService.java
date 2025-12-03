@@ -53,14 +53,14 @@ public class FeedService {
 
         String teamFilter = parseString(request.getTeam());
 
-        // [수정] 입력된 구장 이름을 표준 명칭으로 변환 (예: "대전" -> "대전 한화생명볼파크")
+        // [수정] 구장 필터를 LIKE 검색으로 변경
         String rawStadium = parseString(request.getStadium());
         String stadiumFilter = null;
         if (rawStadium != null) {
-            stadiumFilter = recordService.convertStadium(rawStadium);
+            // "대전"으로 검색하면 "대전(신)", "대전 한화생명볼파크" 모두 매칭
+            stadiumFilter = "%" + rawStadium + "%";
         }
 
-        // 좌석 정보 와일드카드 처리
         String seatFilter = parseString(request.getSeatInfo());
         if (seatFilter != null) {
             seatFilter = "%" + seatFilter + "%";
@@ -72,7 +72,7 @@ public class FeedService {
                 request.getUserId(),
                 followingIds,
                 teamFilter,
-                stadiumFilter, // 변환된 표준 이름으로 검색
+                stadiumFilter, // LIKE 검색용 패턴
                 seatFilter,
                 targetDate,
                 pageable
