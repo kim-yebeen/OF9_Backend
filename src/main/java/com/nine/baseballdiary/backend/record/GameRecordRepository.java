@@ -12,7 +12,7 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
-    // ✅ 전체 피드 조회 (LIKE 파라미터 단순화 - 에러 해결)
+    // ✅ 전체 피드 조회 - stadium을 LIKE로 변경
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -23,7 +23,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
         r.userId IN :followingIds
     )
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    AND (:stadium IS NULL OR r.stadium = :stadium)
+    AND (:stadium IS NULL OR r.stadium LIKE :stadium)
     AND (:seatInfo IS NULL OR r.seatInfo LIKE :seatInfo)
     AND (cast(:date as date) IS NULL OR g.date = :date)
     AND NOT EXISTS (
@@ -43,13 +43,13 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // ✅ 팔로잉 피드 조회 (LIKE 파라미터 단순화 - 에러 해결)
+    // ✅ 팔로잉 피드 조회 - stadium을 LIKE로 변경
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
     WHERE r.userId IN :userIds
     AND (:team IS NULL OR g.homeTeam = :team OR g.awayTeam = :team)
-    AND (:stadium IS NULL OR r.stadium = :stadium)
+    AND (:stadium IS NULL OR r.stadium LIKE :stadium)
     AND (:seatInfo IS NULL OR r.seatInfo LIKE :seatInfo)
     AND (cast(:date as date) IS NULL OR g.date = :date)
     AND NOT EXISTS (
@@ -69,7 +69,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // ... (이하 기존 메서드들은 그대로 유지) ...
+
     long countByUserId(Long userId);
 
     List<GameRecord> findByUserId(Long userId);

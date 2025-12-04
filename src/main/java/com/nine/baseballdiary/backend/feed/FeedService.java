@@ -98,11 +98,11 @@ public class FeedService {
 
         String teamFilter = parseString(request.getTeam());
 
-        // [수정] 입력된 구장 이름을 표준 명칭으로 변환
+        // ✅ getAllFeed()처럼 LIKE 패턴으로 변경
         String rawStadium = parseString(request.getStadium());
         String stadiumFilter = null;
         if (rawStadium != null) {
-            stadiumFilter = recordService.convertStadium(rawStadium);
+            stadiumFilter = "%" + rawStadium + "%";  // LIKE 검색용 패턴
         }
 
         String seatFilter = parseString(request.getSeatInfo());
@@ -116,7 +116,7 @@ public class FeedService {
                 followingIds,
                 request.getUserId(),
                 teamFilter,
-                stadiumFilter, // 변환된 표준 이름으로 검색
+                stadiumFilter,  // LIKE 패턴
                 seatFilter,
                 targetDate,
                 pageable
