@@ -476,21 +476,31 @@ public class RecordService {
         return win ? "WIN" : "LOSE";
     }
 
-    private String convertEmotionLabel(int code) {
-        return switch(code) {
-            case 1 -> "짜릿해요";
-            case 2 -> "만족해요";
-            case 3 -> "감동이에요";
-            case 4 -> "놀랐어요";
-            case 5 -> "행복해요";
-            case 6 -> "답답해요";
-            case 7 -> "아쉬워요";
-            case 8 -> "화났어요";
-            case 9 -> "지쳤어요";
-            default -> "알 수 없음";
-        };
-    }
+    private String convertEmotionLabel(Integer emotionCode) {
+        if (emotionCode == null) {
+            return "알 수 없음";
+        }
 
+        switch (emotionCode) {
+            case 1: return "행복해요";
+            case 2: return "놀랐어요";
+            case 3: return "짜릿해요";
+            case 4: return "벅차요";
+            case 5: return "통쾌해요";
+            case 6: return "만족해요";
+            case 7: return "지루해요";
+            case 8: return "무난해요";
+            case 9: return "긴장돼요";
+            case 10: return "질투나요";
+            case 11: return "답답해요";
+            case 12: return "아쉬워요";
+            case 13: return "지쳤어요";
+            case 14: return "허탈해요";
+            case 15: return "짜증나요";
+            case 16: return "화나요";
+            default: return "알 수 없음";
+        }
+    }
     // [!!! 수정된 convertFavTeam 메소드 (null 방어) !!!]
     private String convertFavTeam(String fav) {
         // [수정] fav가 null일 경우 NullPointerException 방지
