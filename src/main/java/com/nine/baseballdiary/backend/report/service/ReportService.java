@@ -210,58 +210,70 @@ public class ReportService {
                 .build();
     }
 
+    // ReportService 클래스 내부
+
     public SeasonDdayDto getSeasonDday() {
         LocalDate today = LocalDate.now();
         int currentYear = today.getYear();
 
+        // 날짜 상수는 실제 서비스에서는 별도 상수 클래스나 설정 파일로 관리하는 것이 좋습니다.
         LocalDate regularSeasonStart = LocalDate.of(currentYear, 3, 23);
         LocalDate regularSeasonEnd = LocalDate.of(currentYear, 10, 15);
         LocalDate postSeasonStart = LocalDate.of(currentYear, 10, 25);
         LocalDate postSeasonEnd = LocalDate.of(currentYear, 11, 2);
         LocalDate nextRegularSeasonStart = LocalDate.of(currentYear + 1, 3, 28);
 
+        // 1. 정규 시즌 시작 전 (D-day 타겟: 개막일)
         if (today.isBefore(regularSeasonStart)) {
             int daysUntilStart = (int) ChronoUnit.DAYS.between(today, regularSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilStart)
-                    .seasonEndDate(regularSeasonStart.toString())
+                    .targetDate(regularSeasonStart.toString()) // 개막일
                     .status("BEFORE_START")
                     .message(currentYear + " 정규시즌 시작까지")
                     .build();
+
+            // 2. 정규 시즌 진행 중 (D-day 타겟: 시즌 종료일)
         } else if (today.isBefore(regularSeasonEnd) || today.isEqual(regularSeasonEnd)) {
             int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, regularSeasonEnd);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilEnd)
-                    .seasonEndDate(regularSeasonEnd.toString())
+                    .targetDate(regularSeasonEnd.toString()) // 시즌 종료일
                     .status("IN_PROGRESS_REGULAR")
                     .message(currentYear + " 정규 시즌 종료까지")
                     .build();
+
+            // 3. 정규 시즌 종료 후 ~ PS 시작 전 (D-day 타겟: PS 시작일)
         } else if (today.isBefore(postSeasonStart)) {
             int daysUntilPSStart = (int) ChronoUnit.DAYS.between(today, postSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilPSStart)
-                    .seasonEndDate(postSeasonStart.toString())
+                    .targetDate(postSeasonStart.toString()) // PS 시작일
                     .status("BEFORE_POSTSEASON")
                     .message(currentYear + " 포스트 시즌 시작까지")
                     .build();
+
+            // 4. PS 진행 중 (D-day 타겟: PS 종료일)
         } else if (today.isBefore(postSeasonEnd) || today.isEqual(postSeasonEnd)) {
             int daysUntilPSEnd = (int) ChronoUnit.DAYS.between(today, postSeasonEnd);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
                     .daysRemaining(daysUntilPSEnd)
-                    .seasonEndDate(postSeasonEnd.toString())
+                    .targetDate(postSeasonEnd.toString()) // PS 종료일
                     .status("IN_PROGRESS_POSTSEASON")
                     .message(currentYear + " 포스트 시즌 종료까지")
                     .build();
+
+            // 5. 시즌 완전 종료 (D-day 타겟: 내년 개막일)
         } else {
             int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextRegularSeasonStart);
             return SeasonDdayDto.builder()
-                    .seasonYear(currentYear + 1)
+                    .seasonYear(currentYear + 1) // 내년 시즌으로 표기
                     .daysRemaining(daysUntilNextStart)
-                    .seasonEndDate(nextRegularSeasonStart.toString())
+                    .targetDate(nextRegularSeasonStart.toString()) // 내년 개막일
                     .status("ENDED")
                     .message((currentYear + 1) + " 정규시즌 시작까지")
                     .build();
