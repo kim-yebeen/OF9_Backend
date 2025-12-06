@@ -39,4 +39,5 @@ public interface RecordCommentRepository extends JpaRepository<RecordComment, Lo
     AND c.deletedAt IS NULL
 """)
     List<RecordComment> findRepliesByParentId(@Param("parentId") Long parentId);
+    long countByUserIdAndDeletedAtIsNull(Long userId);
 }

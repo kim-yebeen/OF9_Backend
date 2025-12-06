@@ -4,8 +4,6 @@ import com.nine.baseballdiary.backend.badge.Badge;
 import com.nine.baseballdiary.backend.badge.BadgeRepository;
 import com.nine.baseballdiary.backend.badge.UserBadge;
 import com.nine.baseballdiary.backend.badge.UserBadgeRepository;
-import com.nine.baseballdiary.backend.player.PlayerInfoDto;
-import com.nine.baseballdiary.backend.player.PlayerService;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
 import com.nine.baseballdiary.backend.report.dto.*;
@@ -32,12 +30,6 @@ public class ReportService {
     private final GameRecordRepository gameRecordRepository;
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
-    private final PlayerService playerService;
-
-    // 전체 구장 목록
-    private static final List<String> ALL_STADIUMS = Arrays.asList(
-            "잠실", "고척", "사직", "대구", "광주", "대전(신)", "창원", "문학", "수원"
-    );
 
     public MainReportResponseDto getMainReport(Long userId) {
         LocalDate now = LocalDate.now();
@@ -46,44 +38,89 @@ public class ReportService {
         return MainReportResponseDto.builder()
                 .seasonInfo(getSeasonDday())
                 .winRateInfo(getWinRateSummary(userId))
-                .topEmotion(getTopEmotion(userId, currentYear))          // 새 메서드
-                .mvpPlayer(getMvpPlayer(userId))                         // 새 메서드 (단수형)
-                .companionStats(getCompanionStats(userId))
+                .topEmotion(getTopEmotion(userId))
+                .bestCompanion(getBestCompanion(userId))
                 .badgeSummary(getBadgeSummary(userId))
-                .topStadium(getTopStadium(userId))                       // 새 메서드
-                .bestAttendanceMonth(getBestAttendanceMonth(userId, currentYear))  // 새 메서드
-                .bestWinRateMonth(getBestWinRateMonth(userId, currentYear))        // 새 메서드
+                .topStadium(getTopStadium(userId))
+                .bestAttendanceMonth(getBestAttendanceMonth(userId))
+                .bestWinRateMonth(getBestWinRateMonth(userId, currentYear))
                 .build();
     }
 
-
-    //뱃지 요약 조회
+    //뱃지 요약 조회 (메인 페이지용)
     public BadgeSummaryDto getBadgeSummary(Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
-        // 최근 획득한 뱃지 3개 조회
-        List<UserBadge> recentUserBadges = userBadgeRepository.findTop5ByUserIdOrderByAchievedAtDesc(userId);
-        List<BadgeSummaryDto.RecentBadgeDto> recentBadges = recentUserBadges.stream()
-                .map(ub -> BadgeSummaryDto.RecentBadgeDto.builder()
-                        .name(ub.getBadge().getName())
-                        .imageUrl(ub.getBadge().getImageUrl())
-                        .category(getCategoryDisplayName(ub.getBadge().getCategory()))
-                        .build())
-                .collect(Collectors.toList());
+        // 메인 페이지 5개 슬롯에 해당하는 뱃지명 결정
+        String favTeam = user != null ? user.getFavTeam() : null;
+        List<String> mainPageBadgeNames = getMainPageBadgeNames(favTeam);
+
+        // 획득한 뱃지만 필터링
+        List<UserBadge> allUserBadges = userBadgeRepository.findAllByUserId(userId);
+        Map<String, UserBadge> nameToUserBadgeMap = allUserBadges.stream()
+                .collect(Collectors.toMap(ub -> ub.getBadge().getName(), ub -> ub));
+
+        // 메인 페이지 5개 슬롯 중 획득한 것만 반환
+        List<BadgeSummaryDto.MainPageBadgeDto> mainPageBadges = new ArrayList<>();
+        for (int i = 0; i < mainPageBadgeNames.size(); i++) {
+            String badgeName = mainPageBadgeNames.get(i);
+            UserBadge userBadge = nameToUserBadgeMap.get(badgeName);
+
+            if (userBadge != null) {
+                mainPageBadges.add(BadgeSummaryDto.MainPageBadgeDto.builder()
+                        .badgeId(userBadge.getBadge().getId())
+                        .badgeName(userBadge.getBadge().getName())
+                        .imageUrl(userBadge.getBadge().getImageUrl())
+                        .slotOrder(i + 1)  // 1~5
+                        .build());
+            }
+        }
 
         return BadgeSummaryDto.builder()
                 .totalBadgeCount(allBadges.size())
                 .myBadgeCount(myBadgeIds.size())
-                .recentBadges(recentBadges)
+                .mainPageBadges(mainPageBadges)
                 .build();
     }
 
+    /**
+     * 메인 페이지 5개 슬롯의 뱃지명 결정 (응원팀에 따라 동적)
+     */
+    private List<String> getMainPageBadgeNames(String favTeam) {
+        String teamConquestBadge = getTeamConquestBadgeNameByFavTeam(favTeam);
 
+        return List.of(
+                "기록의 시작",          // 슬롯 1
+                teamConquestBadge,      // 슬롯 2 (동적)
+                "응원의 보답",          // 슬롯 3
+                "홈의 따뜻함",          // 슬롯 4
+                "토닥토닥"             // 슬롯 5
+        );
+    }
 
     /**
-     * 승률 요약 조회 (홈/원정 포함)
+     * 응원팀에 따른 팀 정복 뱃지명 반환
      */
+    private String getTeamConquestBadgeNameByFavTeam(String favTeam) {
+        if (favTeam == null) return "베어스 정복"; // 기본값
+
+        return switch(favTeam) {
+            case "두산 베어스" -> "베어스 정복";
+            case "롯데 자이언츠" -> "갈매기 정복";
+            case "삼성 라이온즈" -> "사자 정복";
+            case "키움 히어로즈" -> "히어로 정복";
+            case "한화 이글스" -> "독수리 정복";
+            case "KIA 타이거즈" -> "호랑이 정복";
+            case "KT WIZ" -> "마법사 정복";
+            case "LG 트윈스" -> "쌍둥이 정복";
+            case "NC 다이노스" -> "공룡 정복";
+            case "SSG 랜더스" -> "랜더스 정복";
+            default -> "베어스 정복";
+        };
+    }
+
     @Cacheable(value = "winRateSummary", key = "#userId")
     public WinRateSummaryDto getWinRateSummary(Long userId) {
         log.info("Calculating win rate for user {}", userId);
@@ -92,15 +129,12 @@ public class ReportService {
         String favTeam = user != null ? user.getFavTeam() : null;
         String shortFavTeam = convertFavTeam(favTeam);
 
-        // 전체 통계
         long totalWins = records.stream().filter(r -> "WIN".equals(r.getResult())).count();
         long totalLosses = records.stream().filter(r -> "LOSE".equals(r.getResult())).count();
         long totalDraws = records.stream().filter(r -> "DRAW".equals(r.getResult())).count();
         int totalGames = records.size();
-        // getWinRateSummary 메서드의 모든 승률 계산에서
         double totalWinRate = (totalWins + totalLosses == 0) ? 0.0 : Math.round(((double) totalWins / (totalWins + totalLosses)) * 1000.0) / 10.0;
 
-        // 홈 경기 통계 (응원팀이 홈팀인 경우)
         List<GameRecord> homeGames = records.stream()
                 .filter(r -> r.getGame() != null && shortFavTeam != null && shortFavTeam.equals(r.getGame().getHomeTeam()))
                 .collect(Collectors.toList());
@@ -110,7 +144,6 @@ public class ReportService {
         int homeGameCount = homeGames.size();
         double homeWinRate = (homeWins + homeLosses == 0) ? 0.0 : Math.round(((double) homeWins / (homeWins + homeLosses)) * 1000.0) / 10.0;
 
-        // 원정 경기 통계 (응원팀이 원정팀인 경우)
         List<GameRecord> awayGames = records.stream()
                 .filter(r -> r.getGame() != null && shortFavTeam != null && shortFavTeam.equals(r.getGame().getAwayTeam()))
                 .collect(Collectors.toList());
@@ -142,14 +175,22 @@ public class ReportService {
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
+        // ⚠️ 수정: 모든 획득한 뱃지 조회 (5개 제한 제거)
+        List<UserBadge> allUserBadges = userBadgeRepository.findAllByUserId(userId);
+        Map<Integer, UserBadge> badgeIdToUserBadgeMap = allUserBadges.stream()
+                .collect(Collectors.toMap(ub -> ub.getBadge().getId(), ub -> ub));
+
         Map<String, List<BadgeResponseDto.BadgeDto>> groupedByCategory = allBadges.stream()
                 .map(badge -> {
                     boolean isAchieved = myBadgeIds.contains(badge.getId());
+                    UserBadge userBadge = badgeIdToUserBadgeMap.get(badge.getId());
+
                     return BadgeResponseDto.BadgeDto.builder()
                             .name(badge.getName())
                             .description(badge.getDescription())
                             .imageUrl(badge.getImageUrl())
                             .isAchieved(isAchieved)
+                            .achievedAt(userBadge != null ? userBadge.getAchievedAt() : null)
                             .build();
                 })
                 .collect(Collectors.groupingBy(dto -> findCategoryNameByBadgeName(dto.getName())));
@@ -172,19 +213,13 @@ public class ReportService {
         LocalDate today = LocalDate.now();
         int currentYear = today.getYear();
 
-        // 1. KBO 시즌 주요 일정
         LocalDate regularSeasonStart = LocalDate.of(currentYear, 3, 23);
-        LocalDate regularSeasonEnd = LocalDate.of(currentYear, 10, 15); // 예: 정규시즌 종료일
-        LocalDate postSeasonStart = LocalDate.of(currentYear, 10, 25);  // 예: 포스트시즌 시작일
-        LocalDate postSeasonEnd = LocalDate.of(currentYear, 11, 2); // 예: 포스트시즌 종료일
-
-        // 2. 내년 시즌 시작일
+        LocalDate regularSeasonEnd = LocalDate.of(currentYear, 10, 15);
+        LocalDate postSeasonStart = LocalDate.of(currentYear, 10, 25);
+        LocalDate postSeasonEnd = LocalDate.of(currentYear, 11, 2);
         LocalDate nextRegularSeasonStart = LocalDate.of(currentYear + 1, 3, 28);
 
-
-        // 3. 4가지 시나리오 분기
         if (today.isBefore(regularSeasonStart)) {
-            // 3-1. (오프시즌) 정규시즌 시작 전
             int daysUntilStart = (int) ChronoUnit.DAYS.between(today, regularSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
@@ -193,9 +228,7 @@ public class ReportService {
                     .status("BEFORE_START")
                     .message(currentYear + " 정규시즌 시작까지")
                     .build();
-
         } else if (today.isBefore(regularSeasonEnd) || today.isEqual(regularSeasonEnd)) {
-            // 3-2. 정규시즌 진행 중
             int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, regularSeasonEnd);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
@@ -204,9 +237,7 @@ public class ReportService {
                     .status("IN_PROGRESS_REGULAR")
                     .message(currentYear + " 정규 시즌 종료까지")
                     .build();
-
         } else if (today.isBefore(postSeasonStart)) {
-            // 3-3. 정규시즌 종료 ~ 포스트시즌 시작 전
             int daysUntilPSStart = (int) ChronoUnit.DAYS.between(today, postSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
@@ -215,9 +246,7 @@ public class ReportService {
                     .status("BEFORE_POSTSEASON")
                     .message(currentYear + " 포스트 시즌 시작까지")
                     .build();
-
         } else if (today.isBefore(postSeasonEnd) || today.isEqual(postSeasonEnd)) {
-            // 3-4. 포스트시즌 진행 중
             int daysUntilPSEnd = (int) ChronoUnit.DAYS.between(today, postSeasonEnd);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
@@ -226,9 +255,7 @@ public class ReportService {
                     .status("IN_PROGRESS_POSTSEASON")
                     .message(currentYear + " 포스트 시즌 종료까지")
                     .build();
-
         } else {
-            // 3-5. (오프시즌) 포스트시즌 종료 ~ 내년 시즌 시작 전
             int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextRegularSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear + 1)
@@ -240,7 +267,7 @@ public class ReportService {
         }
     }
 
-    public List<CompanionStatsDto> getCompanionStats(Long userId) {
+    public CompanionStatsDto getBestCompanion(Long userId) {
         List<GameRecord> records = gameRecordRepository.findByUserId(userId);
 
         Map<Long, Long> companionCounts = records.stream()
@@ -248,41 +275,39 @@ public class ReportService {
                 .flatMap(r -> r.getCompanions().stream())
                 .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
 
-        return companionCounts.entrySet().stream()
-                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-                .limit(5)
-                .map(entry -> {
-                    Long companionId = entry.getKey();
-                    int count = entry.getValue().intValue();
+        if (companionCounts.isEmpty()) {
+            return null;
+        }
 
-                    User companion = userRepository.findById(companionId).orElse(null);
-                    if (companion == null) return null;
+        Map.Entry<Long, Long> topEntry = companionCounts.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .orElse(null);
 
-                    // 캐시된 승률 조회
-                    WinRateSummaryDto winRateData = getWinRateSummary(companionId);
+        if (topEntry == null) {
+            return null;
+        }
 
-                    return CompanionStatsDto.builder()
-                            .userId(companion.getId())
-                            .nickname(companion.getNickname())
-                            .profileImageUrl(companion.getProfileImageUrl())
-                            .companionCount(count)
-                            .winRate(winRateData.getTotalWinRate())
-                            .build();
-                })
-                .filter(dto -> dto != null)
-                .collect(Collectors.toList());
+        Long companionId = topEntry.getKey();
+        int count = topEntry.getValue().intValue();
+
+        User companion = userRepository.findById(companionId).orElse(null);
+        if (companion == null) return null;
+
+        WinRateSummaryDto winRateData = getWinRateSummary(companionId);
+
+        return CompanionStatsDto.builder()
+                .userId(companion.getId())
+                .nickname(companion.getNickname())
+                .profileImageUrl(companion.getProfileImageUrl())
+                .companionCount(count)
+                .winRate(winRateData.getTotalWinRate())
+                .build();
     }
 
-    /**
-     * 이번 년도 가장 많이 선택한 감정 1개 조회
-     */
-    public TopEmotionDto getTopEmotion(Long userId, int year) {
-        LocalDate startDate = LocalDate.of(year, 1, 1);
-        LocalDate endDate = LocalDate.of(year, 12, 31);
+    public TopEmotionDto getTopEmotion(Long userId) {
+        List<GameRecord> allRecords = gameRecordRepository.findByUserId(userId);
 
-        List<GameRecord> yearlyRecords = gameRecordRepository.findByUserIdAndGameDateBetween(userId, startDate, endDate);
-
-        Map<Integer, Long> emotionCounts = yearlyRecords.stream()
+        Map<Integer, Long> emotionCounts = allRecords.stream()
                 .collect(Collectors.groupingBy(GameRecord::getEmotionCode, Collectors.counting()));
 
         if (emotionCounts.isEmpty()) {
@@ -304,42 +329,6 @@ public class ReportService {
                 .build();
     }
 
-    /**
-     * MVP 선수 1명 조회
-     */
-    public MvpPlayerDto getMvpPlayer(Long userId) {
-        List<GameRecord> records = gameRecordRepository.findByUserId(userId);
-
-        Map<String, Long> playerCounts = records.stream()
-                .filter(r -> r.getBestPlayer() != null && !r.getBestPlayer().isBlank())
-                .collect(Collectors.groupingBy(GameRecord::getBestPlayer, Collectors.counting()));
-
-        if (playerCounts.isEmpty()) {
-            return null;
-        }
-
-        Map.Entry<String, Long> topEntry = playerCounts.entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .orElse(null);
-
-        String playerName = topEntry.getKey();
-        int count = topEntry.getValue().intValue();
-
-        String teamCode = findTeamByPlayerName(playerName);
-        String teamName = convertTeamCodeToName(teamCode);
-
-        return MvpPlayerDto.builder()
-                .playerName(playerName)
-                .team(teamName)
-                .teamCode(teamCode)
-                .count(count)
-                .playerImageUrl(null)
-                .build();
-    }
-
-    /**
-     * 최다 방문 구장 1개 조회
-     */
     public TopStadiumDto getTopStadium(Long userId) {
         List<GameRecord> records = gameRecordRepository.findByUserId(userId);
 
@@ -371,29 +360,35 @@ public class ReportService {
                 .build();
     }
 
-    /**
-     * 이번 년도 직관 많이 간 달 조회
-     */
-    public BestMonthDto getBestAttendanceMonth(Long userId, int year) {
-        LocalDate startDate = LocalDate.of(year, 1, 1);
-        LocalDate endDate = LocalDate.of(year, 12, 31);
+    public BestMonthDto getBestAttendanceMonth(Long userId) {
+        List<GameRecord> allRecords = gameRecordRepository.findByUserId(userId);
 
-        List<GameRecord> yearlyRecords = gameRecordRepository.findByUserIdAndGameDateBetween(userId, startDate, endDate);
-
-        Map<Integer, Long> monthCounts = yearlyRecords.stream()
-                .collect(Collectors.groupingBy(r -> r.getGame().getDate().getMonthValue(), Collectors.counting()));
-
-        if (monthCounts.isEmpty()) {
+        if (allRecords.isEmpty()) {
             return null;
         }
 
-        Map.Entry<Integer, Long> topEntry = monthCounts.entrySet().stream()
+        Map<String, Long> yearMonthCounts = allRecords.stream()
+                .filter(r -> r.getGame() != null && r.getGame().getDate() != null)
+                .collect(Collectors.groupingBy(
+                        r -> r.getGame().getDate().getYear() + "-" + r.getGame().getDate().getMonthValue(),
+                        Collectors.counting()
+                ));
+
+        if (yearMonthCounts.isEmpty()) {
+            return null;
+        }
+
+        Map.Entry<String, Long> topEntry = yearMonthCounts.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .orElse(null);
 
+        String[] parts = topEntry.getKey().split("-");
+        int year = Integer.parseInt(parts[0]);
+        int month = Integer.parseInt(parts[1]);
+
         return BestMonthDto.builder()
                 .year(year)
-                .month(topEntry.getKey())
+                .month(month)
                 .count(topEntry.getValue().intValue())
                 .rate(null)
                 .build();
@@ -413,7 +408,7 @@ public class ReportService {
         }
 
         Map.Entry<Integer, Double> bestEntry = monthRecords.entrySet().stream()
-                .filter(entry -> entry.getValue().size() >= 2) // 최소 2경기
+                .filter(entry -> entry.getValue().size() >= 2)
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> {
@@ -432,7 +427,7 @@ public class ReportService {
         }
 
         int bestMonth = bestEntry.getKey();
-        double bestWinRate = Math.round(bestEntry.getValue() * 10.0) / 10.0; // 소숫점 1자리
+        double bestWinRate = Math.round(bestEntry.getValue() * 10.0) / 10.0;
         int gameCount = monthRecords.get(bestMonth).size();
 
         return BestMonthDto.builder()
@@ -443,65 +438,54 @@ public class ReportService {
                 .build();
     }
 
-    // Private helper methods
-    private String findTeamByPlayerName(String playerName) {
-        List<PlayerInfoDto> result = playerService.searchPlayers(playerName);
-        return result.isEmpty() ? "XX" : result.get(0).getTeam();
-    }
-
-
-
-    private String convertTeamCodeToName(String code) {
-        return switch(code) {
-            case "KIA" -> "KIA타이거즈";
-            case "NC" -> "NC다이노스";
-            case "삼성" -> "삼성라이온즈";
-            case "LG" -> "LG트윈스";
-            case "두산" -> "두산베어스";
-            case "KT" -> "KT WIZ";
-            case "SSG" -> "SSG랜더스";
-            case "롯데" -> "롯데자이언츠";
-            case "한화" -> "한화이글스";
-            case "키움" -> "키움히어로즈";
-            default -> code;
-        };
-    }
-
-    private String convertEmotionToNoun(int code) {
-        return switch(code) {
-            case 1 -> "짜릿"; case 2 -> "만족"; case 3 -> "감동";
-            case 4 -> "놀람"; case 5 -> "행복"; case 6 -> "답답";
-            case 7 -> "아쉬움"; case 8 -> "화남"; case 9 -> "지침";
-            default -> "기타";
-        };
-    }
-
     private String convertEmotionLabel(int code) {
         return switch(code) {
-            case 1 -> "짜릿해요"; case 2 -> "만족해요"; case 3 -> "감동이에요";
-            case 4 -> "놀랐어요"; case 5 -> "행복해요"; case 6 -> "답답해요";
-            case 7 -> "아쉬워요"; case 8 -> "화났어요"; case 9 -> "지쳤어요";
+            case 1 -> "행복해요";
+            case 2 -> "놀랐어요";
+            case 3 -> "짜릿해요";
+            case 4 -> "벅차요";
+            case 5 -> "통쾌해요";
+            case 6 -> "만족해요";
+            case 7 -> "지루해요";
+            case 8 -> "무난해요";
+            case 9 -> "긴장돼요";
+            case 10 -> "질투나요";
+            case 11 -> "답답해요";
+            case 12 -> "아쉬워요";
+            case 13 -> "지쳤어요";
+            case 14 -> "허탈해요";
+            case 15 -> "짜증나요";
+            case 16 -> "화나요";
             default -> "기타";
         };
     }
 
-
-
     private String findCategoryNameByBadgeName(String badgeName) {
-        if (badgeName.contains("정복")) return "구단 도장깨기";
-        if (badgeName.contains("직관")) return "직관 기록수";
-        if (badgeName.contains("승리")) return "승리요정";
-        if (badgeName.contains("패배")) return "패배요정";
-        return "감정 수집";
+        if (badgeName.equals("기록의 시작") || badgeName.equals("홈의 따뜻함") ||
+                badgeName.equals("원정의 즐거움") || badgeName.equals("같이 응원해요") ||
+                badgeName.equals("속닥속닥")) {
+            return "어서와, 야구 직관은 처음이지?";
+        }
+        if (badgeName.contains("응원의 보답") || badgeName.contains("네잎클로버") ||
+                badgeName.contains("행운의 편지")) {
+            return "나는야 승리요정";
+        }
+        if (badgeName.contains("토닥토닥") || badgeName.contains("그래도 응원해") ||
+                badgeName.contains("이게 사랑이야")) {
+            return "패배해도 괜찮아";
+        }
+        if (badgeName.contains("정복")) {
+            return "모든 야구장을 제패하겠어";
+        }
+        return "기타";
     }
 
     private String getCategoryDisplayName(String category) {
         return switch(category) {
-            case "STADIUM_CONQUEST" -> "구단 도장깨기";
-            case "ATTENDANCE_COUNT" -> "직관 기록수";
-            case "WINS" -> "승리요정";
-            case "LOSSES" -> "패배요정";
-            case "EMOTION_COLLECTION" -> "감정 수집";
+            case "FIRST_TIMER" -> "어서와, 야구 직관은 처음이지?";
+            case "WINS" -> "나는야 승리요정";
+            case "LOSSES" -> "패배해도 괜찮아";
+            case "TEAM_CONQUEST" -> "모든 야구장을 제패하겠어";
             default -> category;
         };
     }
@@ -522,6 +506,7 @@ public class ReportService {
     }
 
     private String convertFavTeam(String fav) {
+        if (fav == null) return null;
         return switch(fav) {
             case "KIA 타이거즈" -> "KIA";
             case "두산 베어스" -> "두산";

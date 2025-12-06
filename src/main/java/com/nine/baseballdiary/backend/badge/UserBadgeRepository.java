@@ -23,4 +23,6 @@ public interface UserBadgeRepository extends JpaRepository<UserBadge, Long> {
     default List<UserBadge> findTop5ByUserIdOrderByAchievedAtDesc(Long userId) {
         return findTop5ByUserIdOrderByAchievedAtDesc(userId, PageRequest.of(0, 5));
     }
+    @Query("SELECT ub FROM UserBadge ub JOIN FETCH ub.badge WHERE ub.user.id = :userId ORDER BY ub.achievedAt DESC")
+    List<UserBadge> findAllByUserId(@Param("userId") Long userId);
 }
