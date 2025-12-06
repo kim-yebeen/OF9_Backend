@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.nine.baseballdiary.backend.auth.service.RefreshTokenService;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -35,6 +36,7 @@ public class UserService {
     private final UserBlockRepository userBlockRepo;
     private final RecordLikeRepository likeRepo;  // ✅ RecordReactionRepository → RecordLikeRepository
     private final S3Service s3Service;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional(readOnly = true)
     public List<UserDto> searchUsers(Long currentUserId, String q) {
@@ -277,30 +279,34 @@ public class UserService {
         }
     }
 
-    public void logout(Long userId) { /* JWT 토큰 무효화 로직 (필요시) */ }
 
     @Transactional
     public void deleteUser(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
+        // 1. S3 파일 삭제 및 DB 연관 데이터 삭제 (기존 로직 유지)
         List<GameRecord> userRecords = recordRepo.findByUserId(userId);
-
         userRecords.forEach(record -> {
             if (record.getMediaUrls() != null) {
                 record.getMediaUrls().forEach(s3Service::deleteFile);
             }
         });
+        if (user.getProfileImageUrl() != null) {
+            s3Service.deleteFile(user.getProfileImageUrl());
+        }
 
-        s3Service.deleteFile(user.getProfileImageUrl());
-
-        // ✅ RecordReactionRepository → RecordLikeRepository
         likeRepo.deleteAllByUserId(userId);
         recordRepo.deleteAll(userRecords);
         reqRepo.deleteAllByRequesterIdOrTargetId(userId);
         userBlockRepo.deleteAllByBlockerIdOrBlockedId(userId);
         followRepo.deleteAllByFollowerIdOrFolloweeId(userId);
 
+        // ✅ 2. [추가] Redis에 저장된 Refresh Token 삭제 (보안 강화)
+        // 탈퇴한 유저의 토큰이 살아있으면 안 되니까요.
+        refreshTokenService.deleteRefreshToken(userId.toString());
+
+        // 3. 사용자 엔티티 삭제
         userRepo.delete(user);
     }
 

@@ -142,14 +142,7 @@ public class UserController {
     }
 
 
-    // ✅ 12. 로그아웃
-    @PostMapping("/me/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        Long userId = getCurrentUserId();
-        userService.logout(userId);
-
-        return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다"));
-    }
+    
 
     // ✅ 13. 회원 탈퇴
     @DeleteMapping("/me")

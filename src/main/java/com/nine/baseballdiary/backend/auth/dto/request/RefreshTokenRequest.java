@@ -1,8 +1,13 @@
 package com.nine.baseballdiary.backend.auth.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class RefreshTokenRequest {
+    @NotBlank(message="리프레시 토큰은 필수입니다.")
     private String refreshToken;
 
-    public String getRefreshToken() { return refreshToken; }
-    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
-}
+   }
