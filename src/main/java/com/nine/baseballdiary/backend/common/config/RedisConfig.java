@@ -1,5 +1,8 @@
 package com.nine.baseballdiary.backend.common.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -15,19 +18,28 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import java.time.Duration;
 
 @Configuration
-@EnableCaching // ✅ 캐싱 기능 활성화
+@EnableCaching
 public class RedisConfig {
 
     /**
-     * @Cacheable 어노테이션이 사용할 CacheManager 설정
-     * 객체(DTO)를 JSON으로 직렬화하여 저장하도록 설정함
+     * ✅ [핵심] 날짜(LocalDate, LocalTime) 처리를 위한 ObjectMapper 설정
      */
+    private ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule()); // LocalDate, LocalTime 처리 모듈 등록
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // [2025, 5, 1] 대신 "2025-05-01" 문자열로 저장
+        return mapper;
+    }
+
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory cf) {
+        // 커스텀 ObjectMapper를 사용하는 Serializer 생성
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(objectMapper());
+
         RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer())) // ✅ Value를 JSON으로 저장
-                .entryTtl(Duration.ofHours(1)); // (선택) 캐시 기본 유효시간 1시간 설정
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonSerializer)) // ✅ 수정된 Serializer 적용
+                .entryTtl(Duration.ofHours(1));
 
         return RedisCacheManager.RedisCacheManagerBuilder
                 .fromConnectionFactory(cf)
@@ -35,22 +47,18 @@ public class RedisConfig {
                 .build();
     }
 
-    /**
-     * 직접 RedisTemplate을 주입받아 쓸 때 사용할 설정 (RefreshToken 저장 등)
-     */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // Key는 String
+        // 커스텀 ObjectMapper를 사용하는 Serializer 생성
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(objectMapper());
+
         template.setKeySerializer(new StringRedisSerializer());
-
-        // Value는 JSON (객체 저장을 위해)
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-
+        template.setValueSerializer(jsonSerializer); // ✅ 수정된 Serializer 적용
         template.setHashKeySerializer(new StringRedisSerializer());
-        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+        template.setHashValueSerializer(jsonSerializer);
 
         template.afterPropertiesSet();
         return template;
