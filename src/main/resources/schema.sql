@@ -234,22 +234,8 @@ CREATE TABLE IF NOT EXISTS user_block (
     CONSTRAINT no_self_block CHECK (blocker_id <> blocked_id)
     );
 
-CREATE TABLE IF NOT EXISTS badge (
-                                     id SERIAL PRIMARY KEY,
-                                     category VARCHAR(50) NOT NULL,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT,
-    image_url TEXT,
-    threshold INT
-    );
 
-CREATE TABLE IF NOT EXISTS user_badge (
-                                          id SERIAL PRIMARY KEY,
-                                          user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    badge_id INT NOT NULL REFERENCES badge(id) ON DELETE CASCADE,
-    achieved_at TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE(user_id, badge_id)
-    );
+
 
 CREATE TABLE IF NOT EXISTS player (
                                       id BIGSERIAL PRIMARY KEY,
@@ -260,7 +246,6 @@ CREATE TABLE IF NOT EXISTS player (
 
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_player_name ON player(name);
-CREATE INDEX IF NOT EXISTS idx_user_badge_user_id ON user_badge(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocker_id ON user_block(blocker_id);
 CREATE INDEX IF NOT EXISTS idx_user_block_blocked_id ON user_block(blocked_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
