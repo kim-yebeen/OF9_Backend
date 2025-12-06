@@ -6,10 +6,12 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.io.Serializable;
 
 @Getter
 @NoArgsConstructor
-public class GameResponse {
+public class GameResponse implements Serializable {
+    private static final long serialVersionUID = 1L;
     private String gameId;
     private LocalDate date;
     private LocalTime time;

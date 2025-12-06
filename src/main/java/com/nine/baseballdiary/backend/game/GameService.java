@@ -1,6 +1,8 @@
 package com.nine.baseballdiary.backend.game;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +31,7 @@ public class GameService {
     // 월 단위(YYYY-MM)로 경기 정보를 조회하여 DTO 리스트로 변환 반환
     // @param yearMonth "2025-05" 형식의 문자열
     //@return 해당 월의 GameResponse 리스트
+    @Cacheable(value = "games", key = "#yearMonth")
     public List<GameResponse> getGamesByMonth(String yearMonth) {
         // YearMonth 파싱
         YearMonth ym = YearMonth.parse(yearMonth);
@@ -74,6 +77,7 @@ public class GameService {
      * 1차 크롤러용: 스케줄 정보만 신규/업데이트
      */
     @Transactional
+    @CacheEvict(value = "games", allEntries = true)
     public void saveOrUpdateSchedule(Game incoming) {
         String id = incoming.getGameId();
         if (gameRepo.existsById(id)) {
@@ -100,6 +104,7 @@ public class GameService {
      * 2차 크롤러용: 점수·상태 업데이트
      */
     @Transactional
+    @CacheEvict(value = "games", allEntries = true)
     public void updateResult(Game incoming) {
         String id = incoming.getGameId();
         Game existing = gameRepo.findById(id)
