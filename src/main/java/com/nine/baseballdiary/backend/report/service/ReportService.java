@@ -43,7 +43,6 @@ public class ReportService {
                 .badgeSummary(getBadgeSummary(userId))
                 .topStadium(getTopStadium(userId))
                 .bestAttendanceMonth(getBestAttendanceMonth(userId))
-                .bestWinRateMonth(getBestWinRateMonth(userId, currentYear))
                 .build();
     }
 
@@ -175,26 +174,28 @@ public class ReportService {
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
-        // ⚠️ 수정: 모든 획득한 뱃지 조회 (5개 제한 제거)
+        // 획득한 뱃지만 조회
         List<UserBadge> allUserBadges = userBadgeRepository.findAllByUserId(userId);
         Map<Integer, UserBadge> badgeIdToUserBadgeMap = allUserBadges.stream()
                 .collect(Collectors.toMap(ub -> ub.getBadge().getId(), ub -> ub));
 
+        // ✅ 획득한 뱃지만 필터링
         Map<String, List<BadgeResponseDto.BadgeDto>> groupedByCategory = allBadges.stream()
+                .filter(badge -> myBadgeIds.contains(badge.getId()))  // 획득한 것만
                 .map(badge -> {
-                    boolean isAchieved = myBadgeIds.contains(badge.getId());
                     UserBadge userBadge = badgeIdToUserBadgeMap.get(badge.getId());
 
                     return BadgeResponseDto.BadgeDto.builder()
                             .name(badge.getName())
                             .description(badge.getDescription())
                             .imageUrl(badge.getImageUrl())
-                            .isAchieved(isAchieved)
+                            .isAchieved(true)  // 모두 true
                             .achievedAt(userBadge != null ? userBadge.getAchievedAt() : null)
                             .build();
                 })
                 .collect(Collectors.groupingBy(dto -> findCategoryNameByBadgeName(dto.getName())));
 
+        // ✅ 획득한 뱃지가 있는 카테고리만 포함
         List<BadgeResponseDto.BadgeCategoryDto> categories = groupedByCategory.entrySet().stream()
                 .map(entry -> BadgeResponseDto.BadgeCategoryDto.builder()
                         .name(entry.getKey())
@@ -394,49 +395,6 @@ public class ReportService {
                 .build();
     }
 
-    public BestMonthDto getBestWinRateMonth(Long userId, int year) {
-        LocalDate startDate = LocalDate.of(year, 1, 1);
-        LocalDate endDate = LocalDate.of(year, 12, 31);
-
-        List<GameRecord> yearlyRecords = gameRecordRepository.findByUserIdAndGameDateBetween(userId, startDate, endDate);
-
-        Map<Integer, List<GameRecord>> monthRecords = yearlyRecords.stream()
-                .collect(Collectors.groupingBy(r -> r.getGame().getDate().getMonthValue()));
-
-        if (monthRecords.isEmpty()) {
-            return null;
-        }
-
-        Map.Entry<Integer, Double> bestEntry = monthRecords.entrySet().stream()
-                .filter(entry -> entry.getValue().size() >= 2)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> {
-                            List<GameRecord> monthGames = entry.getValue();
-                            long wins = monthGames.stream().filter(r -> "WIN".equals(r.getResult())).count();
-                            long losses = monthGames.stream().filter(r -> "LOSE".equals(r.getResult())).count();
-                            return (wins + losses == 0) ? 0.0 : ((double) wins / (wins + losses)) * 100.0;
-                        }
-                ))
-                .entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .orElse(null);
-
-        if (bestEntry == null) {
-            return null;
-        }
-
-        int bestMonth = bestEntry.getKey();
-        double bestWinRate = Math.round(bestEntry.getValue() * 10.0) / 10.0;
-        int gameCount = monthRecords.get(bestMonth).size();
-
-        return BestMonthDto.builder()
-                .year(year)
-                .month(bestMonth)
-                .count(gameCount)
-                .rate(bestWinRate)
-                .build();
-    }
 
     private String convertEmotionLabel(int code) {
         return switch(code) {

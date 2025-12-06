@@ -14,5 +14,5 @@ public class MainReportResponseDto {
     private final BadgeSummaryDto badgeSummary;
     private final TopStadiumDto topStadium;
     private final BestMonthDto bestAttendanceMonth;      // 전체 기간 기준
-    private final BestMonthDto bestWinRateMonth;
+
 }
