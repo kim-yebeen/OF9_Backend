@@ -159,7 +159,7 @@ public class FeedService {
         FollowStatus followStatus = getFollowStatus(currentUserId, user.getId());
 
         // ✅ isMutualFollow 계산
-        Boolean isMutualFollow = null;
+        Boolean isMutualFollow = false;
         if (followStatus == FollowStatus.NOT_FOLLOWING) {
             // 내가 팔로우하지 않는 상태에서, 상대방이 나를 팔로우하고 있는지 확인
             boolean isFollower = userFollowRepo.existsByFollower_IdAndFollowee_Id(user.getId(), currentUserId);
@@ -200,7 +200,7 @@ public class FeedService {
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
 
         // ✅ isMutualFollow 계산
-        Boolean isMutualFollow = null;
+        Boolean isMutualFollow = false;
         if (followStatus == FollowStatus.NOT_FOLLOWING) {
             boolean isFollower = userFollowRepo.existsByFollower_IdAndFollowee_Id(targetUserId, currentUserId);
             isMutualFollow = isFollower;

@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -127,11 +129,24 @@ public class SearchService {
         Page<User> userPage = userRepository.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
                 query, currentUserId, pageable);
 
-        // ✅ DTO의 정적 메서드를 사용하여 변환
+        // ✅ 나를 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowerIds = userFollowRepository.findFollowerIds(currentUserId);
+        Set<Long> myFollowerIdSet = new HashSet<>(myFollowerIds);
+
+        // ✅ 내가 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowingIds = userFollowRepository.findFollowingIds(currentUserId);
+        Set<Long> myFollowingIdSet = new HashSet<>(myFollowingIds);
+
         List<SearchUserDto> users = userPage.getContent().stream()
                 .map(user -> {
                     FollowStatus followStatus = getFollowStatus(currentUserId, user.getId());
-                    return SearchUserDto.of(user, followStatus);
+
+                    // ✅ isMutualFollow 계산
+                    // 내가 팔로우하지 않고 있고 && 상대방이 나를 팔로우하고 있으면 true
+                    Boolean isMutualFollow = !myFollowingIdSet.contains(user.getId())
+                            && myFollowerIdSet.contains(user.getId());
+
+                    return SearchUserDto.of(user, followStatus, isMutualFollow);  // ✅ isMutualFollow 추가
                 })
                 .collect(Collectors.toList());
 
