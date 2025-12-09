@@ -25,6 +25,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import java.util.HashSet;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
@@ -38,31 +44,53 @@ public class UserService {
     private final S3Service s3Service;
     private final RefreshTokenService refreshTokenService;
 
+    // ✅ 1. searchUsers 메서드 수정
     @Transactional(readOnly = true)
     public List<UserDto> searchUsers(Long currentUserId, String q) {
-        List<User> users = userRepo.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
-                q, currentUserId, org.springframework.data.domain.Pageable.unpaged()
-        ).getContent();
+        Pageable pageable = PageRequest.of(0, 30);
+        Page<User> userPage = userRepo.findByNicknameContainingIgnoreCaseAndIdNotExcludingBlocked(
+                q, currentUserId, pageable
+        );
 
-        return users.stream()
-                .map(UserDto::from)
+        // ✅ 나를 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowerIds = followRepo.findFollowerIds(currentUserId);
+        Set<Long> myFollowerIdSet = new HashSet<>(myFollowerIds);
+
+        // ✅ 내가 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowingIds = followRepo.findFollowingIds(currentUserId);
+        Set<Long> myFollowingIdSet = new HashSet<>(myFollowingIds);
+
+        List<Long> targetUserIds = userPage.getContent().stream()
+                .map(User::getId)
+                .collect(Collectors.toList());
+
+        Set<Long> followingIds = followRepo.findFolloweeIdsByFollowerIdAndInTargetUserIds(currentUserId, targetUserIds);
+        Set<Long> pendingIds = reqRepo.findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(currentUserId, targetUserIds);
+
+        return userPage.getContent().stream()
+                .map(user -> {
+                    FollowStatus status;
+                    if (user.getId().equals(currentUserId)) {
+                        status = FollowStatus.ME;
+                    } else if (followingIds.contains(user.getId())) {
+                        status = FollowStatus.FOLLOWING;
+                    } else if (pendingIds.contains(user.getId())) {
+                        status = FollowStatus.REQUESTED;
+                    } else {
+                        status = FollowStatus.NOT_FOLLOWING;
+                    }
+
+                    // ✅ isMutualFollow 계산
+                    // 내가 팔로우하지 않고 있고 && 상대방이 나를 팔로우하고 있으면 true
+                    Boolean isMutualFollow = !myFollowingIdSet.contains(user.getId())
+                            && myFollowerIdSet.contains(user.getId());
+
+                    return UserDto.from(user, status, isMutualFollow);
+                })
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
-    public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
-        List<Long> followingIds = followRepo.findByFollower_Id(profileUserId).stream()
-                .map(follow -> follow.getFollowee().getId())
-                .collect(Collectors.toList());
-
-        if (followingIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
-        return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
-    }
-
+    // ✅ 2. getFollowers 메서드 수정
     @Transactional(readOnly = true)
     public List<UserDto> getFollowers(Long profileUserId, Long currentUserId) {
         List<Long> followerIds = followRepo.findByFollowee_Id(profileUserId).stream()
@@ -74,7 +102,82 @@ public class UserService {
         }
 
         List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followerIds, currentUserId);
-        return convertToUserDtoWithFollowStatus(filteredUserList, currentUserId);
+
+        // ✅ 나를 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowerIds = followRepo.findFollowerIds(currentUserId);
+        Set<Long> myFollowerIdSet = new HashSet<>(myFollowerIds);
+
+        // ✅ 내가 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowingIds = followRepo.findFollowingIds(currentUserId);
+        Set<Long> myFollowingIdSet = new HashSet<>(myFollowingIds);
+
+        List<Long> targetUserIds = filteredUserList.stream().map(User::getId).collect(Collectors.toList());
+        Set<Long> followingIdSet = followRepo.findFolloweeIdsByFollowerIdAndInTargetUserIds(currentUserId, targetUserIds);
+        Set<Long> requestedIdSet = reqRepo.findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(currentUserId, targetUserIds);
+
+        return filteredUserList.stream().map(user -> {
+            FollowStatus status;
+            if (user.getId().equals(currentUserId)) {
+                status = FollowStatus.ME;
+            } else if (followingIdSet.contains(user.getId())) {
+                status = FollowStatus.FOLLOWING;
+            } else if (requestedIdSet.contains(user.getId())) {
+                status = FollowStatus.REQUESTED;
+            } else {
+                status = FollowStatus.NOT_FOLLOWING;
+            }
+
+            // ✅ isMutualFollow 계산
+            Boolean isMutualFollow = !myFollowingIdSet.contains(user.getId())
+                    && myFollowerIdSet.contains(user.getId());
+
+            return UserDto.from(user, status, isMutualFollow);
+        }).collect(Collectors.toList());
+    }
+
+    // ✅ 3. getFollowing 메서드 수정
+    @Transactional(readOnly = true)
+    public List<UserDto> getFollowing(Long profileUserId, Long currentUserId) {
+        List<Long> followingIds = followRepo.findByFollower_Id(profileUserId).stream()
+                .map(follow -> follow.getFollowee().getId())
+                .collect(Collectors.toList());
+
+        if (followingIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<User> filteredUserList = userRepo.findByIdInExcludingBlocked(followingIds, currentUserId);
+
+        // ✅ 나를 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowerIds = followRepo.findFollowerIds(currentUserId);
+        Set<Long> myFollowerIdSet = new HashSet<>(myFollowerIds);
+
+        // ✅ 내가 팔로우하는 사람들의 ID 목록 조회
+        List<Long> myFollowingIds = followRepo.findFollowingIds(currentUserId);
+        Set<Long> myFollowingIdSet = new HashSet<>(myFollowingIds);
+
+        List<Long> targetUserIds = filteredUserList.stream().map(User::getId).collect(Collectors.toList());
+        Set<Long> followingIdSet = followRepo.findFolloweeIdsByFollowerIdAndInTargetUserIds(currentUserId, targetUserIds);
+        Set<Long> requestedIdSet = reqRepo.findPendingRequestTargetIdsByRequesterIdAndInTargetUserIds(currentUserId, targetUserIds);
+
+        return filteredUserList.stream().map(user -> {
+            FollowStatus status;
+            if (user.getId().equals(currentUserId)) {
+                status = FollowStatus.ME;
+            } else if (followingIdSet.contains(user.getId())) {
+                status = FollowStatus.FOLLOWING;
+            } else if (requestedIdSet.contains(user.getId())) {
+                status = FollowStatus.REQUESTED;
+            } else {
+                status = FollowStatus.NOT_FOLLOWING;
+            }
+
+            // ✅ isMutualFollow 계산
+            Boolean isMutualFollow = !myFollowingIdSet.contains(user.getId())
+                    && myFollowerIdSet.contains(user.getId());
+
+            return UserDto.from(user, status, isMutualFollow);
+        }).collect(Collectors.toList());
     }
 
     private List<UserDto> convertToUserDtoWithFollowStatus(List<User> userList, Long currentUserId) {
