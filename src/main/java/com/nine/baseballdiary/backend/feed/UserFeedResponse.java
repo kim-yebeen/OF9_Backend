@@ -18,6 +18,7 @@ public class UserFeedResponse {
     private String favTeam;
     private Boolean isPrivate;
     private FollowStatus followStatus;
+    private Boolean isMutualFollow;
 
     // 통계
     private Long recordCount;

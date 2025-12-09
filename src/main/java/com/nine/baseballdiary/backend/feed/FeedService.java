@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -153,12 +155,25 @@ public class FeedService {
         long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(record.getRecordId());
         List<String> mediaUrls = record.getMediaUrls() != null ? record.getMediaUrls() : List.of();
 
+        // ✅ followStatus 계산
+        FollowStatus followStatus = getFollowStatus(currentUserId, user.getId());
+
+        // ✅ isMutualFollow 계산
+        Boolean isMutualFollow = null;
+        if (followStatus == FollowStatus.NOT_FOLLOWING) {
+            // 내가 팔로우하지 않는 상태에서, 상대방이 나를 팔로우하고 있는지 확인
+            boolean isFollower = userFollowRepo.existsByFollower_IdAndFollowee_Id(user.getId(), currentUserId);
+            isMutualFollow = isFollower;
+        }
+
         return FeedResponse.builder()
                 .recordId(record.getRecordId())
                 .userId(user.getId())
                 .nickname(user.getNickname())
                 .profileImageUrl(user.getProfileImageUrl())
                 .favTeam(user.getFavTeam())
+                .followStatus(followStatus)      // ✅ 추가
+                .isMutualFollow(isMutualFollow)  // ✅ 추가
                 .createdAt(record.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
                 .gameDate(game.getDate().format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 (E)요일")))
                 .gameTime(game.getTime().format(DateTimeFormatter.ofPattern("HH:mm")))
@@ -181,15 +196,27 @@ public class FeedService {
     public UserFeedResponse getUserFeed(Long currentUserId, Long targetUserId) {
         User targetUser = userRepo.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+
         FollowStatus followStatus = getFollowStatus(currentUserId, targetUserId);
+
+        // ✅ isMutualFollow 계산
+        Boolean isMutualFollow = null;
+        if (followStatus == FollowStatus.NOT_FOLLOWING) {
+            boolean isFollower = userFollowRepo.existsByFollower_IdAndFollowee_Id(targetUserId, currentUserId);
+            isMutualFollow = isFollower;
+        }
+
         long recordCount = recordRepo.countByUserId(targetUserId);
         long followerCount = userFollowRepo.countByFollowee_Id(targetUserId);
         long followingCount = userFollowRepo.countByFollower_Id(targetUserId);
+
         boolean isBlocked = userBlockRepo.existsByBlocker_IdAndBlocked_Id(currentUserId, targetUserId) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(targetUserId, currentUserId);
+
         boolean canViewContent = !isBlocked && (!targetUser.getIsPrivate() ||
                 followStatus == FollowStatus.ME ||
                 followStatus == FollowStatus.FOLLOWING);
+
         List<UserFeedItem> feedItems = List.of();
         if (canViewContent) {
             List<GameRecord> records = recordRepo.findByUserIdWithDetails(targetUserId);
@@ -206,6 +233,7 @@ public class FeedService {
                     })
                     .collect(Collectors.toList());
         }
+
         return UserFeedResponse.builder()
                 .userId(targetUser.getId())
                 .nickname(targetUser.getNickname())
@@ -213,6 +241,7 @@ public class FeedService {
                 .favTeam(targetUser.getFavTeam())
                 .isPrivate(targetUser.getIsPrivate())
                 .followStatus(followStatus)
+                .isMutualFollow(isMutualFollow)  // ✅ 추가
                 .recordCount(recordCount)
                 .followerCount(followerCount)
                 .followingCount(followingCount)

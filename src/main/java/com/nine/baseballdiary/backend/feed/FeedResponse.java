@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.feed;
 
+import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,6 +17,8 @@ public class FeedResponse {
     private String nickname;
     private String profileImageUrl;
     private String favTeam;
+    private FollowStatus followStatus;  // ✅ 추가
+    private Boolean isMutualFollow;     // ✅ 추가
 
     // 게시물 정보
     private String createdAt;
