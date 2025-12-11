@@ -46,35 +46,42 @@ public class ReportService {
                 .build();
     }
 
-    //뱃지 요약 조회 (메인 페이지용)
     public BadgeSummaryDto getBadgeSummary(Long userId) {
         User user = userRepository.findById(userId).orElse(null);
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
-        // 메인 페이지 5개 슬롯에 해당하는 뱃지명 결정
+        // ✅ 메인 페이지 5개 슬롯에 해당하는 뱃지명 결정 (고정)
         String favTeam = user != null ? user.getFavTeam() : null;
         List<String> mainPageBadgeNames = getMainPageBadgeNames(favTeam);
 
-        // 획득한 뱃지만 필터링
+        // ✅ 획득한 뱃지만 필터링
         List<UserBadge> allUserBadges = userBadgeRepository.findAllByUserId(userId);
-        Map<String, UserBadge> nameToUserBadgeMap = allUserBadges.stream()
-                .collect(Collectors.toMap(ub -> ub.getBadge().getName(), ub -> ub));
 
-        // 메인 페이지 5개 슬롯 중 획득한 것만 반환
+        // ✅ 5개 고정 슬롯에 해당하는 뱃지 중 획득한 것만 추출
+        List<UserBadge> mainPageUserBadges = allUserBadges.stream()
+                .filter(ub -> mainPageBadgeNames.contains(ub.getBadge().getName()))
+                .collect(Collectors.toList());
+
+        // ✅ 최신순으로 정렬 (achievedAt 내림차순)
+        mainPageUserBadges.sort((a, b) -> {
+            if (a.getAchievedAt() == null && b.getAchievedAt() == null) return 0;
+            if (a.getAchievedAt() == null) return 1;  // null은 뒤로
+            if (b.getAchievedAt() == null) return -1;
+            return b.getAchievedAt().compareTo(a.getAchievedAt()); // 최신순
+        });
+
+        // ✅ 최신순으로 slotOrder 부여 (1, 2, 3, 4, 5)
         List<BadgeSummaryDto.MainPageBadgeDto> mainPageBadges = new ArrayList<>();
-        for (int i = 0; i < mainPageBadgeNames.size(); i++) {
-            String badgeName = mainPageBadgeNames.get(i);
-            UserBadge userBadge = nameToUserBadgeMap.get(badgeName);
+        int slotOrder = 1;
 
-            if (userBadge != null) {
-                mainPageBadges.add(BadgeSummaryDto.MainPageBadgeDto.builder()
-                        .badgeId(userBadge.getBadge().getId())
-                        .badgeName(userBadge.getBadge().getName())
-                        .imageUrl(userBadge.getBadge().getImageUrl())
-                        .slotOrder(i + 1)  // 1~5
-                        .build());
-            }
+        for (UserBadge userBadge : mainPageUserBadges) {
+            mainPageBadges.add(BadgeSummaryDto.MainPageBadgeDto.builder()
+                    .badgeId(userBadge.getBadge().getId())
+                    .badgeName(userBadge.getBadge().getName())
+                    .imageUrl(userBadge.getBadge().getImageUrl())
+                    .slotOrder(slotOrder++)  // 1, 2, 3, 4, 5 순서대로
+                    .build());
         }
 
         return BadgeSummaryDto.builder()
@@ -83,6 +90,7 @@ public class ReportService {
                 .mainPageBadges(mainPageBadges)
                 .build();
     }
+
 
     /**
      * 메인 페이지 5개 슬롯의 뱃지명 결정 (응원팀에 따라 동적)
