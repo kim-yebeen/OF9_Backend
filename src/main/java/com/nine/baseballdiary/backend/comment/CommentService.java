@@ -3,6 +3,7 @@ package com.nine.baseballdiary.backend.comment;
 import com.nine.baseballdiary.backend.Notifiation.NotificationService;
 import com.nine.baseballdiary.backend.record.GameRecord;
 import com.nine.baseballdiary.backend.record.GameRecordRepository;
+import com.nine.baseballdiary.backend.report.service.BadgeService;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class CommentService {
     private final UserRepository userRepo;
     private final GameRecordRepository recordRepo;
     private final NotificationService notificationService;
+    private final BadgeService badgeService;
 
     // 댓글 작성
     public CommentDto createComment(Long recordId, Long userId, CommentRequest request) {
@@ -62,6 +64,8 @@ public class CommentService {
         }
         long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
+        badgeService.checkAndAwardBadgesForUser(userId);
+        
         return convertToDtoWithCount(savedComment, userId, totalCommentCount);
     }
 
