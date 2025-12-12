@@ -65,7 +65,7 @@ public class CommentService {
         long totalCommentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
         badgeService.checkAndAwardBadgesForUser(userId);
-        
+
         return convertToDtoWithCount(savedComment, userId, totalCommentCount);
     }
 
