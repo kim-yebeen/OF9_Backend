@@ -6,8 +6,10 @@ import com.nine.baseballdiary.backend.game.Game;
 import com.nine.baseballdiary.backend.game.GameRepository;
 import com.nine.baseballdiary.backend.like.RecordLikeRepository;
 import com.nine.baseballdiary.backend.report.service.BadgeService;
+import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import com.nine.baseballdiary.backend.user.entity.User;
+import com.nine.baseballdiary.backend.user.entity.UserFollow;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -298,12 +300,18 @@ public class RecordService {
         boolean isLiked = likeRepo.existsByRecordIdAndUserId(recordId, currentUserId);
         long commentCount = commentRepo.countByRecordIdAndDeletedAtIsNull(recordId);
 
+        // ✅ 팔로우 상태 계산
+        FollowStatus followStatus = calculateFollowStatus(currentUserId, author.getId());
+        boolean isMutualFollow = calculateMutualFollow(currentUserId, author.getId());
+
         return RecordDetailResponse.builder()
                 .recordId(rec.getRecordId())
                 .userId(author.getId())
                 .nickname(author.getNickname())
                 .profileImageUrl(author.getProfileImageUrl())
                 .favTeam(author.getFavTeam())
+                .followStatus(followStatus)      // ✅ 추가
+                .isMutualFollow(isMutualFollow) // ✅ 추가
                 .gameId(game != null ? game.getGameId() : null)
                 .gameDate(fmtDate)
                 .gameTime(fmtTime)
@@ -457,7 +465,7 @@ public class RecordService {
         recordRepo.delete(record);
     }
 
-       private String calculateResult(String favTeam, Game game) {
+    private String calculateResult(String favTeam, Game game) {
         // [수정] game이 null이면 계산 불가
         if (game == null) {
             return "ETC";
@@ -584,5 +592,35 @@ public class RecordService {
                 .filter(user -> !user.getId().equals(userId))
                 .map(UserDto::from)
                 .collect(Collectors.toList());
+    }
+
+    // ✅ 팔로우 상태 계산 헬퍼 메서드
+    private FollowStatus calculateFollowStatus(Long currentUserId, Long targetUserId) {
+        if (currentUserId.equals(targetUserId)) {
+            return FollowStatus.ME;
+        }
+
+        boolean iFollow = userflRepo.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
+        boolean theyFollow = userflRepo.existsByFollower_IdAndFollowee_Id(targetUserId, currentUserId);
+
+        if (iFollow && theyFollow) {
+            return FollowStatus.MUTUAL;
+        } else if (iFollow) {
+            return FollowStatus.FOLLOWING;
+        } else {
+            return FollowStatus.NOT_FOLLOWING;
+        }
+    }
+
+    // ✅ 맞팔 여부 계산 헬퍼 메서드
+    private boolean calculateMutualFollow(Long currentUserId, Long targetUserId) {
+        if (currentUserId.equals(targetUserId)) {
+            return false;
+        }
+
+        boolean iFollow = userflRepo.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
+        boolean theyFollow = userflRepo.existsByFollower_IdAndFollowee_Id(targetUserId, currentUserId);
+
+        return iFollow && theyFollow;
     }
 }

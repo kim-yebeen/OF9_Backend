@@ -16,6 +16,7 @@ import com.nine.baseballdiary.backend.user.repository.UserBlockRepository;
 import com.nine.baseballdiary.backend.user.repository.UserFollowRepository;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -70,7 +71,8 @@ public class FeedService {
 
         LocalDate targetDate = parseDate(request.getDate());
 
-        List<GameRecord> records = recordRepo.findAllFeedRecordsWithFilters(
+        // ✅ Page 객체를 받아서 List로 변환
+        Page<GameRecord> recordsPage = recordRepo.findAllFeedRecordsWithFilters(
                 request.getUserId(),
                 followingIds,
                 teamFilter,
@@ -80,7 +82,7 @@ public class FeedService {
                 pageable
         );
 
-        return records.stream()
+        return recordsPage.getContent().stream()
                 .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
     }
@@ -114,7 +116,8 @@ public class FeedService {
 
         LocalDate targetDate = parseDate(request.getDate());
 
-        List<GameRecord> records = recordRepo.findFollowingFeedRecordsWithFilters(
+        // ✅ Page 객체를 받아서 List로 변환
+        Page<GameRecord> recordsPage = recordRepo.findFollowingFeedRecordsWithFilters(
                 followingIds,
                 request.getUserId(),
                 teamFilter,
@@ -124,7 +127,7 @@ public class FeedService {
                 pageable
         );
 
-        return records.stream()
+        return recordsPage.getContent().stream()
                 .map(record -> convertToFeedResponse(record, request.getUserId()))
                 .collect(Collectors.toList());
     }

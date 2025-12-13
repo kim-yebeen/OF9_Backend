@@ -12,7 +12,7 @@ import java.util.Set;
 
 public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
-    // ✅ 전체 피드 조회 - stadium을 LIKE로 변경
+    // ✅ 전체 피드 조회 - stadium을 LIKE로 변경, Page 반환으로 수정
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -33,7 +33,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     )
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findAllFeedRecordsWithFilters(
+    Page<GameRecord> findAllFeedRecordsWithFilters(
             @Param("currentUserId") Long currentUserId,
             @Param("followingIds") List<Long> followingIds,
             @Param("team") String team,
@@ -43,7 +43,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
             Pageable pageable
     );
 
-    // ✅ 팔로잉 피드 조회 - stadium을 LIKE로 변경
+    // ✅ 팔로잉 피드 조회 - stadium을 LIKE로 변경, Page 반환으로 수정
     @Query("""
     SELECT r FROM GameRecord r 
     JOIN Game g ON r.game.gameId = g.gameId 
@@ -59,7 +59,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
     )
     ORDER BY r.createdAt DESC
     """)
-    List<GameRecord> findFollowingFeedRecordsWithFilters(
+    Page<GameRecord> findFollowingFeedRecordsWithFilters(
             @Param("userIds") List<Long> userIds,
             @Param("currentUserId") Long currentUserId,
             @Param("team") String team,
@@ -202,6 +202,7 @@ public interface GameRecordRepository extends JpaRepository<GameRecord, Long> {
 
     @Query("SELECT gr FROM GameRecord gr JOIN FETCH gr.game WHERE gr.userId = :userId ORDER BY gr.createdAt DESC")
     List<GameRecord> findByUserIdWithDetails(@Param("userId") Long userId);
+
     @Query("SELECT gr FROM GameRecord gr " +
             "LEFT JOIN FETCH gr.game " +
             "WHERE gr.recordId = :recordId")

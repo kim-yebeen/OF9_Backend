@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.record;
 
+import com.nine.baseballdiary.backend.search.dto.FollowStatus;
 import com.nine.baseballdiary.backend.user.dto.UserDto;
 import lombok.Getter;
 import lombok.Builder;
@@ -16,6 +17,9 @@ public class RecordDetailResponse {
     private String nickname;       // 작성자 닉네임
     private String profileImageUrl; // 작성자 프로필 이미지
     private String favTeam;        // 작성자 응원팀
+
+    private FollowStatus followStatus;
+    private Boolean isMutualFollow;
 
     private Long recordId;
     private String gameId;

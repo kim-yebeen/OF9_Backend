@@ -47,35 +47,28 @@ public class ReportService {
     }
 
     public BadgeSummaryDto getBadgeSummary(Long userId) {
-        User user = userRepository.findById(userId).orElse(null);
         List<Badge> allBadges = badgeRepository.findAllByOrderByCategory();
         Set<Integer> myBadgeIds = userBadgeRepository.findAchievedBadgeIdsByUserId(userId);
 
-        // ✅ 메인 페이지 5개 슬롯에 해당하는 뱃지명 결정 (고정)
-        String favTeam = user != null ? user.getFavTeam() : null;
-        List<String> mainPageBadgeNames = getMainPageBadgeNames(favTeam);
-
-        // ✅ 획득한 뱃지만 필터링
+        // ✅ 획득한 모든 뱃지 조회
         List<UserBadge> allUserBadges = userBadgeRepository.findAllByUserId(userId);
 
-        // ✅ 5개 고정 슬롯에 해당하는 뱃지 중 획득한 것만 추출
-        List<UserBadge> mainPageUserBadges = allUserBadges.stream()
-                .filter(ub -> mainPageBadgeNames.contains(ub.getBadge().getName()))
+        // ✅ 최신순으로 정렬 (achievedAt 내림차순) 후 상위 5개만 추출
+        List<UserBadge> recentTop5Badges = allUserBadges.stream()
+                .sorted((a, b) -> {
+                    if (a.getAchievedAt() == null && b.getAchievedAt() == null) return 0;
+                    if (a.getAchievedAt() == null) return 1;  // null은 뒤로
+                    if (b.getAchievedAt() == null) return -1;
+                    return b.getAchievedAt().compareTo(a.getAchievedAt()); // 최신순
+                })
+                .limit(5)  // 최신 5개만
                 .collect(Collectors.toList());
 
-        // ✅ 최신순으로 정렬 (achievedAt 내림차순)
-        mainPageUserBadges.sort((a, b) -> {
-            if (a.getAchievedAt() == null && b.getAchievedAt() == null) return 0;
-            if (a.getAchievedAt() == null) return 1;  // null은 뒤로
-            if (b.getAchievedAt() == null) return -1;
-            return b.getAchievedAt().compareTo(a.getAchievedAt()); // 최신순
-        });
-
-        // ✅ 최신순으로 slotOrder 부여 (1, 2, 3, 4, 5)
+        // ✅ slotOrder 부여 (왼쪽부터 1, 2, 3, 4, 5)
         List<BadgeSummaryDto.MainPageBadgeDto> mainPageBadges = new ArrayList<>();
         int slotOrder = 1;
 
-        for (UserBadge userBadge : mainPageUserBadges) {
+        for (UserBadge userBadge : recentTop5Badges) {
             mainPageBadges.add(BadgeSummaryDto.MainPageBadgeDto.builder()
                     .badgeId(userBadge.getBadge().getId())
                     .badgeName(userBadge.getBadge().getName())
@@ -91,42 +84,7 @@ public class ReportService {
                 .build();
     }
 
-
-    /**
-     * 메인 페이지 5개 슬롯의 뱃지명 결정 (응원팀에 따라 동적)
-     */
-    private List<String> getMainPageBadgeNames(String favTeam) {
-        String teamConquestBadge = getTeamConquestBadgeNameByFavTeam(favTeam);
-
-        return List.of(
-                "기록의 시작",          // 슬롯 1
-                teamConquestBadge,      // 슬롯 2 (동적)
-                "응원의 보답",          // 슬롯 3
-                "홈의 따뜻함",          // 슬롯 4
-                "토닥토닥"             // 슬롯 5
-        );
-    }
-
-    /**
-     * 응원팀에 따른 팀 정복 뱃지명 반환
-     */
-    private String getTeamConquestBadgeNameByFavTeam(String favTeam) {
-        if (favTeam == null) return "베어스 정복"; // 기본값
-
-        return switch(favTeam) {
-            case "두산 베어스" -> "베어스 정복";
-            case "롯데 자이언츠" -> "갈매기 정복";
-            case "삼성 라이온즈" -> "사자 정복";
-            case "키움 히어로즈" -> "히어로 정복";
-            case "한화 이글스" -> "독수리 정복";
-            case "KIA 타이거즈" -> "호랑이 정복";
-            case "KT WIZ" -> "마법사 정복";
-            case "LG 트윈스" -> "쌍둥이 정복";
-            case "NC 다이노스" -> "공룡 정복";
-            case "SSG 랜더스" -> "랜더스 정복";
-            default -> "베어스 정복";
-        };
-    }
+    // getMainPageBadgeNames와 getTeamConquestBadgeNameByFavTeam 메서드는 더 이상 필요 없음 (삭제 가능)
 
     @Cacheable(value = "winRateSummary", key = "#userId")
     public WinRateSummaryDto getWinRateSummary(Long userId) {
@@ -197,13 +155,16 @@ public class ReportService {
                             .name(badge.getName())
                             .description(badge.getDescription())
                             .imageUrl(badge.getImageUrl())
-                            .isAchieved(true)  // 모두 true
+                            .isAchieved(true)
                             .achievedAt(userBadge != null ? userBadge.getAchievedAt() : null)
                             .build();
                 })
-                .collect(Collectors.groupingBy(dto -> findCategoryNameByBadgeName(dto.getName())));
+                .collect(Collectors.groupingBy(
+                        dto -> findCategoryNameByBadgeName(dto.getName()),
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
 
-        // ✅ 획득한 뱃지가 있는 카테고리만 포함
         List<BadgeResponseDto.BadgeCategoryDto> categories = groupedByCategory.entrySet().stream()
                 .map(entry -> BadgeResponseDto.BadgeCategoryDto.builder()
                         .name(entry.getKey())
@@ -218,87 +179,55 @@ public class ReportService {
                 .build();
     }
 
-    // ReportService 클래스 내부
+    private SeasonDdayDto getSeasonDday() {
+        LocalDate now = LocalDate.now();
+        int currentYear = now.getYear();
 
-    public SeasonDdayDto getSeasonDday() {
-        LocalDate today = LocalDate.now();
-        int currentYear = today.getYear();
+        LocalDate seasonStart = LocalDate.of(currentYear, 3, 22);
+        LocalDate seasonEnd = LocalDate.of(currentYear, 10, 4);
 
-        // 날짜 상수는 실제 서비스에서는 별도 상수 클래스나 설정 파일로 관리하는 것이 좋습니다.
-        LocalDate regularSeasonStart = LocalDate.of(currentYear, 3, 23);
-        LocalDate regularSeasonEnd = LocalDate.of(currentYear, 10, 15);
-        LocalDate postSeasonStart = LocalDate.of(currentYear, 10, 25);
-        LocalDate postSeasonEnd = LocalDate.of(currentYear, 11, 2);
-        LocalDate nextRegularSeasonStart = LocalDate.of(currentYear + 1, 3, 28);
-
-        // 1. 정규 시즌 시작 전 (D-day 타겟: 개막일)
-        if (today.isBefore(regularSeasonStart)) {
-            int daysUntilStart = (int) ChronoUnit.DAYS.between(today, regularSeasonStart);
+        if (now.isBefore(seasonStart)) {
+            long daysUntilStart = ChronoUnit.DAYS.between(now, seasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
-                    .daysRemaining(daysUntilStart)
-                    .targetDate(regularSeasonStart.toString()) // 개막일
+                    .daysRemaining((int) daysUntilStart)
+                    .targetDate(seasonStart.toString())
                     .status("BEFORE_START")
-                    .message(currentYear + " 정규시즌 시작까지")
+                    .message(currentYear + " 시즌 시작까지")
                     .build();
-
-            // 2. 정규 시즌 진행 중 (D-day 타겟: 시즌 종료일)
-        } else if (today.isBefore(regularSeasonEnd) || today.isEqual(regularSeasonEnd)) {
-            int daysUntilEnd = (int) ChronoUnit.DAYS.between(today, regularSeasonEnd);
+        } else if (now.isAfter(seasonEnd)) {
+            LocalDate nextSeasonStart = LocalDate.of(currentYear + 1, 3, 22);
+            long daysUntilNextSeason = ChronoUnit.DAYS.between(now, nextSeasonStart);
             return SeasonDdayDto.builder()
                     .seasonYear(currentYear)
-                    .daysRemaining(daysUntilEnd)
-                    .targetDate(regularSeasonEnd.toString()) // 시즌 종료일
-                    .status("IN_PROGRESS_REGULAR")
-                    .message(currentYear + " 정규 시즌 종료까지")
-                    .build();
-
-            // 3. 정규 시즌 종료 후 ~ PS 시작 전 (D-day 타겟: PS 시작일)
-        } else if (today.isBefore(postSeasonStart)) {
-            int daysUntilPSStart = (int) ChronoUnit.DAYS.between(today, postSeasonStart);
-            return SeasonDdayDto.builder()
-                    .seasonYear(currentYear)
-                    .daysRemaining(daysUntilPSStart)
-                    .targetDate(postSeasonStart.toString()) // PS 시작일
-                    .status("BEFORE_POSTSEASON")
-                    .message(currentYear + " 포스트 시즌 시작까지")
-                    .build();
-
-            // 4. PS 진행 중 (D-day 타겟: PS 종료일)
-        } else if (today.isBefore(postSeasonEnd) || today.isEqual(postSeasonEnd)) {
-            int daysUntilPSEnd = (int) ChronoUnit.DAYS.between(today, postSeasonEnd);
-            return SeasonDdayDto.builder()
-                    .seasonYear(currentYear)
-                    .daysRemaining(daysUntilPSEnd)
-                    .targetDate(postSeasonEnd.toString()) // PS 종료일
-                    .status("IN_PROGRESS_POSTSEASON")
-                    .message(currentYear + " 포스트 시즌 종료까지")
-                    .build();
-
-            // 5. 시즌 완전 종료 (D-day 타겟: 내년 개막일)
-        } else {
-            int daysUntilNextStart = (int) ChronoUnit.DAYS.between(today, nextRegularSeasonStart);
-            return SeasonDdayDto.builder()
-                    .seasonYear(currentYear + 1) // 내년 시즌으로 표기
-                    .daysRemaining(daysUntilNextStart)
-                    .targetDate(nextRegularSeasonStart.toString()) // 내년 개막일
+                    .daysRemaining((int) daysUntilNextSeason)
+                    .targetDate(nextSeasonStart.toString())
                     .status("ENDED")
-                    .message((currentYear + 1) + " 정규시즌 시작까지")
+                    .message((currentYear + 1) + " 시즌 시작까지")
+                    .build();
+        } else {
+            long daysRemaining = ChronoUnit.DAYS.between(now, seasonEnd);
+            return SeasonDdayDto.builder()
+                    .seasonYear(currentYear)
+                    .daysRemaining((int) daysRemaining)
+                    .targetDate(seasonEnd.toString())
+                    .status("IN_PROGRESS")
+                    .message(currentYear + " 시즌 종료까지")
                     .build();
         }
     }
 
-    public CompanionStatsDto getBestCompanion(Long userId) {
-        List<GameRecord> records = gameRecordRepository.findByUserId(userId);
+    private CompanionStatsDto getBestCompanion(Long userId) {
+        List<GameRecord> myRecords = gameRecordRepository.findByUserId(userId);
 
-        Map<Long, Long> companionCounts = records.stream()
-                .filter(r -> r.getCompanions() != null && !r.getCompanions().isEmpty())
+        List<Long> companionIds = myRecords.stream()
                 .flatMap(r -> r.getCompanions().stream())
-                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
+                .collect(Collectors.toList());
 
-        if (companionCounts.isEmpty()) {
-            return null;
-        }
+        if (companionIds.isEmpty()) return null;
+
+        Map<Long, Long> companionCounts = companionIds.stream()
+                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
 
         Map.Entry<Long, Long> topEntry = companionCounts.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
