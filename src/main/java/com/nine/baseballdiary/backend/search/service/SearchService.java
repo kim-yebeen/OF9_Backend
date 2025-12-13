@@ -108,7 +108,10 @@ public class SearchService {
                     Boolean isLiked = likeRepository.existsByRecordIdAndUserId(record.getRecordId(), userId);
                     Long commentCount = commentRepository.countByRecordIdAndDeletedAtIsNull(record.getRecordId());
 
-                    return SearchRecordDto.from(record, game, author, likeCount, isLiked, commentCount);
+                    // ✅ followStatus 계산 추가
+                    FollowStatus followStatus = calculateFollowStatus(userId, author.getId());
+
+                    return SearchRecordDto.from(record, game, author, likeCount, isLiked, commentCount, followStatus);
                 })
                 .collect(Collectors.toList());
 
@@ -223,6 +226,29 @@ public class SearchService {
 
     // 팔로우 상태 확인
     private FollowStatus getFollowStatus(Long currentUserId, Long targetUserId) {
+        // 이미 팔로우 중인지 확인
+        boolean isFollowing = userFollowRepository.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
+        if (isFollowing) {
+            return FollowStatus.FOLLOWING;
+        }
+
+        // 팔로우 요청 대기 중인지 확인
+        boolean isPending = followRequestRepository.existsByRequester_IdAndTarget_IdAndStatus(
+                currentUserId, targetUserId, FollowRequestStatus.PENDING);
+        if (isPending) {
+            return FollowStatus.REQUESTED;
+        }
+
+        return FollowStatus.NOT_FOLLOWING;
+    }
+
+    // ✅ 본인 체크를 포함한 팔로우 상태 확인 (검색 결과용)
+    private FollowStatus calculateFollowStatus(Long currentUserId, Long targetUserId) {
+        // 본인인 경우
+        if (currentUserId.equals(targetUserId)) {
+            return FollowStatus.ME;
+        }
+
         // 이미 팔로우 중인지 확인
         boolean isFollowing = userFollowRepository.existsByFollower_IdAndFollowee_Id(currentUserId, targetUserId);
         if (isFollowing) {

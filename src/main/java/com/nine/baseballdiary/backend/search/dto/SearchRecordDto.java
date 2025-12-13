@@ -21,6 +21,7 @@ public class SearchRecordDto {
     private String authorNickname;
     private String authorProfileImage;
     private String authorFavTeam;
+    private FollowStatus followStatus;  // ✅ 추가
     private String gameDate;
     private String gameTime;
     private String homeTeam;
@@ -35,18 +36,20 @@ public class SearchRecordDto {
     private String result;
     private List<String> mediaUrls;
     private String createdAt;
-    private Long likeCount;        // 좋아요 개수
-    private Boolean isLiked;       // 현재 사용자가 좋아요 했는지
-    private Long commentCount;     // 댓글 개수
+    private Long likeCount;
+    private Boolean isLiked;
+    private Long commentCount;
 
     public static SearchRecordDto from(GameRecord record, Game game, User author,
-                                       Long likeCount, Boolean isLiked, Long commentCount) {
+                                       Long likeCount, Boolean isLiked, Long commentCount,
+                                       FollowStatus followStatus) {  // ✅ 파라미터 추가
         return SearchRecordDto.builder()
                 .recordId(record.getRecordId())
                 .authorId(author.getId())
                 .authorNickname(author.getNickname() != null ? author.getNickname() : "알 수 없음")
-                .authorProfileImage(author.getProfileImageUrl()) // 프로필 이미지는 null일 수 있음
+                .authorProfileImage(author.getProfileImageUrl())
                 .authorFavTeam(author.getFavTeam() != null ? author.getFavTeam() : "")
+                .followStatus(followStatus)  // ✅ 추가
                 .gameDate(game.getDate().format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 (E)요일", Locale.KOREAN)))
                 .gameTime(game.getTime() != null ? game.getTime().format(DateTimeFormatter.ofPattern("H:mm")) : "")
                 .homeTeam(convertTeamName(game.getHomeTeam()))
@@ -67,7 +70,6 @@ public class SearchRecordDto {
                 .build();
     }
 
-    // ✅ 서비스에 있던 헬퍼 메서드들을 DTO로 이동 (추가)
     private static String convertTeamName(String teamCode) {
         return switch (teamCode) {
             case "KIA" -> "KIA 타이거즈";
