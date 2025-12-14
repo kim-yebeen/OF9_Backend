@@ -14,7 +14,7 @@ jobs:
       - name: Create Firebase Key File
         run: |
             mkdir -p ./src/main/resources
-            echo '${{ secrets.FIREBASE_KEY }}' > ./src/main/resources/firebase-service-account.json
+            echo '${{ secrets.FIREBASE_KEY }}' > ./src/main/resources/dodada-app-firebase-adminsdk-fbsvc-cb22424dd2.json
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2

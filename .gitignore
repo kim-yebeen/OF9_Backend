@@ -42,4 +42,4 @@ application-db.properties
 application-jwt.properties
 
 ### Firebase Secret Key ###
-src/main/resources/swof9-firebase.json
+src/main/resources/dodada-app-firebase-adminsdk-fbsvc-cb22424dd2.json

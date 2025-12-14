@@ -14,7 +14,7 @@ import java.io.IOException;
 public class FcmConfig {
     @Bean
     FirebaseMessaging firebaseMessaging() throws IOException {
-        ClassPathResource resource = new ClassPathResource("firebase-service-account.json");
+        ClassPathResource resource = new ClassPathResource("dodada-app-firebase-adminsdk-fbsvc-cb22424dd2.json");
 
         // 파일이 없을 경우 예외 처리나 로그를 추가하는 것이 좋습니다.
         GoogleCredentials credentials = GoogleCredentials.fromStream(resource.getInputStream());
