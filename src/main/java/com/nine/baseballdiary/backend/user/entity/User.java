@@ -46,7 +46,15 @@ public class User {
     }
 
 
+    @Column(name = "fcm_token")
+    private String fcmToken;
 
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
+    }
+    public String getFcmToken() {
+        return this.fcmToken;
+    }
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

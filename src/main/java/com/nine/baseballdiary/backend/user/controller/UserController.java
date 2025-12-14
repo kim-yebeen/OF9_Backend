@@ -178,4 +178,12 @@ public class UserController {
 
         return ResponseEntity.ok(ApiResponse.success("차단된 사용자 목록을 조회했습니다", blockedUsers));
     }
+
+    @PostMapping("/fcm-token")
+    public ResponseEntity<ApiResponse<Void>> updateFcmToken(@RequestBody Map<String, String> request) {
+        String token = request.get("fcmToken");
+        Long currentUserId = getCurrentUserId();
+        userService.updateFcmToken(currentUserId, token);
+        return ResponseEntity.ok(ApiResponse.success("FCM 토큰이 저장되었습니다."));
+    }
 }

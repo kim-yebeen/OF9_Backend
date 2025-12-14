@@ -463,4 +463,11 @@ public class UserService {
         return userBlockRepo.existsByBlocker_IdAndBlocked_Id(userId1, userId2) ||
                 userBlockRepo.existsByBlocker_IdAndBlocked_Id(userId2, userId1);
     }
+
+    @Transactional
+    public void updateFcmToken(Long userId, String token) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        user.updateFcmToken(token);
+    }
 }

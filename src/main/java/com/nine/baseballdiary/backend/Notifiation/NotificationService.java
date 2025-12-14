@@ -22,7 +22,8 @@ public class NotificationService {
     private final NotificationRepository notificationRepo;
     private final UserRepository userRepo;
     private final UserFollowRepository userFollowRepo;
-    private final GameRecordRepository recordRepo;
+   // private final GameRecordRepository recordRepo;
+    private final FcmService fcmService;
 
     // 1. 좋아요 알림 생성
     public void createLikeNotification(Long recordOwnerId, Long likerId, Long recordId) {
@@ -41,6 +42,15 @@ public class NotificationService {
                 .build();
 
         notificationRepo.save(notification);
+
+        User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
+        fcmService.sendNotification(
+                recordOwner.getFcmToken(),
+                "받은 공감",
+                liker.getNickname() + "님이 나의 직관기록에 좋아요를 남겼어요.",
+                "LIKE",
+                String.valueOf(recordId)
+        );
     }
 
     // 2. 댓글 알림 생성
@@ -60,7 +70,14 @@ public class NotificationService {
                 .isRead(false)
                 .build();
 
-        notificationRepo.save(notification);
+        User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
+        fcmService.sendNotification(
+                recordOwner.getFcmToken(),
+                "댓글",
+                commenter.getNickname() + "님이 나의 직관기록에 댓글을 남겼어요.",
+                "COMMENT",
+                String.valueOf(recordId)
+        );
     }
 
     // 3. 답글 알림 생성
@@ -81,6 +98,15 @@ public class NotificationService {
                 .build();
 
         notificationRepo.save(notification);
+
+        User parentOwner = userRepo.findById(parentCommentOwnerId).orElseThrow();
+        fcmService.sendNotification(
+                parentOwner.getFcmToken(),
+                "답글",
+                replier.getNickname() + "님이 나의 댓글에 답글을 남겼어요.",
+                "REPLY",
+                String.valueOf(recordId)
+        );
     }
 
     // 4. 팔로우 알림
@@ -97,6 +123,15 @@ public class NotificationService {
                 .build();
 
         notificationRepo.save(notification);
+
+        User followee = userRepo.findById(followeeId).orElseThrow();
+        fcmService.sendNotification(
+                followee.getFcmToken(),
+                "팔로우",
+                follower.getNickname() + "님이 나를 팔로우 했어요.",
+                "FOLLOW",
+                String.valueOf(followerId)
+        );
     }
 
     // 5. 팔로우 요청 알림
@@ -113,20 +148,32 @@ public class NotificationService {
                 .build();
 
         notificationRepo.save(notification);
+
+        User target = userRepo.findById(targetId).orElseThrow();
+        fcmService.sendNotification(
+                target.getFcmToken(),
+                "팔로우 요청",
+                requester.getNickname() + "님이 팔로우를 요청했어요.",
+                "FOLLOW_REQUEST",
+                String.valueOf(requesterId)
+        );
     }
 
+    // 6. 새 게시글 알림
     // 6. 새 게시글 알림
     public void createNewRecordNotification(Long recordOwnerId, Long recordId) {
         User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
 
-        List<Long> followerIds = userFollowRepo.findByFollowee_Id(recordOwnerId)
+        // [수정 1] ID만 가져오지 말고, User 객체 리스트를 가져오도록 수정
+        List<User> followers = userFollowRepo.findByFollowee_Id(recordOwnerId)
                 .stream()
-                .map(uf -> uf.getFollower().getId())
+                .map(uf -> uf.getFollower()) // User 객체 추출
                 .collect(Collectors.toList());
 
-        List<Notification> notifications = followerIds.stream()
-                .map(followerId -> Notification.builder()
-                        .userId(followerId)
+        // [수정 2] 위에서 만든 followers 리스트를 사용해서 알림 엔티티 생성
+        List<Notification> notifications = followers.stream()
+                .map(follower -> Notification.builder()
+                        .userId(follower.getId()) // User 객체에서 ID 꺼내기
                         .type(NotificationType.NEW_RECORD)
                         .title("친구의 직관기록")
                         .content("님이 직관 기록을 업로드했어요.")
@@ -137,8 +184,18 @@ public class NotificationService {
                 .collect(Collectors.toList());
 
         notificationRepo.saveAll(notifications);
-    }
 
+        // [수정 3] 이제 followers 변수가 존재하므로 에러가 사라집니다
+        for (User follower : followers) {
+            fcmService.sendNotification(
+                    follower.getFcmToken(),
+                    "친구의 직관기록",
+                    recordOwner.getNickname() + "님이 직관 기록을 업로드했어요.",
+                    "NEW_RECORD",
+                    String.valueOf(recordId)
+            );
+        }
+    }
     // 7. 시스템 소식 생성
     public void createSystemNotification(String title, String content) {
         List<User> allUsers = userRepo.findAll();

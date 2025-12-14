@@ -40,3 +40,6 @@ out/
 ### .properties file ###
 application-db.properties
 application-jwt.properties
+
+### Firebase Secret Key ###
+src/main/resources/swof9-firebase.json
