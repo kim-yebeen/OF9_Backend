@@ -1,18 +1,22 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>야구 직관 일기 - DODADA</title>
 
+    <meta property="og:image" th:content="${imageUrl} ?: 'https://of9-bucket.s3.ap-northeast-2.amazonaws.com/dodada-logo.png'" />
+    <meta name="twitter:image" th:content="${imageUrl} ?: 'https://of9-bucket.s3.ap-northeast-2.amazonaws.com/dodada-logo.png'" />
+
     <meta property="og:title" content="야구 직관 일기 DODADA">
     <meta property="og:description" content="친구의 직관 기록을 앱에서 확인해보세요!">
-    <meta property="og:image" content="https://dodada.site/images/logo.png"> <style>
-    body { text-align: center; padding: 50px; font-family: 'Noto Sans KR', sans-serif; }
-    .btn { display: inline-block; padding: 15px 30px; margin: 10px; color: white; text-decoration: none; border-radius: 10px; font-size: 18px; }
-    .android { background-color: #3DDC84; }
-    .ios { background-color: #000000; }
-</style>
+
+    <style>
+        body { text-align: center; padding: 50px; font-family: 'Noto Sans KR', sans-serif; }
+        .btn { display: inline-block; padding: 15px 30px; margin: 10px; color: white; text-decoration: none; border-radius: 10px; font-size: 18px; }
+        .android { background-color: #3DDC84; }
+        .ios { background-color: #000000; }
+    </style>
 </head>
 <body>
 <h1>⚾ 야구 직관 일기</h1>
