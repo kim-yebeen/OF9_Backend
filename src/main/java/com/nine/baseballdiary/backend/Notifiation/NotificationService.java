@@ -70,6 +70,8 @@ public class NotificationService {
                 .isRead(false)
                 .build();
 
+        notificationRepo.save(notification);
+
         User recordOwner = userRepo.findById(recordOwnerId).orElseThrow();
         fcmService.sendNotification(
                 recordOwner.getFcmToken(),
