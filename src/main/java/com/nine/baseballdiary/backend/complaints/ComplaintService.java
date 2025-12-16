@@ -81,6 +81,6 @@ public class ComplaintService {
 
     @Transactional(readOnly = true)
     public long getComplaintCountByRecordId(Long recordId) {
-        return complaintRepo.countByReportedRecordId(recordId);
+        return complaintRepo.countByReportedRecordRecordId(recordId);  // ✅ 수정
     }
 }
