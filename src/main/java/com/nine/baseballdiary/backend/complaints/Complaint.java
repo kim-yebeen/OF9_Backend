@@ -5,6 +5,7 @@ import com.nine.baseballdiary.backend.record.GameRecord;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,21 +20,25 @@ public class Complaint {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reporter_id", nullable = false)
-    private User reporter;  // 신고한 사람
+    private User reporter;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reported_user_id")
-    private User reportedUser;  // 신고된 사용자
+    private User reportedUser;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "reported_record_id")
-    private GameRecord reportedRecord;  // 신고된 게시글
+    private GameRecord reportedRecord;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "report_date", nullable = false)  // ✅ 추가
+    private LocalDate reportDate;  // ✅ 추가
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
+        this.reportDate = LocalDate.now();  // ✅ 추가
     }
 }

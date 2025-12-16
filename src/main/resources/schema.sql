@@ -245,15 +245,17 @@ CREATE TABLE IF NOT EXISTS player (
     );
 
 -- 신고 테이블
+-- 신고 테이블
 CREATE TABLE IF NOT EXISTS complaints (
                                           id SERIAL PRIMARY KEY,
-                                          reporter_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- 신고한 사람
-    reported_user_id INT REFERENCES users(id) ON DELETE SET NULL,  -- 신고된 사용자
-    reported_record_id INT REFERENCES record(record_id) ON DELETE SET NULL,  -- 신고된 게시글
+                                          reporter_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reported_user_id INT REFERENCES users(id) ON DELETE SET NULL,
+    reported_record_id INT REFERENCES record(record_id) ON DELETE SET NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
+    report_date DATE NOT NULL DEFAULT CURRENT_DATE,  -- ✅ 날짜 컬럼 추가
 
-    -- 같은 사람이 같은 대상을 하루에 한 번만 신고 가능
-    CONSTRAINT unique_complaint_per_day UNIQUE(reporter_id, reported_user_id, reported_record_id, DATE(created_at))
+-- 같은 날 중복 신고 방지
+    CONSTRAINT unique_complaint_per_day UNIQUE(reporter_id, reported_user_id, reported_record_id, report_date)
     );
 
 -- 인덱스
@@ -261,7 +263,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_reporter_id ON complaints(reporter_id)
 CREATE INDEX IF NOT EXISTS idx_complaints_reported_user_id ON complaints(reported_user_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_reported_record_id ON complaints(reported_record_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON complaints(created_at);
-
+CREATE INDEX IF NOT EXISTS idx_complaints_report_date ON complaints(report_date);
 
 
 -- 인덱스
