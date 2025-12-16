@@ -45,6 +45,17 @@ public class User {
         this.updatedAt = now;
     }
 
+    @Column(name = "push_enabled", nullable = false)
+    @Builder.Default
+    private Boolean pushEnabled = true;  // 기본값 true (알림 받기)
+
+    public void updatePushEnabled(Boolean pushEnabled) {
+        this.pushEnabled = pushEnabled;
+    }
+
+    public Boolean getPushEnabled() {
+        return this.pushEnabled;
+    }
 
     @Column(name = "fcm_token")
     private String fcmToken;

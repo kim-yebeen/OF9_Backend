@@ -341,8 +341,18 @@ public class UserService {
         return new UserProfileDto(
                 u.getId(), u.getNickname(), u.getProfileImageUrl(),
                 u.getFavTeam(), u.getIsPrivate(),
-                followerCnt, followingCnt, recordCnt
+                followerCnt, followingCnt, recordCnt, u.getPushEnabled()
         );
+    }
+
+    // updatePushEnabled 메서드 추가
+    @Transactional
+    public void updatePushEnabled(Long userId, Boolean pushEnabled) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다"));
+
+        user.updatePushEnabled(pushEnabled);
+        userRepo.save(user);
     }
 
     @Transactional

@@ -15,4 +15,5 @@ public class UserProfileDto {
     private Long   followerCount;
     private Long   followingCount;
     private Long   recordCount;
+    private Boolean pushEnabled;
 }

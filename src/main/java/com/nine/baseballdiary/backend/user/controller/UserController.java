@@ -186,4 +186,20 @@ public class UserController {
         userService.updateFcmToken(currentUserId, token);
         return ResponseEntity.ok(ApiResponse.success("FCM 토큰이 저장되었습니다."));
     }
+
+    @PatchMapping("/push-notification")
+    public ResponseEntity<ApiResponse<Void>> updatePushNotification(
+            @RequestBody Map<String, Boolean> request) {
+
+        Long userId = getCurrentUserId();
+        Boolean pushEnabled = request.get("pushEnabled");
+
+        if (pushEnabled == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pushEnabled 값이 필요합니다");
+        }
+
+        userService.updatePushEnabled(userId, pushEnabled);
+
+        return ResponseEntity.ok(ApiResponse.success("푸시 알림 설정이 변경되었습니다"));
+    }
 }
