@@ -1,5 +1,6 @@
 package com.nine.baseballdiary.backend.user.repository;
 
+import com.nine.baseballdiary.backend.user.entity.SocialType;
 import com.nine.baseballdiary.backend.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,8 +13,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByKakaoId(Long kakaoId);
-    // ✅ 아래 메서드를 추가해주세요.
+    //Optional<User> findByKakaoId(Long kakaoId);
+    Optional<User> findBySocialIdAndSocialType(String socialId, SocialType socialType);
+
     boolean existsByKakaoId(Long kakaoId);
 
     boolean existsByNickname(String nickname);

@@ -2,6 +2,7 @@ package com.nine.baseballdiary.backend.user.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 
 import java.time.LocalDateTime;
 
@@ -14,8 +15,14 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false, unique=true)
-    private Long kakaoId;
+    //@Column(nullable=false, unique=true)
+    //private Long kakaoId;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private SocialType socialType;
+    @Column(nullable = false)
+    private String socialId;
 
     @Column(nullable=false, unique=true, length=50)
     private String nickname;
@@ -71,3 +78,4 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 }
+

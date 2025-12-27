@@ -1,10 +1,12 @@
 package com.nine.baseballdiary.backend.auth.controller;
 
+import com.nine.baseballdiary.backend.auth.dto.request.AppleLoginRequestDto;
 import com.nine.baseballdiary.backend.auth.dto.request.KakaoCheckRequestDto;
 import com.nine.baseballdiary.backend.auth.dto.request.KakaoLoginRequestDto;
 import com.nine.baseballdiary.backend.auth.dto.request.RefreshTokenRequest;
 import com.nine.baseballdiary.backend.auth.dto.response.AuthResponse;
 import com.nine.baseballdiary.backend.auth.security.JwtProvider;
+import com.nine.baseballdiary.backend.auth.service.AppleService;
 import com.nine.baseballdiary.backend.auth.service.KakaoService;
 import com.nine.baseballdiary.backend.auth.service.RefreshTokenService;
 import com.nine.baseballdiary.backend.common.response.ApiResponse;
@@ -30,6 +32,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private final AppleService appleService;
     private final KakaoService kakaoService;
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
@@ -40,7 +43,28 @@ public class AuthController {
 
     @Value("${kakao.web.redirect-uri}")
     private String kakaoWebRedirectUri;
+    @PostMapping("/apple/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> appleLogin(@RequestBody AppleLoginRequestDto request) {
+        try {
+            User user = appleService.processAppleLogin(
+                    request.getIdentityToken(),
+                    request.getUser(),
+                    request.getFavTeam()
+            );
 
+            String userId = user.getId().toString();
+            String accessToken = jwtProvider.createAccessToken(userId);
+            String refreshToken = jwtProvider.createRefreshToken(userId);
+            refreshTokenService.saveRefreshToken(userId, refreshToken);
+
+            AuthResponse authResponse = new AuthResponse(accessToken, refreshToken);
+            return ResponseEntity.ok(ApiResponse.success("애플 로그인 성공", authResponse));
+        } catch (Exception e) {
+            log.error("애플 로그인 오류", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("LOGIN_ERROR", "애플 로그인 실패"));
+        }
+    }
     @PostMapping("/kakao/check")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> checkExistingUser(@RequestBody KakaoCheckRequestDto request) {
         try {

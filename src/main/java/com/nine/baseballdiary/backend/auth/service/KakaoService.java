@@ -2,6 +2,7 @@ package com.nine.baseballdiary.backend.auth.service;
 
 import com.nine.baseballdiary.backend.S3.S3Service;
 import com.nine.baseballdiary.backend.auth.client.KakaoClient;
+import com.nine.baseballdiary.backend.user.entity.SocialType;
 import com.nine.baseballdiary.backend.user.entity.User;
 import com.nine.baseballdiary.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -61,22 +62,25 @@ public class KakaoService {
         return getOrCreateUser(kakaoUserInfo, favTeam);
     }
 
-    //카카오 유저 정보 바탕으로 유저 조회 및 생성
     private User getOrCreateUser(Map<String, Object> kakaoUserInfo, String favTeam) {
-        Long kakaoId = Long.valueOf(kakaoUserInfo.get("id").toString());
-        Optional<User> existingUser = userRepository.findByKakaoId(kakaoId);
+        // Long kakaoId = ... (삭제)
+        // socialId는 String으로 저장해야 함
+        String socialId = kakaoUserInfo.get("id").toString();
+
+        // 조회 메서드 변경
+        Optional<User> existingUser = userRepository.findBySocialIdAndSocialType(socialId, SocialType.KAKAO);
 
         if (existingUser.isPresent()) {
             return existingUser.get();
         }
 
-
         String finalNickname = generateUniqueRandomNickname();
 
+        // 빌더 패턴 수정
         User newUser = User.builder()
-                .kakaoId(kakaoId)
+                .socialId(socialId)          // kakaoId -> socialId
+                .socialType(SocialType.KAKAO) // socialType 추가
                 .nickname(finalNickname)
-                .profileImageUrl(null)
                 .favTeam(favTeam)
                 .isPrivate(false)
                 .build();
